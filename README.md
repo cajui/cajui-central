@@ -1,48 +1,49 @@
 # Cajuí Central
 
-Servidor local de monitoramento: recebe medições de sensores por API HTTP, guarda
-em SQLite e mostra numa interface web incorporada. Independente do hardware dos
-sensores. Bootstrap em desenvolvimento; ainda não controla atuadores nem recebe
-dados por MQTT.
+Local monitoring server: receives sensor readings over an HTTP API, stores them in
+SQLite and shows them in an embedded web interface. Independent of the sensor
+hardware. Bootstrap under development; it does not control actuators or receive
+data over MQTT yet.
 
-## Executar
+## Running
 
-### Com Docker (não exige Go)
+### With Docker (no Go required)
 
-Requisitos: Docker com Compose v2.
+Requirements: Docker with Compose v2.
 
 ```sh
-cp .env.example .env     # preencha CAJUI_API_TOKEN com: openssl rand -hex 32
+cp .env.example .env     # set CAJUI_API_TOKEN with: openssl rand -hex 32
 docker compose up --build
 ```
 
-Abra http://127.0.0.1:8080. O banco fica no volume Docker `cajui-data`, que sobrevive
-a reinícios e a reconstruções da imagem; `docker compose down -v` o apaga. Ctrl+C
-encerra; `docker compose up -d` deixa em segundo plano e o serviço volta junto com o
-Docker. `CAJUI_PORT` no `.env` muda a porta do host (padrão 8080).
+Open http://127.0.0.1:8080. The database lives in the Docker volume `cajui-data`,
+which survives restarts and image rebuilds; `docker compose down -v` deletes it.
+Ctrl+C stops the stack; `docker compose up -d` runs it in the background and the
+service comes back with Docker. `CAJUI_PORT` in `.env` changes the host port
+(default 8080).
 
-O Compose lê `.env` para preencher as variáveis; o executável em si não lê `.env`.
-Dentro do contêiner o processo escuta em `0.0.0.0` com `CAJUI_ALLOW_NON_LOOPBACK=1`,
-mas a porta é publicada apenas em `127.0.0.1` do host. Não publique em `0.0.0.0`.
+Compose reads `.env` to fill in variables; the executable itself does not read `.env`.
+Inside the container the process listens on `0.0.0.0` with `CAJUI_ALLOW_NON_LOOPBACK=1`,
+but the port is published on the host's `127.0.0.1` only. Never publish on `0.0.0.0`.
 
-### Com Go local
+### With a local Go toolchain
 
-Requisitos: Go 1.27+, Make; toolchain C para `go test -race`.
+Requirements: Go 1.27+, Make; a C toolchain for `go test -race`.
 
 ```sh
 export CAJUI_API_TOKEN="$(openssl rand -hex 32)"
 make run
 ```
 
-Abra http://127.0.0.1:8080. Banco criado em `data/cajui.db`.
-Variáveis: CAJUI_ADDR (padrão 127.0.0.1:8080, apenas IP loopback), CAJUI_DB
-(caminho do arquivo), CAJUI_API_TOKEN (mínimo 24 caracteres; usar segredo aleatório),
-CAJUI_ALLOW_NON_LOOPBACK (somente `1`, previsto para contêineres; ver Segurança).
-Preserve o token no terminal de teste.
+Open http://127.0.0.1:8080. The database is created at `data/cajui.db`.
+Variables: CAJUI_ADDR (default 127.0.0.1:8080, loopback IPs only), CAJUI_DB (file
+path), CAJUI_API_TOKEN (at least 24 characters; use a random secret),
+CAJUI_ALLOW_NON_LOOPBACK (only `1`, meant for containers; see Security).
+Keep the token in the test terminal.
 
-### Enviar uma medição simulada
+### Sending a simulated reading
 
-Em outro terminal, exporte o mesmo token e envie:
+In another terminal, export the same token and send:
 
 ```sh
 curl --fail-with-body http://127.0.0.1:8080/api/v1/readings \
@@ -51,37 +52,36 @@ curl --fail-with-body http://127.0.0.1:8080/api/v1/readings \
   --data '{"node_id":"demo-node","sensor_id":"ambient","session_id":"boot-1","sequence":1,"metric":"temperature","value":26.7,"unit":"degC"}'
 ```
 
-Atualize a página. Repetir o exemplo não duplica a medição; mude sequence para
-uma nova amostra. Os dados permanecem no SQLite após encerrar o servidor.
+Refresh the page. Repeating the example does not duplicate the reading; change
+sequence for a new sample. Data stays in SQLite after the server stops.
 
-## Qualidade e estrutura
+## Quality and layout
 
 ```sh
-make check          # formatação, vet, testes com race e cobertura >= 80%
+make check          # formatting, vet, race tests and coverage >= 80%
 make build          # bin/cajui
-make docker-check   # o mesmo make check dentro de golang:1.27, sem Go local
-make docker-build   # imagem cajui:local
-# após os testes:
+make docker-check   # the same make check inside golang:1.27, no local Go
+make docker-build   # cajui:local image
+# after the tests:
 go tool cover -html=coverage.out
 ```
 
-- cmd/cajui: inicialização e encerramento.
-- internal/telemetry: contrato e validação.
-- internal/storage: SQLite e evolução de schema.
-- internal/httpapi: API e interface incorporada ao executável.
-- internal/config: configuração validada.
-- Dockerfile e compose.yaml: imagem estática sem root e execução local.
-- .github/workflows: CI preparada para GitHub (ainda não executada remotamente).
+- cmd/cajui: startup and shutdown.
+- internal/telemetry: contract and validation.
+- internal/storage: SQLite and schema evolution.
+- internal/httpapi: API and the interface embedded in the binary.
+- internal/config: validated configuration.
+- Dockerfile and compose.yaml: static non-root image and local execution.
+- .github/workflows: GitHub CI.
 
-[Contrato da API](docs/api.md) · [Arquitetura](docs/architecture.md) ·
-[Estado atual](docs/estado-atual.md) · [Contribuir](CONTRIBUTING.md) · [Segurança](SECURITY.md).
+[API contract](docs/api.md) · [Architecture](docs/architecture.md) ·
+[Status](docs/status.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md).
 
-## Escopo e publicação
+## Scope and publication
 
-Próxima etapa: ingestão por MQTT, com medições reais e estados de falha e
-comunicação. Cadastro, alertas, automações e autenticação de usuários ainda não
-implementados.
+Next step: MQTT ingestion with real readings and failure/communication states.
+Device registry, alerts, automations and user authentication are not implemented yet.
 
-Licenciado sob [Apache-2.0](LICENSE).
-Repositório: https://github.com/romulostorel/cajui-central. Canal privado de segurança
-ainda a definir (ver SECURITY.md). Módulo Go: `github.com/romulostorel/cajui-central`.
+Licensed under [Apache-2.0](LICENSE).
+Repository: https://github.com/romulostorel/cajui-central. Private security channel
+still to be defined (see SECURITY.md). Go module: `github.com/romulostorel/cajui-central`.

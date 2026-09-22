@@ -1,19 +1,19 @@
-# Contribuir
+# Contributing
 
-Consulte README.md para executar. Use Go na versão indicada em go.mod, ou
-`make docker-check` para rodar as mesmas verificações em contêiner, sem Go local.
-Antes de propor alterações, rode `make check` e `make build`.
+See README.md to run the project. Use the Go version declared in go.mod, or
+`make docker-check` to run the same checks in a container without a local Go.
+Run `make check` and `make build` before proposing changes.
 
-Mantenha PRs focados: problema, comportamento esperado e evidência de validação.
-Mudanças de comportamento devem incluir testes relevantes. Testes de persistência
-usam SQLite real em diretório temporário; testes HTTP usam httptest.
-A CI exige formatação, go vet, detector de corridas, cobertura total mínima de 80%
-e construção da imagem Docker.
-Esse limite é inicial: revisar cenários e efeitos colaterais continua obrigatório.
+Keep pull requests focused: problem, expected behaviour and validation evidence.
+Behaviour changes must include relevant tests. Persistence tests use a real SQLite
+database in a temporary directory; HTTP tests use httptest.
+CI requires formatting, go vet, the race detector, a minimum total coverage of 80%
+and a successful Docker image build.
+That threshold is a starting point: reviewing scenarios and side effects remains mandatory.
 
-Não envie bancos pessoais, credenciais ou logs de dispositivos reais. Exemplos
-precisam identificar dados simulados. Interfaces públicas e mudanças de schema
-exigem documentação e compatibilidade planejada.
+Do not submit personal databases, credentials or logs from real devices. Examples
+must be identified as simulated data. Public interfaces and schema changes require
+documentation and a compatibility plan.
 
-Código sob Apache-2.0. Contribuições devem ser compatíveis com essa licença.
-Repositório: https://github.com/romulostorel/cajui-central. Issues e PRs pelo GitHub.
+Code is under Apache-2.0. Contributions must be compatible with that license.
+Repository: https://github.com/romulostorel/cajui-central. Issues and pull requests on GitHub.

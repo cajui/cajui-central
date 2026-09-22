@@ -1,39 +1,40 @@
-# Arquitetura inicial
+# Initial architecture
 
-Decisão de implementação de 2026-09-22: Go, SQLite e interface HTML incorporada.
-Mosquitto/MQTT permanece integração seguinte; não é dependência do bootstrap.
+Implementation decision of 2026-09-22: Go, SQLite and an embedded HTML interface.
+Mosquitto/MQTT remains the next integration; it is not a dependency of the bootstrap.
 
-Fluxo: adaptador HTTP → contrato telemetry → storage SQLite.
-O contrato de Repository fica junto ao consumidor HTTP, sem framework/ORM.
-Go é candidato à distribuição multiplataforma; este bootstrap não promete suporte
-Windows. Driver SQLite modernc é Go sem cgo; o detector de corridas pode exigir C.
+Flow: HTTP adapter → telemetry contract → SQLite storage.
+The Repository contract lives next to its HTTP consumer, without framework or ORM.
+Go is a candidate for multi-platform distribution; this bootstrap does not promise
+Windows support. The modernc SQLite driver is cgo-free Go; the race detector may need
+a C toolchain.
 
-Medição identifica nó, sensor, sessão, sequência e métrica. Reinício do nó deve
-mudar a sessão, não sua identidade. Retentativas idênticas não duplicam amostras;
-mesma identidade com conteúdo diferente retorna conflito. Recebimento é registrado
-pelo servidor e preservado nas retentativas; horário medido é opcional e não inferido.
-Erro de sensor/ausência de leitura não é zero: não enviar uma medição inválida.
-Contrato de status, unidades padronizadas e versão MQTT serão definidos na integração.
+A reading identifies node, sensor, session, sequence and metric. A node restart must
+change the session, not its identity. Identical retries do not duplicate samples;
+the same identity with different content returns a conflict. Receipt is recorded by
+the server and preserved across retries; the measured time is optional and never inferred.
+A sensor error or a missing reading is not zero: do not send an invalid reading.
+Status contract, standard units and the MQTT version will be defined during that integration.
 
-Schema inicial versionado por PRAGMA user_version, criado em transação. Schema
-mais novo é rejeitado para evitar execução de binário antigo sobre banco incompatível.
-SQLite usa WAL, uma conexão e timeout de bloqueio. Sem retenção automática nesta fase;
-consultas limitadas às últimas 100 amostras. Não copiar apenas o .db durante escrita:
-backup consistente e restauração serão implementados antes de operação contínua.
+The initial schema is versioned through PRAGMA user_version and created in a transaction.
+A newer schema is rejected so an old binary never runs on an incompatible database.
+SQLite uses WAL, a single connection and a busy timeout. No automatic retention in this
+phase; queries are limited to the last 100 samples. Do not copy only the .db while writes
+happen: consistent backup and restore will be implemented before continuous operation.
 
-Interface de demonstração local, sem atualização automática nem indicador online.
-Não há acoplamento a protocolo de transporte específico; a ponte futura fará tradução e autenticação.
-Antes de rede local multiusuário: login, credenciais por central, TLS quando aplicável,
-limites de ingestão, autorização e política de retenção/backup.
+Local demonstration interface, without auto-refresh or an online indicator.
+No coupling to a specific transport protocol; a future bridge will translate and authenticate.
+Before a multi-user local network: login, per-hub credentials, TLS where applicable,
+ingestion limits, authorization and a retention/backup policy.
 
-Execução por contêiner (2026-09-22, para dispensar Go local):
-imagem em dois estágios, compilação estática sem cgo em `golang:1.27` e execução em
-`distroless/static` como usuário não root, com dados em volume nomeado montado em
-`/data`. O processo precisa escutar na interface do contêiner, por isso existe
-`CAJUI_ALLOW_NON_LOOPBACK=1`; a garantia de loopback passa para o `compose.yaml`,
-que publica a porta somente em `127.0.0.1` do host. Alternativa descartada: rede de
-host do Docker, que preservaria o loopback do processo mas não funciona de forma
-uniforme no Docker Desktop. Sem healthcheck na imagem: não há shell nem curl.
+Container execution (2026-09-22, to avoid a local Go toolchain): two-stage image,
+static cgo-free build on `golang:1.27` and execution on `distroless/static` as a
+non-root user, with data in a named volume mounted at `/data`. The process must listen
+on the container interface, hence `CAJUI_ALLOW_NON_LOOPBACK=1`; the loopback guarantee
+moves to `compose.yaml`, which publishes the port on the host's `127.0.0.1` only.
+Rejected alternative: Docker host networking, which would keep the process on loopback
+but does not behave uniformly on Docker Desktop. No health check in the image: there is
+no shell or curl.
 
-Referências: https://go.dev/doc/ ; https://pkg.go.dev/modernc.org/sqlite ;
+References: https://go.dev/doc/ ; https://pkg.go.dev/modernc.org/sqlite ;
 https://www.sqlite.org/wal.html

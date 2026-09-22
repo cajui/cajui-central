@@ -1,15 +1,17 @@
-# Segurança
+# Security
 
-Bootstrap para desenvolvimento local. O executável aceita somente loopback, salvo
-com `CAJUI_ALLOW_NON_LOOPBACK=1`, previsto para contêineres: nesse caso a restrição
-passa para a publicação da porta, que o `compose.yaml` faz apenas em `127.0.0.1` do
-host. Não publique em `0.0.0.0` nem use a variável fora de contêiner.
-Dashboard e healthcheck são públicos na máquina; a API exige Bearer token.
-Não exponha via proxy/túnel: ainda não há login, TLS, papéis ou política de sessão.
+Bootstrap for local development. The executable binds loopback only, except with
+`CAJUI_ALLOW_NON_LOOPBACK=1`, which exists for containers: there the restriction moves
+to port publication, which `compose.yaml` does on the host's `127.0.0.1` only. Never
+publish on `0.0.0.0` and never use that variable outside a container.
+The dashboard and the health check are open to anyone on the machine; the API requires
+a Bearer token. Do not expose it through a proxy or tunnel: there is no login, TLS,
+roles or session policy yet.
 
-Tokens devem ser gerados aleatoriamente e enviados por variável de ambiente.
-Não compartilhe o token em issues, logs ou capturas. Canal privado de relatos e
-política de versões suportadas ainda não definidos no GitHub. Por enquanto,
-reportar diretamente ao responsável pelo projeto, sem divulgar detalhes sensíveis.
+Tokens must be generated randomly and passed through environment variables.
+Never share the token in issues, logs or screenshots. A private reporting channel and a
+supported-versions policy are not defined on GitHub yet. For now, report directly to
+the project maintainer without disclosing sensitive details.
 
-Atualizações de dependências são propostas pelo Dependabot no GitHub. CI não substitui revisão de segurança nem auditoria das dependências.
+Dependency updates are proposed by Dependabot on GitHub. CI does not replace security
+review or dependency auditing.

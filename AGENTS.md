@@ -1,14 +1,15 @@
-# Desenvolvimento do Cajuí Central
+# Development of Cajuí Central
 
-Servidor local de monitoramento: recebe medições por API HTTP, guarda em SQLite e
-mostra numa interface web incorporada. Leia README.md e docs/ antes de alterar.
+Local monitoring server: receives readings over an HTTP API, stores them in SQLite
+and shows them in an embedded web interface. Read README.md and docs/ before changing anything.
 
-- Nome público: Cajuí Central. Identificadores internos (módulo, pacotes, banco,
-  variáveis CAJUI_*) permanecem `cajui`; só interface e documentação usam o nome público.
-- Separe regras de domínio, transporte e persistência. Evite abstrações sem uso.
-- Documente contratos e alterações de schema. Preserve medições e migrações existentes.
-- Não registre tokens, não coloque credenciais no Git e não exponha a interface sem autenticação.
-- Teste comportamento, falhas e persistência; cobertura não substitui revisão.
-- Execute make check e make build (ou make docker-check) antes de entregar mudanças de código.
-- Atualize docs/estado-atual.md com evidência e limitações; distinga dados de exemplo de medições reais.
-- Documentação e mensagens de commit descrevem apenas este repositório.
+- Public name: Cajuí Central. Internal identifiers (module, packages, database,
+  CAJUI_* variables) stay `cajui`; only the interface and documentation use the public name.
+- Keep domain rules, transport and persistence separate. No unused abstractions.
+- Document contracts and schema changes. Preserve existing readings and migrations.
+- Never log tokens, never commit credentials, never expose the interface without authentication.
+- Test behaviour, failures and persistence; coverage does not replace review.
+- Run make check and make build (or make docker-check) before delivering code changes.
+- Update docs/status.md with evidence and limitations; keep example data distinct from real readings.
+- Documentation and commit messages describe this repository only.
+- Everything in this repository is written in English.
