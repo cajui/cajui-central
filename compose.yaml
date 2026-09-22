@@ -1,0 +1,15 @@
+# Runs the application without a local Go toolchain.
+# Host exposure stays on 127.0.0.1; never publish the port on 0.0.0.0 (no login yet).
+services:
+  cajui:
+    build: .
+    image: cajui:local
+    ports:
+      - "127.0.0.1:${CAJUI_PORT:-8080}:8080"
+    environment:
+      CAJUI_API_TOKEN: ${CAJUI_API_TOKEN:?set CAJUI_API_TOKEN with at least 24 random characters}
+    volumes:
+      - cajui-data:/data
+    restart: unless-stopped
+volumes:
+  cajui-data:

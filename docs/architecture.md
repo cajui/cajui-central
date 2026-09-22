@@ -27,5 +27,14 @@ Não há acoplamento ao protocolo LoRa; a ponte futura fará tradução e autent
 Antes de rede local multiusuário: login, credenciais por central, TLS quando aplicável,
 limites de ingestão, autorização e política de retenção/backup.
 
+Execução por contêiner (2026-09-22, pedido do proprietário para não instalar Go):
+imagem em dois estágios, compilação estática sem cgo em `golang:1.27` e execução em
+`distroless/static` como usuário não root, com dados em volume nomeado montado em
+`/data`. O processo precisa escutar na interface do contêiner, por isso existe
+`CAJUI_ALLOW_NON_LOOPBACK=1`; a garantia de loopback passa para o `compose.yaml`,
+que publica a porta somente em `127.0.0.1` do host. Alternativa descartada: rede de
+host do Docker, que preservaria o loopback do processo mas não funciona de forma
+uniforme no Docker Desktop. Sem healthcheck na imagem: não há shell nem curl.
+
 Referências: https://go.dev/doc/ ; https://pkg.go.dev/modernc.org/sqlite ;
 https://www.sqlite.org/wal.html

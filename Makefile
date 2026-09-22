@@ -1,4 +1,4 @@
- .PHONY: run build test check fmt
+ .PHONY: run build test check fmt docker-build docker-check
 run:
 	go run ./cmd/cajui
 build:
@@ -13,3 +13,8 @@ check:
 	@go tool cover -func=coverage.out | awk '/^total:/ {if ($$3+0 < 80) {print "Cobertura mínima: 80%"; exit 1}}'
 fmt:
 	gofmt -w cmd internal
+docker-build:
+	docker build -t cajui:local .
+# Same checks as `make check`, inside the Go image; caches live in named volumes.
+docker-check:
+	docker run --rm -v "$(CURDIR)":/src -w /src -v cajui-go-mod:/go/pkg/mod -v cajui-go-build:/root/.cache/go-build golang:1.27 make check
