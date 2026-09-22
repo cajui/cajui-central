@@ -9,7 +9,7 @@ and shows them in an embedded web interface. Read README.md and docs/ before cha
 - Document contracts and schema changes. Preserve existing readings and migrations.
 - Never log tokens, never commit credentials, never expose the interface without authentication.
 - Test behaviour, failures and persistence; coverage does not replace review.
-- Run make check and make build (or make docker-check) before delivering code changes.
+- Run `make check` and `make build` (or `make docker-check`) before submitting changes.
 - Update docs/status.md with evidence and limitations; keep example data distinct from real readings.
 - Documentation and commit messages describe this repository only.
 - Everything in this repository is written in English.

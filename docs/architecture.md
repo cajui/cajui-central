@@ -1,13 +1,12 @@
 # Initial architecture
 
 Implementation decision of 2026-09-22: Go, SQLite and an embedded HTML interface.
-Mosquitto/MQTT remains the next integration; it is not a dependency of the bootstrap.
+Mosquitto/MQTT remains the next integration; it is not a dependency of this version.
 
 Flow: HTTP adapter → telemetry contract → SQLite storage.
 The Repository contract lives next to its HTTP consumer, without framework or ORM.
-Go is a candidate for multi-platform distribution; this bootstrap does not promise
-Windows support. The modernc SQLite driver is cgo-free Go; the race detector may need
-a C toolchain.
+Go allows multi-platform distribution; Windows is not supported yet. The modernc
+SQLite driver is cgo-free Go; the race detector may need a C toolchain.
 
 A reading identifies node, sensor, session, sequence and metric. A node restart must
 change the session, not its identity. Identical retries do not duplicate samples;

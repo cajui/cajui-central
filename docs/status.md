@@ -1,8 +1,7 @@
 # Status — Cajuí Central
 
-Updated 2026-09-22. Bootstrap implemented; independent of the hardware. Docker
-execution added the same day; a local Go toolchain is no longer required. Repository
-published and documentation written in English.
+Updated 2026-09-22. First version implemented, hardware-agnostic; Docker execution
+added the same day.
 
 ## Delivered
 
@@ -11,7 +10,7 @@ HTML interface, transactional schema migration, validation and idempotent ingest
 API token, server restricted to loopback, payload limits and timeouts, shutdown through
 context/signals. Apache-2.0 license. Public repository at
 https://github.com/romulostorel/cajui-central; public name **Cajuí Central**
-(2026-09-22). Go module with the real address.
+(2026-09-22).
 
 Docker: two-stage `Dockerfile` (build on `golang:1.27`, runtime on non-root
 `distroless/static`, static cgo-free binary), `compose.yaml` with the named volume
@@ -40,7 +39,7 @@ that builds the image; Dependabot tracks base images and actions.
   remotely for the first time on 2026-09-22: both jobs passed on the Dependabot pull
   requests.
 
-Original validation environment: macOS arm64, official Go 1.27.1, no global installation.
+Validated on macOS arm64 with Go 1.27.1.
 
 ## Limits
 
@@ -56,5 +55,4 @@ manual and only with the service stopped (WAL).
 Define the MQTT/device status contract and implement an ingestion adapter reusing
 telemetry/storage, with tests for reconnection, repeated messages and failures. Then
 validate a real sample from a device in the history and the interface.
-Publication: module and remote defined; still pending: enable the private security
-channel on GitHub.
+Pending: enable private vulnerability reporting on GitHub.
