@@ -10,6 +10,8 @@ import (
 type Config struct{ Address, Database, Token string }
 
 // Load deliberately restricts this unauthenticated dashboard to loopback.
+// CAJUI_ALLOW_NON_LOOPBACK=1 exists for containers only: the process has to bind
+// the container interface, and the host-side port publication keeps loopback.
 func Load(getenv func(string) string) (Config, error) {
 	c := Config{Address: getenv("CAJUI_ADDR"), Database: getenv("CAJUI_DB"), Token: getenv("CAJUI_API_TOKEN")}
 	if c.Address == "" {
@@ -23,8 +25,8 @@ func Load(getenv func(string) string) (Config, error) {
 		return c, errors.New("invalid CAJUI_ADDR")
 	}
 	ip, err := netip.ParseAddr(host)
-	if err != nil || !ip.IsLoopback() {
-		return c, errors.New("CAJUI_ADDR must use a loopback IP")
+	if err != nil || (!ip.IsLoopback() && getenv("CAJUI_ALLOW_NON_LOOPBACK") != "1") {
+		return c, errors.New("CAJUI_ADDR must use a loopback IP unless CAJUI_ALLOW_NON_LOOPBACK=1")
 	}
 	n, err := strconv.Atoi(port)
 	if err != nil || n < 1 || n > 65535 {
