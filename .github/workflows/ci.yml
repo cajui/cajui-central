@@ -15,7 +15,7 @@ jobs:
       - run: go mod verify
       - run: make check
       - run: make build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage.out
