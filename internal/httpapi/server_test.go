@@ -42,7 +42,7 @@ func request(h http.Handler, method, path, body, auth, content string) *httptest
 }
 func TestIngestionAndDashboard(t *testing.T) {
 	h := testHandler(t)
-	if w := request(h, "GET", "/", "", "", ""); w.Code != 200 || !strings.Contains(w.Body.String(), "Nenhuma medição") {
+	if w := request(h, "GET", "/", "", "", ""); w.Code != 200 || !strings.Contains(w.Body.String(), "No readings") {
 		t.Fatal(w.Code, w.Body)
 	}
 	for _, status := range []int{201, 200} {
