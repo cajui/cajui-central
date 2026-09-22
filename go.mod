@@ -1,4 +1,4 @@
-module cajui.local/server
+module github.com/romulostorel/cajui-central
 
 go 1.27.0
 

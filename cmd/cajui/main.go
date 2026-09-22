@@ -1,12 +1,12 @@
 package main
 
 import (
-	"cajui.local/server/internal/config"
-	"cajui.local/server/internal/httpapi"
-	"cajui.local/server/internal/storage"
 	"context"
 	"errors"
 	"fmt"
+	"github.com/romulostorel/cajui-central/internal/config"
+	"github.com/romulostorel/cajui-central/internal/httpapi"
+	"github.com/romulostorel/cajui-central/internal/storage"
 	"log/slog"
 	"net/http"
 	"os"

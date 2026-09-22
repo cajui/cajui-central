@@ -1,11 +1,11 @@
 package httpapi
 
 import (
-	"cajui.local/server/internal/storage"
-	"cajui.local/server/internal/telemetry"
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/romulostorel/cajui-central/internal/storage"
+	"github.com/romulostorel/cajui-central/internal/telemetry"
 	"io"
 	"log/slog"
 	"net/http"
