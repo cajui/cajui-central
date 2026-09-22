@@ -1,6 +1,9 @@
 # Desenvolvimento do Cajuí
 
-Aplicação independente do firmware e CAD em ../../projetos/prototipo-lora.
+Aplicação independente do firmware e do CAD do projeto Cajuí, mantidos fora deste repositório.
+Notas de projeto do proprietário também ficam fora; não copiá-las para cá.
+Nome público: **Cajuí Central**. Identificadores internos (módulo, pacotes, banco,
+variáveis CAJUI_*) permanecem `cajui`; só interface e documentação usam o nome público.
 Leia README.md e docs/estado-atual.md antes de alterar o projeto.
 
 - Separe regras de domínio, transporte e persistência. Evite abstrações sem uso.

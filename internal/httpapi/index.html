@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cajuí · Monitoramento</title>
+<title>Cajuí Central</title>
 <style>body{font:16px system-ui,sans-serif;margin:40px auto;padding:0 24px;max-width:1100px;background:#faf9f5;color:#24382f}h1{font-size:36px}p{line-height:1.6}table{border-collapse:collapse;width:100%;background:white}th,td{padding:12px;text-align:left;border-bottom:1px solid #ddd}small{color:#55665c}.scroll{overflow:auto}</style>
-<header><small>CAJUÍ · DESENVOLVIMENTO LOCAL</small><h1>Medições recebidas</h1><p>Últimas 100 medições, em ordem de chegada. Atualize a página para consultar novos dados.</p></header>
+<header><small>CAJUÍ CENTRAL · DESENVOLVIMENTO LOCAL</small><h1>Medições recebidas</h1><p>Últimas 100 medições, em ordem de chegada. Atualize a página para consultar novos dados.</p></header>
 {{if .}}<div class="scroll"><table><thead><tr><th>Transmissor / sensor</th><th>Métrica</th><th>Valor</th><th>Recebido (UTC)</th></tr></thead><tbody>{{range .}}<tr><td>{{.NodeID}} / {{.SensorID}}</td><td>{{.Metric}}</td><td>{{.Value}} {{.Unit}}</td><td>{{.ReceivedAt.Format "2006-01-02 15:04:05"}}</td></tr>{{end}}</tbody></table></div>{{else}}<p>Nenhuma medição recebida. Envie o exemplo da documentação para experimentar a aplicação.</p>{{end}}
 <footer><p><small>Histórico de recebimento; não indica que o sensor está online. Integração com rádio e automações ainda não implementadas.</small></p></footer></html>

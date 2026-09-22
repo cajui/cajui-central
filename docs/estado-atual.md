@@ -9,7 +9,9 @@ Go 1.27, SQLite modernc v1.59.0 com dependências fixadas/go.sum, API HTTP v1,
 interface HTML incorporada, migração transacional de schema, validação e ingestão
 idempotente. Token para API, servidor restrito a loopback, limites de payload e
 timeouts, encerramento com contexto/sinais. Licença Apache-2.0 escolhida pelo proprietário.
-Git local independente em software/cajui; ainda sem remoto/publicação.
+Git independente em software/cajui, remoto público em
+https://github.com/romulostorel/cajui-central; nome público **Cajuí Central**
+(decisão do proprietário, 2026-09-22). Módulo Go com o endereço real.
 
 Docker: `Dockerfile` em dois estágios (build em `golang:1.27`, execução em
 `distroless/static` não root, binário estático sem cgo), `compose.yaml` com volume
@@ -57,4 +59,5 @@ e só com o serviço parado (WAL).
 Definir contrato MQTT/status da central e implementar adaptador de ingestão
 reutilizando telemetry/storage, com testes de reconexão, mensagens repetidas e
 falhas. Depois validar uma amostra física da receptora no histórico e na interface.
-Antes de publicação: URL real do módulo, canal privado de segurança e repositório remoto.
+Publicação: módulo e remoto definidos; falta habilitar o canal privado de segurança no
+GitHub e confirmar a primeira execução da CI remota.
