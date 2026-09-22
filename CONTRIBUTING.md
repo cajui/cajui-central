@@ -16,4 +16,4 @@ precisam identificar dados simulados. Interfaces públicas e mudanças de schema
 exigem documentação e compatibilidade planejada.
 
 Código sob Apache-2.0. Contribuições devem ser compatíveis com essa licença.
-Repositório ainda local; canal público de contribuição será definido ao publicar.
+Repositório: https://github.com/romulostorel/cajui-central. Issues e PRs pelo GitHub.

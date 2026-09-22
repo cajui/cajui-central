@@ -1,7 +1,9 @@
-# Cajuí
+# Cajuí Central
 
-Plataforma local de monitoramento, independente do hardware dos sensores.
-Bootstrap em desenvolvimento; ainda não controla atuadores nem recebe dados por MQTT.
+Servidor local de monitoramento: recebe medições de sensores por API HTTP, guarda
+em SQLite e mostra numa interface web incorporada. Independente do hardware dos
+sensores. Bootstrap em desenvolvimento; ainda não controla atuadores nem recebe
+dados por MQTT.
 
 ## Executar
 
@@ -81,5 +83,5 @@ comunicação. Cadastro, alertas, automações e autenticação de usuários ain
 implementados.
 
 Licenciado sob [Apache-2.0](LICENSE).
-Repositório ainda local; definir URL pública e canal de segurança antes de publicar.
-`cajui.local/server` é caminho de módulo provisório, substituível pelo endereço real.
+Repositório: https://github.com/romulostorel/cajui-central. Canal privado de segurança
+ainda a definir (ver SECURITY.md). Módulo Go: `github.com/romulostorel/cajui-central`.
