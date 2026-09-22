@@ -1,9 +1,9 @@
 package storage
 
 import (
-	"cajui.local/server/internal/telemetry"
 	"context"
 	"errors"
+	"github.com/romulostorel/cajui-central/internal/telemetry"
 	"path/filepath"
 	"sync"
 	"testing"
