@@ -1,0 +1,9 @@
+/data/
+/bin/
+/coverage.out
+/coverage.html
+.env
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
