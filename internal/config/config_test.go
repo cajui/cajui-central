@@ -23,6 +23,20 @@ func TestLoad(t *testing.T) {
 	if c, err = Load(get); err != nil || c.Database != "example.db" {
 		t.Fatal(c, err)
 	}
+	values["CAJUI_ADDR"] = "0.0.0.0:8080"
+	values["CAJUI_ALLOW_NON_LOOPBACK"] = "true"
+	if _, err = Load(get); err == nil {
+		t.Fatal("accepted non-loopback without the exact opt-in value")
+	}
+	values["CAJUI_ALLOW_NON_LOOPBACK"] = "1"
+	values["CAJUI_ADDR"] = "localhost:8080"
+	if _, err = Load(get); err == nil {
+		t.Fatal("accepted hostname with opt-in")
+	}
+	values["CAJUI_ADDR"] = "0.0.0.0:8080"
+	if c, err = Load(get); err != nil || c.Address != "0.0.0.0:8080" {
+		t.Fatal(c, err)
+	}
 	values["CAJUI_API_TOKEN"] = "short"
 	if _, err = Load(get); err == nil {
 		t.Fatal("accepted short token")
