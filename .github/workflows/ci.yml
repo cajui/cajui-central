@@ -19,3 +19,8 @@ jobs:
         with:
           name: coverage
           path: coverage.out
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t cajui:ci .
