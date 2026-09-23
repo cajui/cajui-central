@@ -1,0 +1,34 @@
+# Merge into configuration.yaml after configuring the MQTT integration.
+# Demonstration data, not actual sensor measurements. No Central dependency.
+mqtt:
+  sensor:
+    - name: "Demo temperature"
+      unique_id: "demo-source_demo-device_ambient_temperature"
+      state_topic: "telemetry/v1/demo-source/demo-device/samples"
+      availability_topic: "telemetry/v1/demo-source/demo-device/samples"
+      qos: 1
+      device_class: temperature
+      state_class: measurement
+      unit_of_measurement: "°C"
+      expire_after: 900
+      value_template: >-
+        {% set readings = value_json.readings | selectattr('sensor_id', 'equalto', 'ambient') | selectattr('metric', 'equalto', 'temperature') | list %}
+        {{ readings[0].value if readings and readings[0].status == 'ok' else 'None' }}
+      availability_template: >-
+        {% set readings = value_json.readings | selectattr('sensor_id', 'equalto', 'ambient') | selectattr('metric', 'equalto', 'temperature') | list %}
+        {{ 'online' if value_json.version == 1 and readings and readings[0].status == 'ok' else 'offline' }}
+    - name: "Demo humidity"
+      unique_id: "demo-source_demo-device_ambient_humidity"
+      state_topic: "telemetry/v1/demo-source/demo-device/samples"
+      availability_topic: "telemetry/v1/demo-source/demo-device/samples"
+      qos: 1
+      device_class: humidity
+      state_class: measurement
+      unit_of_measurement: "%"
+      expire_after: 900
+      value_template: >-
+        {% set readings = value_json.readings | selectattr('sensor_id', 'equalto', 'ambient') | selectattr('metric', 'equalto', 'humidity') | list %}
+        {{ readings[0].value if readings and readings[0].status == 'ok' else 'None' }}
+      availability_template: >-
+        {% set readings = value_json.readings | selectattr('sensor_id', 'equalto', 'ambient') | selectattr('metric', 'equalto', 'humidity') | list %}
+        {{ 'online' if value_json.version == 1 and readings and readings[0].status == 'ok' else 'offline' }}

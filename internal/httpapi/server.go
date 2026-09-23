@@ -22,6 +22,8 @@ type Repository interface {
 	Insert(context.Context, telemetry.Reading, time.Time) (bool, error)
 	Recent(context.Context, int) ([]telemetry.Reading, error)
 	Ping(context.Context) error
+	RecentSamples(context.Context, int) ([]telemetry.StoredSample, error)
+	Devices(context.Context, time.Time) ([]telemetry.Device, error)
 }
 
 //go:embed index.html
@@ -46,6 +48,8 @@ func New(repo Repository, token string, logger *slog.Logger) (http.Handler, erro
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("GET /{$}", s.index)
 	mux.Handle("GET /api/v1/readings", s.authorize(http.HandlerFunc(s.list)))
+	mux.Handle("GET /api/v1/samples", s.authorize(http.HandlerFunc(s.samples)))
+	mux.Handle("GET /api/v1/devices", s.authorize(http.HandlerFunc(s.devices)))
 	mux.Handle("POST /api/v1/readings", s.authorize(http.HandlerFunc(s.ingest)))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -98,7 +102,21 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err = dashboard.Execute(w, readings); err != nil {
+	samples, err := s.repo.RecentSamples(r.Context(), 100)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	devices, err := s.repo.Devices(r.Context(), time.Now())
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	if err = dashboard.Execute(w, struct {
+		Readings []telemetry.Reading
+		Samples  []telemetry.StoredSample
+		Devices  []telemetry.Device
+	}{readings, samples, devices}); err != nil {
 		s.logger.Error("render dashboard", "error", err)
 	}
 }
@@ -156,4 +174,23 @@ func (s *server) ingest(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		_, _ = io.WriteString(w, `{"status":"duplicate"}`)
 	}
+}
+
+func (s *server) samples(w http.ResponseWriter, r *http.Request) {
+	samples, err := s.repo.RecentSamples(r.Context(), 100)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(samples)
+}
+func (s *server) devices(w http.ResponseWriter, r *http.Request) {
+	devices, err := s.repo.Devices(r.Context(), time.Now())
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(devices)
 }

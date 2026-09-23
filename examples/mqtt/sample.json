@@ -1,0 +1,1 @@
+{"version":1,"source_id":"demo-source","device_id":"demo-device","sample_id":"demo-session.1","expected_interval_seconds":300,"readings":[{"sensor_id":"ambient","metric":"temperature","value":26.7,"unit":"degC","status":"ok"},{"sensor_id":"ambient","metric":"humidity","value":61.2,"unit":"%","status":"ok"}]}

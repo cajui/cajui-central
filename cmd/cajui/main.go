@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/cajui/cajui-central/internal/config"
-	"github.com/cajui/cajui-central/internal/httpapi"
-	"github.com/cajui/cajui-central/internal/storage"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,6 +11,11 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/cajui/cajui-central/internal/config"
+	"github.com/cajui/cajui-central/internal/httpapi"
+	"github.com/cajui/cajui-central/internal/mqttingest"
+	"github.com/cajui/cajui-central/internal/storage"
 )
 
 func main() {
@@ -37,6 +39,13 @@ func run(ctx context.Context) error {
 		return err
 	}
 	defer db.Close()
+	if c.MQTT.URL != "" {
+		consumer := mqttingest.New(c.MQTT, db, slog.Default())
+		mqttContext, stop := context.WithCancel(ctx)
+		done := make(chan struct{})
+		go func() { defer close(done); consumer.Run(mqttContext) }()
+		defer func() { stop(); <-done }()
+	}
 	handler, err := httpapi.New(db, c.Token, slog.Default())
 	if err != nil {
 		return err

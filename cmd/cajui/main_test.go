@@ -33,6 +33,19 @@ func TestStartupConfigurationErrors(t *testing.T) {
 }
 
 func TestServerLifecycle(t *testing.T) {
+	for _, mode := range []string{"http", "mqtt-unavailable"} {
+		t.Run(mode, func(t *testing.T) {
+			if mode == "mqtt-unavailable" {
+				t.Setenv("CAJUI_MQTT_URL", "tcp://127.0.0.1:1")
+				t.Setenv("CAJUI_MQTT_ALLOW_PLAINTEXT", "1")
+				t.Setenv("CAJUI_MQTT_USERNAME", "test")
+				t.Setenv("CAJUI_MQTT_PASSWORD", "test-password")
+			}
+			testServerLifecycle(t)
+		})
+	}
+}
+func testServerLifecycle(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)

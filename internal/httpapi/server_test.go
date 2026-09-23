@@ -135,3 +135,58 @@ func TestStorageFailure(t *testing.T) {
 		t.Fatal(w.Code)
 	}
 }
+
+func (brokenRepo) RecentSamples(context.Context, int) ([]telemetry.StoredSample, error) {
+	return nil, errors.New("database failure")
+}
+func (brokenRepo) Devices(context.Context, time.Time) ([]telemetry.Device, error) {
+	return nil, errors.New("database failure")
+}
+
+func TestMQTTSampleRoutesAndDashboard(t *testing.T) {
+	db, err := storage.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	value := 21.5
+	sample := telemetry.Sample{Version: 1, SourceID: "source", DeviceID: "device", SampleID: "one", ExpectedIntervalSeconds: 1, Readings: []telemetry.Measurement{{SensorID: "ambient", Metric: "temperature", Value: &value, Unit: "degC", Status: "ok"}}}
+	if _, err = db.InsertSample(context.Background(), sample, time.Now().Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	h, err := New(db, token, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/api/v1/samples", "/api/v1/devices"} {
+		req := httptest.NewRequest("GET", path, nil)
+		out := httptest.NewRecorder()
+		h.ServeHTTP(out, req)
+		if out.Code != 401 {
+			t.Fatal(out.Code)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		out = httptest.NewRecorder()
+		h.ServeHTTP(out, req)
+		if out.Code != 200 || !strings.Contains(out.Body.String(), "device") {
+			t.Fatal(out.Code, out.Body.String())
+		}
+	}
+	out := httptest.NewRecorder()
+	h.ServeHTTP(out, httptest.NewRequest("GET", "/", nil))
+	for _, want := range []string{"No recent samples", "21.5", "source"} {
+		if !strings.Contains(out.Body.String(), want) {
+			t.Fatal(out.Body.String())
+		}
+	}
+	broken, _ := New(brokenRepo{}, token, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	for _, path := range []string{"/api/v1/samples", "/api/v1/devices"} {
+		req := httptest.NewRequest("GET", path, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		out = httptest.NewRecorder()
+		broken.ServeHTTP(out, req)
+		if out.Code != 500 {
+			t.Fatal(out.Code)
+		}
+	}
+}

@@ -1,0 +1,6 @@
+user central
+topic read telemetry/v1/+/+/samples
+user homeassistant
+topic read telemetry/v1/+/+/samples
+user demo-source
+topic write telemetry/v1/demo-source/+/samples

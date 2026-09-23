@@ -7,3 +7,8 @@
 *.db-shm
 *.db-wal
 .DS_Store
+
+.local-mqtt/
+
+.venv/
+__pycache__/

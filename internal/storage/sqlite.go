@@ -42,7 +42,7 @@ func (s *Store) migrate() error {
 	if err = tx.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return err
 	}
-	if version > 1 {
+	if version > 2 {
 		return fmt.Errorf("unsupported schema version %d", version)
 	}
 	if version == 0 {
@@ -52,6 +52,17 @@ func (s *Store) migrate() error {
    payload TEXT NOT NULL,
    UNIQUE(node_id,sensor_id,session_id,sequence,metric));
    PRAGMA user_version=1;`)
+		if err != nil {
+			return err
+		}
+	}
+	if version < 2 {
+		_, err = tx.Exec(`CREATE TABLE samples (
+          id INTEGER PRIMARY KEY, source_id TEXT NOT NULL, device_id TEXT NOT NULL,
+          sample_id TEXT NOT NULL, payload TEXT NOT NULL, received_at TEXT NOT NULL,
+          UNIQUE(source_id,device_id,sample_id));
+          CREATE INDEX samples_device ON samples(source_id,device_id,id);
+          PRAGMA user_version=2;`)
 		if err != nil {
 			return err
 		}

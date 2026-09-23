@@ -15,6 +15,7 @@ jobs:
       - run: go mod verify
       - run: make check
       - run: make build
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
       - uses: actions/upload-artifact@v4
         with:
           name: coverage
@@ -24,3 +25,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t cajui:ci .
+
+  mqtt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sh scripts/test_mqtt.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mqtt-coverage
+          path: coverage.out
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r tests/requirements.txt
+      - run: python -m unittest discover -s tests -v

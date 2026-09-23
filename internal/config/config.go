@@ -5,9 +5,14 @@ import (
 	"net"
 	"net/netip"
 	"strconv"
+
+	"github.com/cajui/cajui-central/internal/mqttingest"
 )
 
-type Config struct{ Address, Database, Token string }
+type Config struct {
+	Address, Database, Token string
+	MQTT                     mqttingest.Config
+}
 
 // Load deliberately restricts this unauthenticated dashboard to loopback.
 // CAJUI_ALLOW_NON_LOOPBACK=1 exists for containers only: the process has to bind
@@ -32,8 +37,13 @@ func Load(getenv func(string) string) (Config, error) {
 	if err != nil || n < 1 || n > 65535 {
 		return c, errors.New("invalid port")
 	}
+	c.Token, err = secret(getenv, "CAJUI_API_TOKEN")
+	if err != nil {
+		return c, err
+	}
 	if len(c.Token) < 24 {
 		return c, errors.New("CAJUI_API_TOKEN must contain at least 24 characters")
 	}
-	return c, nil
+	c.MQTT, err = loadMQTT(getenv)
+	return c, err
 }

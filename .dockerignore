@@ -8,3 +8,9 @@ coverage.html
 *.db-shm
 *.db-wal
 .env
+
+.en
+.local-mqtt
+
+.venv
+**/__pycache__
