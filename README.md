@@ -101,8 +101,8 @@ no multi-metric transaction and no end-to-end delivery guarantee.
 
 ## Roadmap
 
-Next: MQTT ingestion with real readings and failure/communication states. Not yet
-implemented: device registry, alerts, automations, user authentication.
+Next: TLS for producers on the local network. Not yet implemented: device registry,
+alerts beyond silence detection, automations, user authentication.
 
 ## License
 
@@ -214,6 +214,31 @@ The dashboard shows both MQTT samples and the existing HTTP readings separately.
 | `CAJUI_MQTT_ALLOW_PLAINTEXT` | Set `1` only for trusted local development. |
 | `CAJUI_API_TOKEN_FILE` | File alternative to `CAJUI_API_TOKEN`; mutually exclusive. |
 
+### Producers on the local network
+
+Each device or gateway that publishes samples gets its own broker user. The user name
+is its `source_id`, and the generated ACL lets it write only under
+`telemetry/v1/<source_id>/`. Names use 1–64 characters from `[A-Za-z0-9._-]`, starting
+with a letter or digit.
+
+```sh
+python3 scripts/init_mqtt.py --producer receiver-1   # password in .local-mqtt/producers/
+CAJUI_MQTT_LAN_ADDR=192.168.1.20 \
+  docker compose -f compose.mqtt.yaml -f compose.lan.yaml up --build -d
+```
+
+`compose.lan.yaml` additionally publishes the broker on one IPv4 address of this host
+(port `CAJUI_MQTT_LAN_PORT`, default 1883); the dashboard stays on loopback. Use the
+address the producer can reach, and update it if DHCP assigns a new one. Recreate the
+broker after adding a producer, since credentials are generated at startup:
+`docker compose -f compose.mqtt.yaml -f compose.lan.yaml up -d --force-recreate broker-init broker`.
+Removing a file from `.local-mqtt/producers/` and recreating the broker revokes it.
+
+This listener is plain MQTT: credentials and samples cross the network unencrypted.
+Use it only on a trusted network until TLS is configured. Because MQTT 3.1.1 acknowledges
+ACL-denied publications, a producer publishing with a mismatched `source_id` gets
+PUBACK while the broker drops the sample; the integration test checks the ACL with MQTT 5.
+
 ### Home Assistant, without Central
 
 Use the same broker and its read-only `homeassistant` account. Configure the
@@ -245,7 +270,9 @@ python3 -m venv .venv
 The integration script starts an isolated real broker and removes only its own
 containers/volumes on exit. It tests publishing, deduplication, invalid input,
 connection loss/resubscription, subscriber restart, retained snapshot rejection,
-and an ACL-denied publication. Unit tests cover persistence/reopen, migration,
+an ACL-denied publication, and a producer credential that may publish only in its own
+namespace. It creates a temporary `integration-producer` credential and removes it
+unless one already existed. Unit tests cover persistence/reopen, migration,
 silence/recovery, validation, and shutdown while the broker is unavailable.
 Python tests evaluate the Home Assistant example templates; they do not run a full
 Home Assistant installation. Both suites run in CI. There is no application-level
