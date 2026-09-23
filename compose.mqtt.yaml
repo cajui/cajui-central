@@ -6,6 +6,7 @@ services:
     entrypoint: [sh, /init-auth.sh]
     volumes:
       - ./examples/mqtt/init-auth.sh:/init-auth.sh:ro
+      - ./examples/mqtt/acl:/acl-base:ro
       - ./.local-mqtt:/run/secrets:ro
       - broker-auth:/auth
   broker:
@@ -16,7 +17,6 @@ services:
     ports: ["127.0.0.1:${CAJUI_MQTT_PORT:-1883}:1883"]
     volumes:
       - ./examples/mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - ./examples/mqtt/acl:/mosquitto/config/acl:ro
       - broker-auth:/auth:ro
       - broker-data:/mosquitto/data
     restart: unless-stopped
