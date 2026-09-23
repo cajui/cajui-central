@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/romulostorel/cajui-central/internal/telemetry"
+	"github.com/cajui/cajui-central/internal/telemetry"
 )
 
 type Repository interface {

@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/romulostorel/cajui-central/internal/telemetry"
+	"github.com/cajui/cajui-central/internal/telemetry"
 	_ "modernc.org/sqlite"
 )
 

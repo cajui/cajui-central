@@ -3,7 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
-	"github.com/romulostorel/cajui-central/internal/telemetry"
+	"github.com/cajui/cajui-central/internal/telemetry"
 	"path/filepath"
 	"sync"
 	"testing"
