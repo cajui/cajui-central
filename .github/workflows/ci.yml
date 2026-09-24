@@ -25,6 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t cajui:ci .
+      - run: docker build -f mosquitto/Dockerfile -t cajui-broker:ci .
 
   mqtt:
     runs-on: ubuntu-latest
