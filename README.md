@@ -180,11 +180,19 @@ publication without an error reason; producer provisioning must verify topic
 permissions. MQTT 5 publishers can inspect negative PUBACK reason codes. The
 consumer uses MQTT 3.1.1 and works alongside MQTT 5 clients on Mosquitto.
 
-Central uses a clean MQTT session: samples published while it is disconnected
-may be lost. Its bounded 128-message ingestion queue may drop samples under overload;
-storage failures are logged without exposing payloads or credentials. Retained
-snapshots are ignored so a reconnect does not make old data appear newly received.
-Broker persistence alone does not give this clean-session consumer an offline backlog.
+Central keeps a persistent MQTT session (clean session off, fixed client ID). While it
+is stopped or reconnecting, including across broker restarts, the broker keeps its
+subscription and queues samples for it, then delivers them on reconnection. Each sample
+is acknowledged to the broker only after it is stored, or permanently rejected, so the
+broker never sends more than its in-flight window and an acknowledged sample is never
+dropped; a sample interrupted by shutdown or a storage failure is redelivered after the
+next reconnect. The broker keeps at most 1000 queued messages per client and discards
+the session of a client absent for seven days; beyond those limits samples are lost.
+Queued samples keep their identity, so redeliveries are deduplicated, but their
+`received_at` is the delivery time. Only one Central may use a given client ID. The
+broker's retained snapshot, sent on every new subscription, is ignored so that an old
+sample does not appear newly received; a sample published while Central was away is a
+new arrival even if the publisher set retain.
 
 A known device becomes stale after three expected intervals without a **new unique
 sample**. Duplicate retries do not refresh that deadline. Error readings still count
@@ -206,7 +214,7 @@ The dashboard shows both MQTT samples and the existing HTTP readings separately.
 | `CAJUI_MQTT_URL` | Optional; `ssl://host:8883` uses system CA trust and TLS 1.2 or newer. `tcp://host:1883` requires explicit plaintext opt-in. No URL credentials. |
 | `CAJUI_MQTT_USERNAME` | Required when MQTT is enabled. |
 | `CAJUI_MQTT_PASSWORD_FILE` | File containing the password; preferred over `CAJUI_MQTT_PASSWORD`. Mutually exclusive. |
-| `CAJUI_MQTT_CLIENT_ID` | Default `cajui-central`; use a distinct stable ID for each running instance. |
+| `CAJUI_MQTT_CLIENT_ID` | Default `cajui-central`. Names the persistent session: keep it stable, and give each running instance its own. |
 | `CAJUI_MQTT_ALLOW_PLAINTEXT` | Set `1` only for trusted local development. |
 | `CAJUI_API_TOKEN_FILE` | File alternative to `CAJUI_API_TOKEN`; mutually exclusive. |
 

@@ -63,3 +63,27 @@ func TestRunCanceledAndUnavailable(t *testing.T) {
 		t.Fatal("timer canceled")
 	}
 }
+
+func TestSettledAcknowledgesStoredOrPermanentlyRejected(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want bool
+	}{
+		{nil, true},
+		{telemetry.ErrInvalid, true},
+		{telemetry.ErrConflict, true},
+		{errors.New("database locked"), false},
+		{context.DeadlineExceeded, false},
+	} {
+		if got := settled(tc.err); got != tc.want {
+			t.Errorf("settled(%v) = %v, want %v", tc.err, got, tc.want)
+		}
+	}
+	inbox := make(chan message, 2)
+	inbox <- message{}
+	inbox <- message{}
+	drain(inbox)
+	if len(inbox) != 0 {
+		t.Fatal("drain left messages")
+	}
+}

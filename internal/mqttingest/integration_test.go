@@ -3,6 +3,7 @@ package mqttingest
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -39,7 +40,8 @@ func TestBrokerIntegration(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer db.Close()
-	config := Config{URL: url, Username: "central", Password: secret("central"), ClientID: "integration-central"}
+	config := Config{URL: url, Username: "central", Password: secret("central"), ClientID: fmt.Sprintf("integration-central-%d", time.Now().UnixNano())}
+	// A unique ID per run: a persistent session left by an earlier run would redeliver its samples.
 	c := New(config, db, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	start := func() (context.CancelFunc, chan struct{}) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -99,18 +101,38 @@ func TestBrokerIntegration(t *testing.T) {
 	s.SampleID = "integration.3"
 	payload, _ = json.Marshal(s)
 	eventually(t, func() bool { publish(payload); return count() == 3 })
-	// Subscriber restart: clean sessions ignore retained historical samples.
+	// A sample published while Central is away waits in its persistent session and is
+	// delivered on restart, even if the publisher set retain: it is a new arrival.
 	cancel()
 	<-done
-	s.SampleID = "retained.old"
+	s.SampleID = "published-while-away"
 	payload, _ = json.Marshal(s)
 	await(publisher.Publish(topic, 1, true, payload))
 	cancel, done = start()
-	eventually(t, func() bool { return c.Connected() })
-	s.SampleID = "integration.4"
+	eventually(t, func() bool { return c.Connected() && count() == 4 })
+	s.SampleID = "integration.5"
 	payload, _ = json.Marshal(s)
 	publish(payload)
-	eventually(t, func() bool { return count() == 4 })
+	eventually(t, func() bool { return count() == 5 })
+	// The broker's retained snapshot, sent to every new subscription, is not a new arrival:
+	// a consumer with a new session receives only that snapshot and must ignore it.
+	s.SampleID = "retained.snapshot"
+	payload, _ = json.Marshal(s)
+	await(publisher.Publish(topic, 1, true, payload))
+	eventually(t, func() bool { return count() == 6 }) // Live delivery to the running consumer.
+	fresh := New(Config{URL: url, Username: "central", Password: secret("central"),
+		ClientID: config.ClientID + "-fresh"}, &repository{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	freshRepo := fresh.repo.(*repository)
+	freshCtx, stopFresh := context.WithCancel(context.Background())
+	freshDone := make(chan struct{})
+	go func() { defer close(freshDone); fresh.Run(freshCtx) }()
+	eventually(t, func() bool { return fresh.Connected() })
+	time.Sleep(time.Second)
+	stopFresh()
+	<-freshDone
+	if freshRepo.calls != 0 {
+		t.Fatal("retained snapshot ingested by a new session")
+	}
 	await(publisher.Publish(topic, 1, true, []byte{})) // remove retained test state
 	// An independent read-only consumer continues receiving with Central stopped.
 	cancel()
@@ -136,9 +158,12 @@ func TestBrokerIntegration(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("independent consumer did not receive")
 	}
-	if count() != 4 {
+	if count() != 6 {
 		t.Fatal("Central ingested while stopped")
 	}
+	// The persistent session queued that sample for Central; it arrives on restart.
+	cancel, done = start()
+	eventually(t, func() bool { return count() == 7 })
 
 }
 func eventually(t *testing.T, condition func() bool) {
