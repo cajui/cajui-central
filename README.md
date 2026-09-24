@@ -234,6 +234,17 @@ broker after adding a producer, since credentials are generated at startup:
 `docker compose -f compose.mqtt.yaml -f compose.lan.yaml up -d --force-recreate broker-init broker`.
 Removing a file from `.local-mqtt/producers/` and recreating the broker revokes it.
 
+To let devices find the broker without typing its address, announce it on the local
+network while the stack runs:
+
+```sh
+sh scripts/advertise_broker.sh   # dns-sd on macOS, avahi-publish-service on Linux
+```
+
+It publishes an `_mqtt._tcp` service on `CAJUI_MQTT_LAN_PORT` and runs until interrupted.
+It runs on the host because Docker Desktop does not forward multicast from containers.
+Announcing only advertises the address: producers still need their own credential.
+
 This listener is plain MQTT: credentials and samples cross the network unencrypted.
 Use it only on a trusted network until TLS is configured. Because MQTT 3.1.1 acknowledges
 ACL-denied publications, a producer publishing with a mismatched `source_id` gets
