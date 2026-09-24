@@ -8,20 +8,32 @@ actuator control yet.
 
 ### Docker
 
-Requires Docker with Compose v2.
+Requires Docker with Compose v2. Download [`compose.yaml`](compose.yaml), or use this
+checkout, and run:
 
 ```sh
-cp .env.example .env     # set CAJUI_API_TOKEN, e.g. openssl rand -hex 32
-docker compose up --build
+docker compose up -d
 ```
 
-Open http://127.0.0.1:8080. The database lives in the `cajui-data` volume and
-survives restarts and rebuilds; `docker compose down -v` deletes it.
-`docker compose up -d` runs the service in the background and restarts it with Docker.
+This starts Central and its MQTT broker from published images
+(`ghcr.io/cajui/cajui-central`, `ghcr.io/cajui/cajui-broker`, amd64 and arm64). Open
+http://127.0.0.1:8080. On first start the broker generates every credential (API token,
+Central, Home Assistant and demo accounts) into the `secrets` volume; nothing needs to be
+typed or installed on the host. Both services restart with Docker.
 
-Compose reads `.env`; the binary itself does not. Inside the container the process
-listens on `0.0.0.0` (`CAJUI_ALLOW_NON_LOOPBACK=1`), but Compose publishes the port on
-the host's `127.0.0.1` only. Never publish it on `0.0.0.0`: there is no login.
+```sh
+docker compose run --rm credentials token            # API token
+docker compose run --rm credentials producer NAME    # credential for a device
+docker compose run --rm credentials homeassistant    # read-only account password
+docker compose run --rm demo                         # publish the simulated sample
+```
+
+Data lives in named volumes and survives restarts and image updates
+(`docker compose pull && docker compose up -d`). `docker compose down -v` deletes the
+database and every credential. The dashboard is published on `127.0.0.1` only because it
+has no login; never publish it on another interface. The broker listens on port 1883 of
+every interface so devices on the network can publish; see
+[Producers on the local network](#producers-on-the-local-network).
 
 ### Go
 
@@ -38,15 +50,19 @@ Open http://127.0.0.1:8080. The database is created at `data/cajui.db`.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `CAJUI_API_TOKEN` | required | At least 24 characters; use a random secret. |
+| `CAJUI_API_TOKEN` | required | At least 24 characters; use a random secret. Compose generates it. |
 | `CAJUI_ADDR` | `127.0.0.1:8080` | Loopback IPs only. |
 | `CAJUI_DB` | `data/cajui.db` | SQLite file path. |
 | `CAJUI_ALLOW_NON_LOOPBACK` | unset | `1` inside containers only; see [SECURITY.md](SECURITY.md). |
-| `CAJUI_PORT` | `8080` | Compose only: host port, bound on `127.0.0.1`. |
+
+Compose also reads these optional values from a `.env` file (see `.env.example`):
+`CAJUI_PORT` (dashboard, default 8080, always on `127.0.0.1`), `CAJUI_MQTT_PORT`
+(default 1883), `CAJUI_MQTT_BIND` (default all interfaces; `127.0.0.1` keeps the broker
+local) and `CAJUI_VERSION` (image tag, default `main`).
 
 ### Sending a test reading
 
-In another terminal, export the same token (with Docker, the value in `.env`) and run:
+In another terminal, export the same token (with Docker, `docker compose run --rm credentials token`) and run:
 
 ```sh
 curl --fail-with-body http://127.0.0.1:8080/api/v1/readings \
@@ -65,6 +81,7 @@ make check          # gofmt, go vet, tests with -race, coverage >= 80%
 make build          # bin/cajui
 make docker-check   # make check inside the golang:1.27 image
 make docker-build   # cajui:local image
+docker compose -f compose.yaml -f compose.dev.yaml up --build -d   # build both images
 go tool cover -html=coverage.out   # coverage report, after make check
 ```
 
@@ -74,7 +91,7 @@ go tool cover -html=coverage.out   # coverage report, after make check
 - `internal/httpapi`: HTTP API and embedded web page.
 - `internal/config`: environment configuration.
 - `internal/mqttingest`: MQTT subscription and reconnect lifecycle.
-- `Dockerfile`, `compose.yaml`: container image and local stack.
+- `Dockerfile`, `mosquitto/`, `compose.yaml`: Central image, broker image and stack.
 
 [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
@@ -108,40 +125,19 @@ alerts beyond silence detection, automations, user authentication.
 
 [Apache-2.0](LICENSE).
 
-## MQTT development stack
+## MQTT
 
-MQTT is optional. The original HTTP-only Compose stack remains available.
-To run Central with an authenticated local Mosquitto broker:
+The Compose stack runs Mosquitto with authentication and per-user ACLs. Central and the
+`homeassistant` account can only read samples; the `demo-source` account can only write
+under `telemetry/v1/demo-source/`; each producer can only write under its own namespace.
+Never share an unrestricted broker account across devices. `docker compose run --rm demo`
+publishes the simulated [`sample.json`](examples/mqtt/sample.json); repeating it is
+deduplicated. Do not put real credentials or measurements in example files.
 
-```sh
-python3 scripts/init_mqtt.py
-docker compose -f compose.mqtt.yaml up --build -d
-docker compose -f compose.mqtt.yaml run --rm publish
-```
-
-Open http://127.0.0.1:8080 and refresh to see the **demonstration** sample.
-Repeating the publisher sends the same identity and is deduplicated. Change
-`sample_id` in a copy of `examples/mqtt/sample.json` for each new acquisition.
-The `publish` service mounts that directory read-only and accepts `mosquitto_pub`
-arguments. Do not publish real credentials or measurements in example files.
-
-The initializer preserves existing passwords. Secrets live in the ignored
-`.local-mqtt` directory (host mode 0700); individual files are readable by container
-users through read-only mounts. This is local file protection, not encryption.
-It creates separate credentials for `central`, `homeassistant`, and `demo-source`:
-Central and Home Assistant can read samples; the demonstration publisher can only
-write under `telemetry/v1/demo-source/`. Adapt the ACL and credentials for each
-additional producer. Never share an unrestricted broker account across devices.
-
-This stack uses plain MQTT **for local development only**: ports 1883 and 8080
-are published on loopback. Other containers on its Docker network can reach the
-broker but still need credentials. Configure TLS before using an untrusted network.
-Do not expose the dashboard to the LAN: it has no login. Change `CAJUI_PORT` or
-`CAJUI_MQTT_PORT` if another service already uses those ports.
-
-SQLite and broker data use named volumes. `docker compose -f compose.mqtt.yaml down`
-preserves them; adding `-v` deletes them. The MQTT stack uses a separate database
-volume from the HTTP-only example. It is a development setup, not an installer.
+Credentials are stored unencrypted in the `secrets` volume, readable only by containers
+that mount it and by users who control Docker. Central receives only its API token and
+broker password. The broker regenerates its password file and ACL on start and within a
+few seconds after a producer credential changes, without dropping other clients.
 
 ### Wire contract, version 1
 
@@ -222,17 +218,13 @@ is its `source_id`, and the generated ACL lets it write only under
 with a letter or digit.
 
 ```sh
-python3 scripts/init_mqtt.py --producer receiver-1   # password in .local-mqtt/producers/
-CAJUI_MQTT_LAN_ADDR=192.168.1.20 \
-  docker compose -f compose.mqtt.yaml -f compose.lan.yaml up --build -d
+docker compose run --rm credentials producer receiver-1   # prints the password
+docker compose run --rm credentials remove receiver-1     # revokes it
+printf '%s\n' "$PASSWORD" | docker compose run --rm -T credentials import receiver-1
 ```
 
-`compose.lan.yaml` additionally publishes the broker on one IPv4 address of this host
-(port `CAJUI_MQTT_LAN_PORT`, default 1883); the dashboard stays on loopback. Use the
-address the producer can reach, and update it if DHCP assigns a new one. Recreate the
-broker after adding a producer, since credentials are generated at startup:
-`docker compose -f compose.mqtt.yaml -f compose.lan.yaml up -d --force-recreate broker-init broker`.
-Removing a file from `.local-mqtt/producers/` and recreating the broker revokes it.
+The device connects to this computer's network address on port 1883. `import` keeps an
+existing device password when moving to a new installation.
 
 To let devices find the broker without typing its address, announce it on the local
 network while the stack runs:
@@ -241,7 +233,7 @@ network while the stack runs:
 sh scripts/advertise_broker.sh   # dns-sd on macOS, avahi-publish-service on Linux
 ```
 
-It publishes an `_mqtt._tcp` service on `CAJUI_MQTT_LAN_PORT` and runs until interrupted.
+It publishes an `_mqtt._tcp` service on `CAJUI_MQTT_PORT` and runs until interrupted.
 It runs on the host because Docker Desktop does not forward multicast from containers.
 Announcing only advertises the address: producers still need their own credential.
 
@@ -266,8 +258,9 @@ directly; Central can be stopped or absent. `expire_after` is configured explici
 (900 seconds for the example's 300-second interval). Unlike Central's sample
 identity deduplication, Home Assistant's example evaluates each message, so retries
 may refresh its expiry. Do not retain measurement messages. Home Assistant must be
-able to reach the broker: this loopback-only development stack does not expose it
-to a different machine. For remote deployments use a secured, reachable broker.
+able to reach the broker on port 1883 of this computer; get the account password with
+`docker compose run --rm credentials homeassistant`. The listener is plain MQTT, so keep
+it on a trusted network.
 
 ### MQTT verification
 
@@ -278,12 +271,11 @@ python3 -m venv .venv
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-The integration script starts an isolated real broker and removes only its own
-containers/volumes on exit. It tests publishing, deduplication, invalid input,
-connection loss/resubscription, subscriber restart, retained snapshot rejection,
-an ACL-denied publication, and a producer credential that may publish only in its own
-namespace. It creates a temporary `integration-producer` credential and removes it
-unless one already existed. Unit tests cover persistence/reopen, migration,
+The integration script builds the broker image and starts it in an isolated project,
+removing only its own containers and volumes on exit. It tests publishing,
+deduplication, invalid input, connection loss/resubscription, subscriber restart,
+retained snapshot rejection, an ACL-denied publication, generated credentials, and
+producer credentials created, imported and removed at runtime, including the reload. Unit tests cover persistence/reopen, migration,
 silence/recovery, validation, and shutdown while the broker is unavailable.
 Python tests evaluate the Home Assistant example templates; they do not run a full
 Home Assistant installation. Both suites run in CI. There is no application-level

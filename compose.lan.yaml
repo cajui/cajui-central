@@ -1,7 +1,0 @@
-# Optional override for compose.mqtt.yaml: also publishes the broker on one LAN address
-# of this host, so producers on the local network can connect. Plain MQTT: use only on a
-# trusted network. The dashboard stays on loopback.
-services:
-  broker:
-    ports:
-      - "${CAJUI_MQTT_LAN_ADDR:?set CAJUI_MQTT_LAN_ADDR to this host's LAN IPv4 address}:${CAJUI_MQTT_LAN_PORT:-1883}:1883"

@@ -1,15 +1,58 @@
-# Runs the application without a local Go toolchain.
-# Host exposure stays on 127.0.0.1; never publish the port on 0.0.0.0 (no login yet).
+# Cajuí Central with its MQTT broker. Start with `docker compose up -d`; credentials are
+# generated on first start. Manage them with `docker compose run --rm credentials`.
+name: cajui
 services:
+  broker:
+    image: ghcr.io/cajui/cajui-broker:${CAJUI_VERSION:-main}
+    # Devices on the local network publish here. Authentication is required; traffic is
+    # plain MQTT, so use a trusted network. CAJUI_MQTT_BIND=127.0.0.1 keeps it local.
+    ports:
+      - "${CAJUI_MQTT_BIND:-0.0.0.0}:${CAJUI_MQTT_PORT:-1883}:1883"
+    volumes:
+      - secrets:/secrets
+      - broker-data:/mosquitto/data
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /mosquitto/auth/passwords && pgrep mosquitto >/dev/null"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    restart: unless-stopped
   cajui:
-    build: .
-    image: cajui:local
+    image: ghcr.io/cajui/cajui-central:${CAJUI_VERSION:-main}
+    depends_on:
+      broker:
+        condition: service_healthy
+    # The dashboard has no login: it stays on this computer.
     ports:
       - "127.0.0.1:${CAJUI_PORT:-8080}:8080"
     environment:
-      CAJUI_API_TOKEN: ${CAJUI_API_TOKEN:?set CAJUI_API_TOKEN with at least 24 random characters}
+      CAJUI_API_TOKEN_FILE: /secrets/api-token
+      CAJUI_MQTT_URL: tcp://broker:1883
+      CAJUI_MQTT_ALLOW_PLAINTEXT: "1"
+      CAJUI_MQTT_USERNAME: central
+      CAJUI_MQTT_PASSWORD_FILE: /secrets/central
     volumes:
-      - cajui-data:/data
+      - secrets:/secrets:ro
+      - data:/data
     restart: unless-stopped
+  credentials:
+    image: ghcr.io/cajui/cajui-broker:${CAJUI_VERSION:-main}
+    profiles: [tools]
+    entrypoint: [sh, /cajui/credentials.sh]
+    volumes:
+      - secrets:/secrets
+  demo:
+    image: ghcr.io/cajui/cajui-broker:${CAJUI_VERSION:-main}
+    profiles: [tools]
+    # Publishes the simulated example sample with the demo-source account.
+    entrypoint:
+      - sh
+      - -c
+      - mosquitto_pub -h broker -q 1 -u demo-source -P "$$(cat /secrets/demo-source)"
+        -t telemetry/v1/demo-source/demo-device/samples -f /cajui/examples/sample.json
+    volumes:
+      - secrets:/secrets:ro
 volumes:
-  cajui-data:
+  secrets:
+  broker-data:
+  data:

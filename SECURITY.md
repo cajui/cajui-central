@@ -7,10 +7,16 @@ open to anyone on the machine; the API requires a Bearer token.
 The binary binds loopback addresses only. `CAJUI_ALLOW_NON_LOOPBACK=1` lifts that
 restriction for containers, where `compose.yaml` publishes the port on the host's
 `127.0.0.1` only. Never set the variable outside a container and never publish the
-port on `0.0.0.0`.
+dashboard port on `0.0.0.0`.
 
-Generate tokens randomly and pass them through environment variables. Never share a
-token in issues, logs or screenshots.
+The Compose broker listens on every interface so devices on the network can publish.
+It requires authentication and per-user ACLs, but traffic is plain MQTT: passwords and
+samples are readable on the network. Use it on a trusted network, or set
+`CAJUI_MQTT_BIND=127.0.0.1`, until TLS is configured.
+
+Compose generates random credentials on first start and stores them unencrypted in the
+`secrets` volume. Anyone who controls Docker on the host can read them. Never share a
+token or password in issues, logs or screenshots.
 
 Reporting: private vulnerability reporting is not enabled yet. Contact the maintainer
 directly; do not open a public issue for a vulnerability. Dependabot proposes

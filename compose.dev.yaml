@@ -1,0 +1,17 @@
+# Development override: builds both images from this checkout instead of pulling them.
+#   docker compose -f compose.yaml -f compose.dev.yaml up --build -d
+services:
+  broker:
+    build:
+      context: .
+      dockerfile: mosquitto/Dockerfile
+    image: cajui-broker:dev
+  cajui:
+    build: .
+    image: cajui-central:dev
+  credentials:
+    image: cajui-broker:dev
+    pull_policy: never
+  demo:
+    image: cajui-broker:dev
+    pull_policy: never

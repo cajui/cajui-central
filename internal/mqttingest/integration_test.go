@@ -22,8 +22,13 @@ func TestBrokerIntegration(t *testing.T) {
 	if url == "" {
 		t.Skip("set CAJUI_TEST_MQTT_URL for real broker integration")
 	}
+	// Directory holding the broker's generated credentials (the Compose secrets volume).
+	secrets := os.Getenv("CAJUI_TEST_SECRETS")
+	if secrets == "" {
+		t.Fatal("set CAJUI_TEST_SECRETS to the broker credentials directory")
+	}
 	secret := func(name string) string {
-		b, e := os.ReadFile(filepath.Join("../../.local-mqtt", name))
+		b, e := os.ReadFile(filepath.Join(secrets, name))
 		if e != nil {
 			t.Fatal(e)
 		}

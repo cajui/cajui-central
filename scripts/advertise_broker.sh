@@ -3,7 +3,7 @@
 # can discover it instead of typing its address. Runs until interrupted.
 # Docker Desktop cannot multicast from containers, so this runs on the host.
 set -eu
-port="${CAJUI_MQTT_LAN_PORT:-1883}"
+port="${CAJUI_MQTT_PORT:-1883}"
 name="${CAJUI_MQTT_SERVICE_NAME:-Cajui MQTT broker}"
 if command -v dns-sd >/dev/null 2>&1; then
   exec dns-sd -R "$name" _mqtt._tcp local "$port"
