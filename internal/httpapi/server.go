@@ -47,6 +47,10 @@ func New(repo Repository, token string, logger *slog.Logger) (http.Handler, erro
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("GET /{$}", s.index)
+	mux.HandleFunc("GET /ui/{path...}", serveUIAsset)
+	for path, mode := range map[string]string{"/design/brand": "brand", "/design/components": "components", "/design/dashboard": "demo", "/design/research": "research"} {
+		mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) { s.design(w, r, mode) })
+	}
 	mux.Handle("GET /api/v1/readings", s.authorize(http.HandlerFunc(s.list)))
 	mux.Handle("GET /api/v1/samples", s.authorize(http.HandlerFunc(s.samples)))
 	mux.Handle("GET /api/v1/devices", s.authorize(http.HandlerFunc(s.devices)))
@@ -54,7 +58,7 @@ func New(repo Repository, token string, logger *slog.Logger) (http.Handler, erro
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; form-action 'none'")
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'")
 		mux.ServeHTTP(w, r)
 	}), nil
 }
@@ -112,11 +116,7 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	if err = dashboard.Execute(w, struct {
-		Readings []telemetry.Reading
-		Samples  []telemetry.StoredSample
-		Devices  []telemetry.Device
-	}{readings, samples, devices}); err != nil {
+	if err = dashboard.Execute(w, dashboardPage{Mode: "live", Title: "Overview", State: dashboardState{Readings: readings, Samples: samples, Devices: devices, GeneratedAt: time.Now().UTC()}}); err != nil {
 		s.logger.Error("render dashboard", "error", err)
 	}
 }

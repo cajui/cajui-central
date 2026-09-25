@@ -1,0 +1,15 @@
+{
+  "name": "cajui-ui-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:model": "node --test model.test.mjs",
+    "format:check": "prettier --check \"../../internal/httpapi/ui/*.{css,mjs}\" \"*.mjs\" package.json"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
+    "prettier": "3.6.2"
+  }
+}

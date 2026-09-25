@@ -71,7 +71,7 @@ curl --fail-with-body http://127.0.0.1:8080/api/v1/readings \
   --data '{"node_id":"demo-node","sensor_id":"ambient","session_id":"boot-1","sequence":1,"metric":"temperature","value":26.7,"unit":"degC"}'
 ```
 
-Refresh the page. The request is idempotent: repeating it does not duplicate the
+The dashboard refreshes automatically or with Refresh. The request is idempotent: repeating it does not duplicate the
 reading; change `sequence` to add a sample. Data persists across restarts.
 
 ## Development
@@ -100,7 +100,7 @@ go tool cover -html=coverage.out   # coverage report, after make check
 All `/api` routes require `Authorization: Bearer <CAJUI_API_TOKEN>`.
 
 - `GET /healthz`: 200 when the database is reachable, 503 otherwise.
-- `GET /`: web page with the last 100 readings (no authentication, loopback only).
+- `GET /`: dashboard with the latest readings and samples (no authentication, loopback only).
 - `GET /api/v1/readings`: JSON list, most recently received first.
 - `POST /api/v1/readings`: one JSON object, `Content-Type: application/json`.
 
@@ -198,8 +198,7 @@ A known device becomes stale after three expected intervals without a **new uniq
 sample**. Duplicate retries do not refresh that deadline. Error readings still count
 as communication and have a separate error indicator. This is an arrival-based
 alert, not proof of radio connectivity or a guarantee that a backfilled measurement
-is current. Unknown devices cannot be reported as missing. The page must be refreshed
-to update alerts. `/healthz` checks the database, not MQTT connectivity; connection
+is current. Unknown devices cannot be reported as missing. The dashboard refreshes automatically while visible and idle, or with its Refresh button. `/healthz` checks the database, not MQTT connectivity; connection
 and subscription progress are logged.
 
 Authenticated `GET /api/v1/samples` returns the latest 100 sample envelopes with
@@ -289,3 +288,80 @@ Python tests evaluate the Home Assistant example templates; they do not run a fu
 Home Assistant installation. Both suites run in CI. There is no application-level
 receipt, auto-discovery, device provisioning wizard, or publisher firmware in this
 repository.
+
+## Interface and design reference
+
+The interface is part of the same executable and container image. No Node.js,
+package installation, frontend compilation or CDN is needed to run Central.
+JavaScript modules, CSS, original SVG icons and the licensed Manrope font are
+embedded locally. The existing installation command stays the same.
+
+| Page | Purpose |
+| --- | --- |
+| `/` | Actual readings, sensor filters, recent history, device details, silence/error indicators and CSV export. |
+| `/design/dashboard` | An explicitly simulated workspace. Nothing is sent to devices or written to the database. |
+| `/design/brand` | Working visual identity: symbol, color roles, typography, shape, spacing, downloadable tokens and a computed contrast audit. |
+| `/design/components` | Interactive component catalog, display states and integration examples. |
+| `/design/research` | References from Home Assistant, ThingsBoard, Grafana and openHAB, with implementation choices and deferred features. |
+
+The working identity is version 0.1. Light and dark themes share semantic tokens;
+theme preference is stored locally in the browser, without credentials or telemetry.
+The font license is included at `internal/httpapi/ui/assets/fonts/OFL-Manrope.txt`.
+
+### Display components
+
+Native custom elements share `ui/tokens.css` and `ui/ui.css`:
+`cj-sensor`, `cj-badge`, `cj-chart`, `cj-device`, `cj-battery`, `cj-signal`,
+`cj-state` and `cj-level`. Load `/ui/components.mjs` as a module to register them.
+Set simple attributes for static content or assign `element.data` for a sensor or
+chart model. The catalog demonstrates the supported attributes and model shape.
+These are display components; binary-state examples and level meters do not add
+new telemetry contracts or actuator APIs.
+
+A reading error, a skipped sample, a stale value and an absent measurement remain
+distinct. Zero remains a valid number. HTTP readings have no declared reporting
+interval, so their status is **Recorded**, without an inferred freshness guarantee.
+Unknown battery and signal remain unknown. Devices with no recent report and
+reported measurement errors are shown independently.
+
+History uses **arrival timestamps** from the latest loaded records, with one
+measurement/unit per chart. Period selection filters that bounded snapshot; it
+is not a full historical query. Missing observations and gaps greater than three
+expected intervals break the line. Pointer and keyboard inspection and a data table
+provide the same values. CSV export includes the currently visible sensors and
+protects text cells from spreadsheet formula interpretation.
+
+The actual dashboard refreshes every 30 seconds while visible and not being
+interacted with; manual refresh is always available. A failed refresh preserves the
+previous snapshot and shows a warning. Without JavaScript, the existing read-only
+receipt tables remain available. Friendly names and locations in the example are
+simulated; a persistent device/area registry is a separate feature.
+
+### Script policy and access
+
+The CSP permits scripts, styles, fonts, images and read requests from the same origin
+only. Inline executable scripts, `eval`, external resources, frames and form submission
+remain blocked. The initial data snapshot is JSON escaped by Go's HTML template;
+telemetry text is escaped by the components. API tokens are never embedded in HTML,
+JavaScript or browser storage. Refresh reads the same public loopback-only document,
+without opening an unauthenticated API route. Existing authenticated APIs are unchanged.
+The dashboard still has **no login** and must remain on loopback.
+
+### Frontend development checks
+
+Development tests use Node 22; it is not a runtime dependency. With an isolated Central
+instance running on `127.0.0.1:8091` (or `CAJUI_UI_TEST_URL`):
+
+```sh
+npm ci --prefix tests/ui --ignore-scripts
+npm --prefix tests/ui run format:check
+npm --prefix tests/ui run test:model
+(cd tests/ui && npx playwright install chromium)
+npm --prefix tests/ui test
+```
+
+Playwright tests desktop/mobile interactions, filtering, inspection, export, unavailable
+refresh, safe text handling and accessibility checks in both themes. The automatic
+accessibility audit covers selected WCAG A/AA rules, not a complete conformance review.
+The Go suite checks asset routing, CSP, escaped snapshot data and API compatibility.
+These tests run in CI. Prettier is a development formatter, not a compilation step.
