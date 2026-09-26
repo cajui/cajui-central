@@ -22,17 +22,10 @@ type dashboardState struct {
 	GeneratedAt time.Time                `json:"generated_at"`
 }
 type dashboardPage struct {
-	Mode, Title string
-	State       dashboardState
+	Title string
+	State dashboardState
 }
 
-func (s *server) design(w http.ResponseWriter, _ *http.Request, mode string) {
-	titles := map[string]string{"brand": "Visual identity", "components": "Component library", "demo": "Example dashboard", "research": "Design research"}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := dashboard.Execute(w, dashboardPage{Mode: mode, Title: titles[mode]}); err != nil {
-		s.logger.Error("render design reference", "error", err)
-	}
-}
 func serveUIAsset(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("path")
 	if !fs.ValidPath(name) {

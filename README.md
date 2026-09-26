@@ -289,63 +289,69 @@ Home Assistant installation. Both suites run in CI. There is no application-leve
 receipt, auto-discovery, device provisioning wizard, or publisher firmware in this
 repository.
 
-## Interface and design reference
+## Interface
 
-The default layout favors quick reading and touch interaction: 48 px values,
-18 px measurement names, 16 px source/freshness text, and 48 px primary controls.
-Quantity icons and accents stay consistent between cards and charts. Error and
-stale labels remain separate from quantity colors; no healthy range is inferred.
-Cards open the selected history on tap or keyboard activation. Narrow screens
-use one column, tablets two, and wide displays can show three.
-The brand reference documents these tokens and checks accent contrast in both themes.
-These are design targets, not evidence of outdoor legibility; test on the intended
-tablet under actual lighting conditions.
+Central organizes observations as **devices → sensors → measurements**. One device
+with one temperature/humidity sensor appears as one device containing one sensor
+and two readings. The summary counts sensors separately from their measurements.
+Device identity is scoped by transport, source and device ID; repeated sensor IDs
+in different devices are never combined. Different units keep separate histories.
+Counts reflect the latest loaded records, not a persistent inventory of every sensor.
 
-The interface is part of the same executable and container image. No Node.js,
-package installation, frontend compilation or CDN is needed to run Central.
-JavaScript modules, CSS, original SVG icons and the licensed Manrope font are
-embedded locally. The existing installation command stays the same.
+The product shows actual received data only. It has no brand pages, component
+catalog, simulated gallery or design-system navigation. The reference lives in
+[`docs/brand/`](docs/brand/README.md) and is served separately for development.
 
-| Page | Purpose |
-| --- | --- |
-| `/` | Actual readings, sensor filters, recent history, device details, silence/error indicators and CSV export. |
-| `/design/dashboard` | An explicitly simulated workspace. Nothing is sent to devices or written to the database. |
-| `/design/brand` | Working visual identity: symbol, color roles, typography, shape, spacing, downloadable tokens and a computed contrast audit. |
-| `/design/components` | Interactive component catalog, display states and integration examples. |
-| `/design/research` | References from Home Assistant, ThingsBoard, Grafana and openHAB, with implementation choices and deferred features. |
+Readings use large values, identifiable icons and quantity accents. Sensor failures
+and device silence remain explicit, independent states; an accent does not imply a
+healthy range. Select a reading to open its history. Search matches devices and
+sensors while preserving their surrounding group; export includes sensor readings
+from the visible device groups. Friendly names and locations require a future
+persistent registry; otherwise the reported identifiers are shown.
 
-The working identity is version 0.1. Light and dark themes share semantic tokens;
-theme preference is stored locally in the browser, without credentials or telemetry.
-The font license is included at `internal/httpapi/ui/assets/fonts/OFL-Manrope.txt`.
-
-### Display components
-
-Native custom elements share `ui/tokens.css` and `ui/ui.css`:
-`cj-sensor`, `cj-badge`, `cj-chart`, `cj-device`, `cj-battery`, `cj-signal`,
-`cj-state` and `cj-level`. Load `/ui/components.mjs` as a module to register them.
-Set simple attributes for static content or assign `element.data` for a sensor or
-chart model. The catalog demonstrates the supported attributes and model shape.
-These are display components; binary-state examples and level meters do not add
-new telemetry contracts or actuator APIs.
+Radio diagnostics stay in each device's collapsed **Connection details**. The
+version 1 convention recognized here is `sensor_id: "radio"` with `rssi` in `dBm`
+or `snr` in `dB`. These exact channels are excluded from environmental sensor counts
+and the sensor CSV. Their values, data quality and histories remain available.
+Other names and units are not silently reclassified. No transport or firmware
+contract is changed by this presentation rule.
 
 A reading error, a skipped sample, a stale value and an absent measurement remain
 distinct. Zero remains a valid number. HTTP readings have no declared reporting
-interval, so their status is **Recorded**, without an inferred freshness guarantee.
-Unknown battery and signal remain unknown. Devices with no recent report and
-reported measurement errors are shown independently.
+interval, so their status is **Recorded**, without a freshness guarantee. A device
+reporting successfully does not mean its measurements are within a healthy range.
 
-History uses **arrival timestamps** from the latest loaded records, with one
-measurement/unit per chart. Period selection filters that bounded snapshot; it
-is not a full historical query. Missing observations and gaps greater than three
-expected intervals break the line. Pointer and keyboard inspection and a data table
-provide the same values. CSV export includes the currently visible sensors and
-protects text cells from spreadsheet formula interpretation.
+History uses **arrival timestamps** from the latest loaded records (up to 100 MQTT
+samples and 100 HTTP readings), with one measurement/unit per chart. Period selection
+filters that snapshot, not a full historical query. Missing observations and gaps
+beyond three expected intervals break the line. Pointer and keyboard inspection and
+a data table expose the same values. Unknown diagnostics are never replaced by zero.
 
-The actual dashboard refreshes every 30 seconds while visible and not being
-interacted with; manual refresh is always available. A failed refresh preserves the
-previous snapshot and shows a warning. Without JavaScript, the existing read-only
-receipt tables remain available. Friendly names and locations in the example are
-simulated; a persistent device/area registry is a separate feature.
+The dashboard refreshes every 30 seconds while visible and not being interacted
+with. Manual refresh remains available; a failed refresh retains the previous
+snapshot with a warning. Without JavaScript, read-only receipt tables remain.
+
+The interface is embedded in the same executable and container image: local
+JavaScript modules, CSS, SVG icons and the licensed Manrope font. There is no frontend
+compilation, runtime CDN or additional installation step. Theme preference stays in
+browser storage without credentials or telemetry. Outdoor legibility still needs
+evaluation on the intended tablet under actual lighting conditions.
+
+### Brand and component documentation
+
+See [`docs/brand/README.md`](docs/brand/README.md) for identity, component examples,
+research and the standalone reference server (`python3 scripts/serve_brand.py`).
+The server binds to `127.0.0.1:8092` and serves an allowlist of reference files and
+shared UI assets. Python is optional for documentation development, not Central.
+Reference files and examples are outside the Go embed and container build inputs.
+The former `/design/*` routes and reference modules return 404 in Central.
+
+The reference reuses the product's tokens, font, icons and native components from
+`internal/httpapi/ui/`. `cj-reading` is a measurement inside a sensor group;
+`cj-sensor` is a standalone card used in the reference gallery. Other shared pieces
+include `cj-badge`, `cj-chart`, `cj-device`, `cj-battery`, `cj-signal`, `cj-state`
+and `cj-level`. Binary/level examples do not introduce actuator APIs or new telemetry
+schemas. Font license: `internal/httpapi/ui/assets/fonts/OFL-Manrope.txt`.
 
 ### Script policy and access
 
@@ -359,18 +365,20 @@ The dashboard still has **no login** and must remain on loopback.
 
 ### Frontend development checks
 
-Development tests use Node 22; it is not a runtime dependency. With an isolated Central
+Development tests use Node 22 and Python 3 for the reference server; neither is a runtime dependency. With an isolated Central
 instance running on `127.0.0.1:8091` (or `CAJUI_UI_TEST_URL`):
 
 ```sh
 npm ci --prefix tests/ui --ignore-scripts
 npm --prefix tests/ui run format:check
 npm --prefix tests/ui run test:model
+python3 -m unittest discover -s tests -p test_brand_server.py -v
 (cd tests/ui && npx playwright install chromium)
 npm --prefix tests/ui test
 ```
 
-Playwright tests desktop/mobile interactions, filtering, inspection, export, unavailable
+Playwright starts the separate reference server automatically. It tests product grouping,
+reference isolation, desktop/tablet/mobile interactions, filtering, inspection, export, unavailable
 refresh, safe text handling and accessibility checks in both themes. The automatic
 accessibility audit covers selected WCAG A/AA rules, not a complete conformance review.
 The Go suite checks asset routing, CSP, escaped snapshot data and API compatibility.

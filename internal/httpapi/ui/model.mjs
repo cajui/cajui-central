@@ -215,3 +215,85 @@ export function contrast(foreground, background) {
     b = luminance(background);
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
+
+// Version 1 producers can report these exact radio channels as link diagnostics.
+// Do not infer diagnostics from a unit alone: an arbitrary sensor may measure dB.
+export function isLinkDiagnostic(channel) {
+  return (
+    channel.sensor === "radio" &&
+    ((channel.metric === "rssi" && channel.unit === "dBm") ||
+      (channel.metric === "snr" && channel.unit === "dB"))
+  );
+}
+export function buildDeviceGroups(channels, reportedDevices = []) {
+  const groups = new Map();
+  const ensure = (transport, source, device) => {
+    const key = JSON.stringify([transport, source, device]);
+    if (!groups.has(key))
+      groups.set(key, {
+        key,
+        transport,
+        source,
+        device,
+        name: device,
+        location: "",
+        at: "",
+        interval: 0,
+        stale: false,
+        reportedError: false,
+        sensors: [],
+        diagnostics: [],
+      });
+    return groups.get(key);
+  };
+  for (const d of reportedDevices) {
+    const group = ensure("mqtt", d.source_id, d.device_id);
+    Object.assign(group, {
+      name: d.name ?? d.device_id,
+      location: d.location ?? "",
+      at: d.last_received_at,
+      interval: d.expected_interval_seconds,
+      stale: Boolean(d.stale),
+      reportedError: Boolean(d.sensor_error),
+    });
+  }
+  for (const c of channels) {
+    const group = ensure(c.transport, c.source, c.device);
+    if (!group.at || Date.parse(c.at) > Date.parse(group.at)) group.at = c.at;
+    if (isLinkDiagnostic(c)) {
+      group.diagnostics.push(c);
+      continue;
+    }
+    let sensor = group.sensors.find((s) => s.id === c.sensor);
+    if (!sensor) {
+      sensor = { id: c.sensor, name: label(c.sensor), channels: [] };
+      group.sensors.push(sensor);
+    }
+    sensor.channels.push(c);
+  }
+  for (const group of groups.values()) {
+    group.sensors.sort((a, b) => a.id.localeCompare(b.id));
+    for (const sensor of group.sensors)
+      sensor.channels.sort((a, b) => {
+        const rank = (c) =>
+          c.metric === "temperature" ? 0 : c.metric === "humidity" ? 1 : 2;
+        return (
+          rank(a) - rank(b) ||
+          a.metric.localeCompare(b.metric) ||
+          a.unit.localeCompare(b.unit)
+        );
+      });
+    const all = [
+      ...group.sensors.flatMap((s) => s.channels),
+      ...group.diagnostics,
+    ];
+    group.error = group.reportedError || all.some((c) => c.state === "error");
+    group.attention =
+      group.stale ||
+      group.error ||
+      all.some((c) => ["stale", "skipped", "empty"].includes(c.state));
+  }
+  return [...groups.values()].sort(
+    (a, b) => a.name.localeCompare(b.name) || a.key.localeCompare(b.key),
+  );
+}

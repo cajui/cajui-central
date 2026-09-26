@@ -7,19 +7,19 @@
 <link rel="stylesheet" href="/ui/ui.css">
 <script type="module" src="/ui/app.mjs"></script>
 </head>
-<body data-page="{{.Mode}}">
+<body data-page="live">
 <a href="#main" class="skip-link">Skip to content</a>
-<div class="shell"><aside class="sidebar" id="sidebar"><a class="wordmark" href="/">Cajuí Central</a><nav class="nav" aria-label="Design reference"><a href="/design/brand">Visual identity</a><a href="/design/components">Components</a><a href="/design/dashboard">Example dashboard</a><a href="/design/research">Research</a></nav></aside><div class="workspace"><header class="topbar" id="topbar">{{.Title}}</header>
-{{if eq .Mode "demo"}}<div class="demo-banner"><span><strong>Example workspace.</strong> All readings and device names on this page are simulated.</span><a href="/">View your real readings →</a></div>{{end}}
+<div class="product-shell"><div class="workspace"><header class="topbar" id="topbar">{{.Title}}</header>
+
 <main class="content" id="main"><div id="app">
-{{if eq .Mode "live"}}<h1>Received readings</h1><p class="muted">Recent data. Interactive views load when JavaScript is available.</p>
-{{with .State}}{{if .Readings}}<div class="scroll"><table><thead><tr><th>Node / sensor</th><th>Metric</th><th>Value</th><th>Received (UTC)</th></tr></thead><tbody>{{range .Readings}}<tr><td>{{.NodeID}} / {{.SensorID}}</td><td>{{.Metric}}</td><td>{{.Value}} {{.Unit}}</td><td>{{.ReceivedAt.Format "2006-01-02 15:04:05"}}</td></tr>{{end}}</tbody></table></div>{{else}}<p>No readings received yet. Send the example from the documentation to try the application.</p>{{end}}
+<h1>Received readings</h1><p class="muted">Recent data. Interactive views load when JavaScript is available.</p>
+{{with .State}}{{if .Readings}}<div class="scroll"><table><thead><tr><th>Node / sensor</th><th>Metric</th><th>Value</th><th>Received (UTC)</th></tr></thead><tbody>{{range .Readings}}<tr><td>{{.NodeID}} / {{.SensorID}}</td><td>{{.Metric}}</td><td>{{.Value}} {{.Unit}}</td><td>{{.ReceivedAt.Format "2006-01-02 15:04:05"}}</td></tr>{{end}}</tbody></table></div>{{else}}<p>No readings received yet. Connect a device to start receiving measurements.</p>{{end}}
 <h2>Known devices</h2><p>Up to 100 devices. Silence means no new unique sample received for three expected intervals. Error readings still count as communication.</p>
 <table><tr><th>Source / device</th><th>Arrival status</th><th>Sensor status</th></tr>{{range .Devices}}<tr><td>{{.SourceID}} / {{.DeviceID}}</td><td>{{if .Stale}}No recent samples{{else}}Recent sample{{end}}</td><td>{{if .SensorError}}Reading error{{else}}No reported error{{end}}</td></tr>{{else}}<tr><td colspan="3">No MQTT devices received yet.</td></tr>{{end}}</table>
 <h2>MQTT samples</h2><p>Last 100 samples. Values below are reported measurements; missing values are not zero.</p>
 <table><tr><th>Source / device</th><th>Sensor / metric</th><th>Value / status</th><th>Received (UTC)</th></tr>{{range .Samples}}{{$sample := .}}{{range .Readings}}<tr><td>{{$sample.SourceID}} / {{$sample.DeviceID}}</td><td>{{.SensorID}} / {{.Metric}}</td><td>{{if eq .Status "ok"}}{{.Value}} {{.Unit}}{{else}}{{.Status}}{{end}}</td><td>{{$sample.ReceivedAt.Format "2006-01-02 15:04:05"}}</td></tr>{{end}}{{end}}</table>
 {{end}}
-{{else}}<h1>{{.Title}}</h1><p>This interactive reference needs JavaScript. All assets are served locally.</p>{{end}}
+
 </div></main></div></div>
 <script type="application/json" id="initial-state">{{.State}}</script>
 </body></html>

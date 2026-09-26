@@ -28,3 +28,8 @@ read-only HTML snapshot contains telemetry but never an API token. Scripts refre
 that same loopback-only document; authenticated API access remains separate.
 Component text is escaped, and spreadsheet exports protect text fields from formula
 interpretation. Browser storage contains only the selected color theme.
+
+The optional brand reference server binds only to loopback and exposes a fixed map
+of reference and shared UI files. It has no Central APIs, credentials, configuration
+files or repository directory listing. Reference pages and simulated data are not
+embedded in the Central executable or served by the product.
