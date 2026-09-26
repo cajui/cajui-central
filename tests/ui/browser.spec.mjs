@@ -4,6 +4,8 @@ import { test, expect } from "@playwright/test";
 for (const viewport of [
   { width: 1440, height: 1000 },
   { width: 390, height: 844 },
+  { width: 820, height: 1180 },
+  { width: 1180, height: 820 },
 ]) {
   test(`dashboard interactions and local assets ${viewport.width}`, async ({
     page,
@@ -54,7 +56,7 @@ for (const viewport of [
     );
     await page.getByRole("button", { name: "Switch to dark theme" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-    if (viewport.width < 760) {
+    if (viewport.width <= 1000) {
       await page.getByRole("button", { name: "Open navigation" }).click();
       await expect(
         page.getByRole("navigation", { name: "Design system" }),
@@ -100,7 +102,7 @@ test("brand contrast audit updates with theme and navigation works", async ({
   page,
 }) => {
   await page.goto("/design/brand");
-  await expect(page.locator("#contrast-audit tr")).toHaveCount(6);
+  await expect(page.locator("#contrast-audit tr")).toHaveCount(11);
   await expect(page.locator("#contrast-audit")).not.toContainText(
     "Below target",
   );
@@ -176,4 +178,94 @@ test("isolated chart observations and invalid binary states remain visible", asy
   const state = page.locator("cj-state").first();
   await state.evaluate((el) => el.setAttribute("state", "error"));
   await expect(state.locator(".state-value")).toHaveText("Unknown");
+});
+
+test("tablet recognition, touch targets and history keep quantity separate from state", async ({
+  browser,
+  baseURL,
+}) => {
+  const context = await browser.newContext({
+    viewport: { width: 820, height: 1180 },
+    hasTouch: true,
+    baseURL,
+  });
+  const page = await context.newPage();
+  await page.goto("/design/dashboard");
+  const temperature = page.locator("#sensors cj-sensor").nth(0);
+  const humidity = page.locator("#sensors cj-sensor").nth(1);
+  const accent = (locator) =>
+    locator
+      .locator(".metric-icon")
+      .evaluate((el) => getComputedStyle(el).color);
+  expect(await accent(temperature)).not.toBe(await accent(humidity));
+  const sizes = await temperature.evaluate((el) =>
+    Object.fromEntries(
+      [".card-title", ".card-context", ".measurement", ".reading-age"].map(
+        (selector) => [
+          selector,
+          parseFloat(getComputedStyle(el.querySelector(selector)).fontSize),
+        ],
+      ),
+    ),
+  );
+  expect(sizes[".card-title"]).toBeGreaterThanOrEqual(18);
+  expect(sizes[".card-context"]).toBeGreaterThanOrEqual(16);
+  expect(sizes[".measurement"]).toBeGreaterThanOrEqual(40);
+  expect(sizes[".reading-age"]).toBeGreaterThanOrEqual(16);
+  for (const selector of [
+    "#refresh",
+    "#export",
+    "#search",
+    "[data-filter=attention]",
+    "#period",
+  ]) {
+    const box = await page.locator(selector).boundingBox();
+    expect(box.height, selector).toBeGreaterThanOrEqual(48);
+    expect(box.width, selector).toBeGreaterThanOrEqual(48);
+  }
+  const temperatureBox = await temperature.boundingBox();
+  const humidityBox = await humidity.boundingBox();
+  expect(temperatureBox.y).toBe(humidityBox.y);
+  await humidity.tap();
+  await expect(page.locator("#history-heading")).toBeFocused();
+  await expect(page.locator("#chart-legend")).toContainText("Humidity");
+  const color = await page
+    .locator("#history .series")
+    .evaluate((el) => getComputedStyle(el).stroke);
+  expect(color).toBe(await accent(humidity));
+  await page.locator(".summary-link").tap();
+  await expect(page.locator("#attention-panel h2")).toBeInViewport();
+  await context.close();
+});
+
+test("measurement identity survives failures and unknown metric names stay neutral", async ({
+  page,
+}) => {
+  await page.goto("/design/components");
+  const card = page.locator("#playground");
+  const before = await card
+    .locator(".metric-icon")
+    .evaluate((el) => getComputedStyle(el).color);
+  await page.locator("#play-state").selectOption("error");
+  expect(
+    await card
+      .locator(".metric-icon")
+      .evaluate((el) => getComputedStyle(el).color),
+  ).toBe(before);
+  await expect(card.locator(".reading-note")).toHaveText("Value unavailable");
+  await expect(card.locator(".badge svg")).toHaveCount(1);
+  for (const metric of [
+    "custom_metric",
+    "__proto__",
+    "constructor",
+    '<img src=x onerror="window.pwned=true">',
+  ]) {
+    await card.evaluate((el, name) => el.setAttribute("metric", name), metric);
+    await expect(card.locator("article")).toHaveAttribute(
+      "data-kind",
+      "device",
+    );
+    await expect(card.locator("img")).toHaveCount(0);
+  }
+  expect(await page.evaluate(() => window.pwned)).toBeUndefined();
 });

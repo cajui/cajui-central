@@ -291,6 +291,16 @@ repository.
 
 ## Interface and design reference
 
+The default layout favors quick reading and touch interaction: 48 px values,
+18 px measurement names, 16 px source/freshness text, and 48 px primary controls.
+Quantity icons and accents stay consistent between cards and charts. Error and
+stale labels remain separate from quantity colors; no healthy range is inferred.
+Cards open the selected history on tap or keyboard activation. Narrow screens
+use one column, tablets two, and wide displays can show three.
+The brand reference documents these tokens and checks accent contrast in both themes.
+These are design targets, not evidence of outdoor legibility; test on the intended
+tablet under actual lighting conditions.
+
 The interface is part of the same executable and container image. No Node.js,
 package installation, frontend compilation or CDN is needed to run Central.
 JavaScript modules, CSS, original SVG icons and the licensed Manrope font are

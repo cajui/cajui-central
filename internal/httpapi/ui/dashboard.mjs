@@ -7,7 +7,7 @@ import {
   csvRows,
   states,
 } from "./model.mjs";
-import { icon } from "./icons.mjs";
+import { icon, metricIcon } from "./icons.mjs";
 import { demoData } from "./demo.mjs";
 
 export function mountDashboard(root, { demo = false, state = {}, notify }) {
@@ -19,7 +19,7 @@ export function mountDashboard(root, { demo = false, state = {}, notify }) {
     hours = 24,
     pending = false;
   let timer;
-  root.innerHTML = `<header class="page-heading"><div><p class="eyebrow">YOUR CONNECTED SPACE</p><h1>Overview</h1><p>${demo ? "A little perspective on what’s happening around you." : "Your latest measurements, in one place."}</p></div><div class="top-actions"><button class="button" id="export">${icon("download")}Export</button><button class="button primary" id="refresh">${icon("refresh")}Refresh</button></div></header><div id="fetch-error" class="notice hidden" role="status"></div><section class="summary-strip" aria-label="Workspace summary" id="summary"></section><div class="toolbar"><div class="segmented" aria-label="Filter sensors"><button data-filter="all" aria-pressed="true">All sensors</button><button data-filter="ok" aria-pressed="false">Updated</button><button data-filter="attention" aria-pressed="false">Needs attention</button></div><label class="search">${icon("search")}<span class="sr-only">Search sensors</span><input id="search" placeholder="Search sensors…" type="search" autocomplete="off"></label></div><section class="sensor-grid" id="sensors" aria-label="Latest sensor readings"></section><div class="main-grid"><section class="panel"><div class="panel-heading"><div><h2>Over time</h2><p id="history-subtitle">Recent measurements · local time</p></div><label><span class="sr-only">Chart period</span><select id="period" class="input"><option value="24">Last 24 hours</option><option value="6">Last 6 hours</option><option value="1">Last hour</option><option value="0">All loaded data</option></select></label></div><label class="sr-only" for="metric-select">Chart measurement</label><select id="metric-select" class="input"></select><cj-chart id="history"></cj-chart><div class="plot-footer"><span class="legend" id="chart-legend"></span><span id="plot-count"></span></div></section><section class="panel"><div class="panel-heading"><div><h2>Needs attention</h2><p>Silence and reading errors, kept separate.</p></div>${icon("alert")}</div><div id="alerts" class="alert-list"></div></section></div><section class="panel table-panel" id="devices"><div class="panel-heading"><div><h2>Devices</h2><p>Last reported state of your connected devices.</p></div><span id="device-count" class="muted small"></span></div><div class="table-wrap"><table><caption class="sr-only">Device status and last report</caption><thead><tr><th>Device</th><th>Status</th><th>Battery</th><th>Signal</th><th>Last report</th></tr></thead><tbody id="device-rows"></tbody></table></div></section><footer class="footer"><span id="snapshot-time"></span><span>${demo ? "Simulated workspace · no devices controlled" : "Latest 100 samples + 100 HTTP readings · arrival times"} · <a href="/design/components">Component library</a></span></footer><dialog id="device-dialog" aria-labelledby="device-dialog-title"><div class="dialog-head"><h2 id="device-dialog-title">Device details</h2><button class="icon-button" id="close-dialog" aria-label="Close details">${icon("close")}</button></div><div id="device-detail"></div></dialog>`;
+  root.innerHTML = `<header class="page-heading"><div><h1>Overview</h1><p>Latest readings and reported issues.</p></div><div class="top-actions"><button class="button" id="export">${icon("download")}Export</button><button class="button primary" id="refresh">${icon("refresh")}Refresh</button></div></header><div id="fetch-error" class="notice hidden" role="status"></div><section class="summary-strip" aria-label="Workspace summary" id="summary"></section><div class="toolbar"><div class="segmented" aria-label="Filter sensors"><button data-filter="all" aria-pressed="true">All sensors</button><button data-filter="ok" aria-pressed="false">Updated</button><button data-filter="attention" aria-pressed="false">Needs attention</button></div><label class="search">${icon("search")}<span class="sr-only">Search sensors</span><input id="search" placeholder="Search sensors…" type="search" autocomplete="off"></label></div><section class="sensor-grid" id="sensors" aria-label="Latest sensor readings"></section><div class="main-grid"><section class="panel" id="history-panel"><div class="panel-heading"><div><h2 id="history-heading" tabindex="-1">Over time</h2><p id="history-subtitle">Recent measurements · local time</p></div><label><span class="sr-only">Chart period</span><select id="period" class="input"><option value="24">Last 24 hours</option><option value="6">Last 6 hours</option><option value="1">Last hour</option><option value="0">All loaded data</option></select></label></div><label class="sr-only" for="metric-select">Chart measurement</label><select id="metric-select" class="input"></select><cj-chart id="history"></cj-chart><div class="plot-footer"><span class="legend" id="chart-legend"></span><span id="plot-count"></span></div></section><section class="panel attention-panel" id="attention-panel"><div class="panel-heading"><div><h2>Needs attention</h2><p>Silence and reading errors, kept separate.</p></div>${icon("alert")}</div><div id="alerts" class="alert-list"></div></section></div><section class="panel table-panel" id="devices"><div class="panel-heading"><div><h2>Devices</h2><p>Last reported state of your connected devices.</p></div><span id="device-count" class="muted small"></span></div><div class="table-wrap"><table><caption class="sr-only">Device status and last report</caption><thead><tr><th>Device</th><th>Status</th><th>Battery</th><th>Signal</th><th>Last report</th></tr></thead><tbody id="device-rows"></tbody></table></div></section><footer class="footer"><span id="snapshot-time"></span><span>${demo ? "Simulated workspace · no devices controlled" : "Latest 100 samples + 100 HTTP readings · arrival times"} · <a href="/design/components">Component library</a></span></footer><dialog id="device-dialog" aria-labelledby="device-dialog-title"><div class="dialog-head"><h2 id="device-dialog-title">Device details</h2><button class="icon-button" id="close-dialog" aria-label="Close details">${icon("close")}</button></div><div id="device-detail"></div></dialog>`;
   root.querySelector("#devices").classList.add("device-section");
   const rebuild = () => {
     channels = buildChannels(snapshot, Date.parse(snapshot.generated_at));
@@ -66,6 +66,8 @@ export function mountDashboard(root, { demo = false, state = {}, notify }) {
         selected = c.key;
         root.querySelector("#metric-select").value = selected;
         renderChart();
+        root.querySelector("#history-heading").focus({ preventScroll: true });
+        root.querySelector("#history-panel").scrollIntoView({ block: "start" });
         for (const b of target.children)
           b.setAttribute("aria-pressed", String(b === button));
       });
@@ -83,8 +85,10 @@ export function mountDashboard(root, { demo = false, state = {}, notify }) {
       points,
       unit: c?.unit,
       label: c?.title,
+      metric: c?.metric,
       interval: c?.interval,
     };
+    root.querySelector("#history-panel").dataset.kind = metricIcon(c?.metric);
     root.querySelector("#chart-legend").textContent = c
       ? `${c.title} · ${formatUnit(c.unit)}`
       : "No measurement selected";
@@ -141,12 +145,14 @@ export function mountDashboard(root, { demo = false, state = {}, notify }) {
       if (d.stale)
         items.push({
           d,
+          kind: "stale",
           title: `${d.name ?? d.device_id} has not reported`,
           body: `Last sample ${age(d.last_received_at, Date.parse(snapshot.generated_at)).toLowerCase()}. Expected every ${d.expected_interval_seconds / 60} min.`,
         });
       if (d.sensor_error)
         items.push({
           d,
+          kind: "error",
           title: `${d.name ?? d.device_id}: reading error`,
           body: "The device reported, but a measurement is unavailable.",
         });
@@ -155,7 +161,7 @@ export function mountDashboard(root, { demo = false, state = {}, notify }) {
       items
         .map(
           (item, i) =>
-            `<div class="alert-item">${icon(item.d.stale ? "clock" : "alert")}<div><p>${e(item.title)}</p><small>${e(item.body)}</small><button class="text-button" data-alert="${i}">View device details →</button></div></div>`,
+            `<div class="alert-item" data-state="${item.kind}">${icon(item.kind === "stale" ? "clock" : "alert")}<div><p>${e(item.title)}</p><small>${e(item.body)}</small><button class="text-button" data-alert="${i}">View device details →</button></div></div>`,
         )
         .join("") ||
       `<div class="alert-empty">${icon("check")}<h3>No reported issues</h3><p class="small">${devices.length ? "No silence or reading errors in the latest reports." : "Device reports will appear here."}</p></div>`;
@@ -181,7 +187,7 @@ export function mountDashboard(root, { demo = false, state = {}, notify }) {
     root.querySelector("#summary").innerHTML = metrics
       .map(
         ([name, note, tail]) =>
-          `<div class="summary-cell"><div class="eyebrow">${e(name)}</div><div class="summary-number">${note}<span>${e(tail)}</span></div></div>`,
+          `<div class="summary-cell"${name === "Need attention" && issues ? ' data-attention="true"' : ""}>${name === "Need attention" ? `<a href="#attention-panel" class="summary-link"><div class="eyebrow">${icon(issues ? "alert" : "check")}${e(name)}</div><div class="summary-number">${note}<span>${e(tail)} →</span></div></a>` : `<div class="eyebrow">${e(name)}</div><div class="summary-number">${note}<span>${e(tail)}</span></div>`}</div>`,
       )
       .join("");
     root.querySelector("#metric-select").innerHTML = channels

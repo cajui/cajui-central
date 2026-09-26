@@ -44,16 +44,17 @@ export function icon(name) {
 export function mark() {
   return '<svg viewBox="0 0 64 64" fill="none" aria-hidden="true"><path d="M48 16a23 23 0 1 0 0 32" stroke="currentColor" stroke-width="10" stroke-linecap="round"/><path d="M44 32H29" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><circle cx="53" cy="32" r="5" fill="currentColor"/></svg>';
 }
+const metricIcons = {
+  temperature: "temperature",
+  humidity: "humidity",
+  soil_moisture: "soil",
+  illuminance: "light",
+  light: "light",
+  battery: "battery",
+  co2: "air",
+  water_level: "level",
+  contact: "door",
+  motion: "motion",
+};
 export const metricIcon = (metric) =>
-  ({
-    temperature: "temperature",
-    humidity: "humidity",
-    soil_moisture: "soil",
-    illuminance: "light",
-    light: "light",
-    battery: "battery",
-    co2: "air",
-    water_level: "level",
-    contact: "door",
-    motion: "motion",
-  })[metric] ?? "device";
+  Object.hasOwn(metricIcons, metric) ? metricIcons[metric] : "device";

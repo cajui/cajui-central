@@ -28,6 +28,22 @@
   --plot: #327c61;
   --plot-secondary: #407ba1;
   --focus: #3d765e;
+  /* Measurement accents identify a quantity, never a healthy range. */
+  --temperature: #994819;
+  --temperature-soft: #fff0e3;
+  --humidity: #14658c;
+  --humidity-soft: #e7f4fc;
+  --air: #7352a0;
+  --air-soft: #f2ecfa;
+  --soil: #526a28;
+  --soil-soft: #edf3df;
+  --light: #795b0a;
+  --light-soft: #fff4cd;
+  --text-label: 1.125rem;
+  --text-reading: 3rem;
+  --text-body: 1rem;
+  --text-detail: 0.875rem;
+  --touch-target: 48px;
   --radius-sm: 8px;
   --radius: 14px;
   --radius-lg: 22px;
@@ -67,5 +83,15 @@
   --plot: #a6d4b4;
   --plot-secondary: #9fcce8;
   --focus: #b3d8bc;
+  --temperature: #ffba87;
+  --temperature-soft: #442d20;
+  --humidity: #8cd3f6;
+  --humidity-soft: #213c4b;
+  --air: #cfb5fb;
+  --air-soft: #372b49;
+  --soil: #c2d994;
+  --soil-soft: #313d23;
+  --light: #f2d879;
+  --light-soft: #403820;
   --shadow: none;
 }

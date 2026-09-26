@@ -34,7 +34,7 @@ class Badge extends Component {
     const state = Object.hasOwn(states, this.getAttribute("state"))
       ? this.getAttribute("state")
       : "empty";
-    this.innerHTML = `<span class="badge" data-state="${state}">${e(this.getAttribute("label") ?? states[state])}</span>`;
+    this.innerHTML = `<span class="badge" data-state="${state}">${icon(state === "error" ? "alert" : state === "stale" || state === "warning" ? "clock" : state === "ok" ? "check" : "device")}${e(this.getAttribute("label") ?? states[state])}</span>`;
   }
 }
 class Sensor extends Component {
@@ -61,7 +61,15 @@ class Sensor extends Component {
       28,
       d.interval ? d.interval * 3000 : Infinity,
     );
-    this.innerHTML = `<article class="card"><div class="card-top"><span class="metric-icon">${icon(metricIcon(d.metric ?? this.getAttribute("metric")))}</span><cj-badge state="${e(state)}"></cj-badge></div><h3 class="card-title">${e(d.title ?? this.getAttribute("label") ?? "Measurement")}</h3><p class="measurement">${formatValue(value)}<span class="unit">${e(formatUnit(d.unit ?? this.getAttribute("unit")))}</span></p><p class="card-context">${e(d.context ?? this.getAttribute("context") ?? "No sensor selected")}</p>${spark ? `<svg class="spark" viewBox="0 0 180 32" preserveAspectRatio="none" aria-hidden="true"><path d="${spark.path}" transform="translate(0 2)"/></svg>` : '<div class="spark" aria-hidden="true"></div>'}<div class="card-bottom"><span>${iconText(state)}</span><span>${e(d.updated ?? this.getAttribute("updated") ?? "Time unknown")}</span></div></article>`;
+    const kind = metricIcon(d.metric ?? this.getAttribute("metric"));
+    this.innerHTML = `<article class="card sensor-card" data-kind="${kind}" data-state="${e(state)}">
+      <div class="sensor-heading"><span class="metric-icon">${icon(kind)}</span><div><h3 class="card-title">${e(d.title ?? this.getAttribute("label") ?? "Measurement")}</h3><p class="card-context">${e(d.context ?? this.getAttribute("context") ?? "No sensor selected")}</p></div></div>
+      <p class="measurement">${formatValue(value)}<span class="unit">${e(formatUnit(d.unit ?? this.getAttribute("unit")))}</span></p>
+      ${spark ? `<svg class="spark" viewBox="0 0 180 32" preserveAspectRatio="none" aria-hidden="true"><path d="${spark.path}" transform="translate(0 2)"/></svg>` : ""}
+      <div class="sensor-status"><cj-badge state="${e(state)}"></cj-badge><span class="reading-age">${e(d.updated ?? this.getAttribute("updated") ?? "Time unknown")}</span></div>
+      ${state === "ok" ? "" : `<p class="reading-note">${e(iconText(state))}</p>`}
+      <span class="sensor-action" aria-hidden="true">View history ${icon("arrow")}</span>
+    </article>`;
   }
 }
 function iconText(state) {
@@ -96,7 +104,7 @@ class Level extends Component {
   render() {
     const n = attributeNumber(this, "value");
     const valid = n !== null && Number.isFinite(n) && n >= 0 && n <= 100;
-    this.innerHTML = `<article class="card"><div class="card-top"><span class="metric-icon">${icon("level")}</span><cj-badge state="${valid ? "ok" : "empty"}"></cj-badge></div><h3 class="card-title">${e(this.getAttribute("label") ?? "Fill level")}</h3><p class="measurement">${formatValue(valid ? n : null, 0)}<span class="unit">%</span></p><p class="card-context">${e(this.getAttribute("context") ?? "")}</p><div class="level-track" ${valid ? `role="meter" aria-label="${e(this.getAttribute("label") ?? "Fill level")}" aria-valuenow="${n}" aria-valuemin="0" aria-valuemax="100"` : ""}><svg viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true"><rect width="${valid ? n : 0}" height="8" rx="4"/></svg></div><div class="level-labels"><span>Empty</span><span>Full</span></div></article>`;
+    this.innerHTML = `<article class="card" data-kind="level"><div class="card-top"><span class="metric-icon">${icon("level")}</span><cj-badge state="${valid ? "ok" : "empty"}"></cj-badge></div><h3 class="card-title">${e(this.getAttribute("label") ?? "Fill level")}</h3><p class="measurement">${formatValue(valid ? n : null, 0)}<span class="unit">%</span></p><p class="card-context">${e(this.getAttribute("context") ?? "")}</p><div class="level-track" ${valid ? `role="meter" aria-label="${e(this.getAttribute("label") ?? "Fill level")}" aria-valuenow="${n}" aria-valuemin="0" aria-valuemax="100"` : ""}><svg viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true"><rect width="${valid ? n : 0}" height="8" rx="4"/></svg></div><div class="level-labels"><span>Empty</span><span>Full</span></div></article>`;
   }
 }
 class BinaryState extends Component {
@@ -130,9 +138,10 @@ class Chart extends Component {
     this.observer?.disconnect();
   }
   render() {
+    this.dataset.kind = metricIcon(this.data.metric);
     this.lastWidth = Math.round(this.clientWidth);
     const width = Math.max(this.lastWidth, 260),
-      plotWidth = width - 60;
+      plotWidth = width - 84;
     const {
       points = [],
       unit = "",
@@ -171,7 +180,7 @@ class Chart extends Component {
     const ticks = [0, 0.25, 0.5, 0.75, 1]
       .map(
         (f) =>
-          `<line class="gridline" x1="40" y1="${18 + 164 * f}" x2="${width - 20}" y2="${18 + 164 * f}"/><text x="30" y="${22 + 164 * f}" text-anchor="end">${formatValue(g.max * (1 - f) + g.min * f)}</text>`,
+          `<line class="gridline" x1="64" y1="${18 + 164 * f}" x2="${width - 20}" y2="${18 + 164 * f}"/><text x="54" y="${22 + 164 * f}" text-anchor="end">${formatValue(g.max * (1 - f) + g.min * f)}</text>`,
       )
       .join("");
     const time = (t) =>
@@ -180,7 +189,7 @@ class Chart extends Component {
         minute: "2-digit",
         hour12: false,
       });
-    this.innerHTML = `<svg class="plot" viewBox="0 0 ${width} 216" role="img" aria-label="${e(label)} in ${e(formatUnit(unit))}; ${g.points.length} observations. Use the slider or data table for exact values.">${ticks}<g transform="translate(40 18)"><path class="series" d="${g.path}"/>${isolated}<line class="gridline cursor" x1="0" x2="0" y1="0" y2="164"/></g><text x="40" y="208">${time(g.start)}</text><text x="${width / 2}" y="208" text-anchor="middle">${time((g.start + g.end) / 2)}</text><text x="${width - 20}" y="208" text-anchor="end">${time(g.end)}</text></svg><label class="plot-inspect"><span>Inspect reading</span><input type="range" min="0" max="${g.points.length - 1}" value="${g.points.length - 1}" aria-label="Inspect ${e(label)} observations"><output></output></label><details class="small muted"><summary>View data table</summary><div class="table-wrap"><table><caption class="sr-only">${e(label)} data</caption><thead><tr><th>Time (local)</th><th>Value (${e(formatUnit(unit))})</th></tr></thead><tbody>${g.points.map((p) => `<tr><td>${e(new Date(p.time).toLocaleString("en"))}</td><td>${numeric(p.value) === null ? "No reading" : formatValue(p.value)}</td></tr>`).join("")}</tbody></table></div></details>`;
+    this.innerHTML = `<svg class="plot" viewBox="0 0 ${width} 216" role="img" aria-label="${e(label)} in ${e(formatUnit(unit))}; ${g.points.length} observations. Use the slider or data table for exact values.">${ticks}<g transform="translate(64 18)"><path class="series" d="${g.path}"/>${isolated}<line class="gridline cursor" x1="0" x2="0" y1="0" y2="164"/></g><text x="64" y="208">${time(g.start)}</text><text x="${width / 2}" y="208" text-anchor="middle">${time((g.start + g.end) / 2)}</text><text x="${width - 20}" y="208" text-anchor="end">${time(g.end)}</text></svg><label class="plot-inspect"><span>Inspect reading</span><input type="range" min="0" max="${g.points.length - 1}" value="${g.points.length - 1}" aria-label="Inspect ${e(label)} observations"><output></output></label><details class="small muted"><summary>View data table</summary><div class="table-wrap"><table><caption class="sr-only">${e(label)} data</caption><thead><tr><th>Time (local)</th><th>Value (${e(formatUnit(unit))})</th></tr></thead><tbody>${g.points.map((p) => `<tr><td>${e(new Date(p.time).toLocaleString("en"))}</td><td>${numeric(p.value) === null ? "No reading" : formatValue(p.value)}</td></tr>`).join("")}</tbody></table></div></details>`;
     const slider = this.querySelector("input"),
       output = this.querySelector("output"),
       cursor = this.querySelector(".cursor");
@@ -201,7 +210,7 @@ class Chart extends Component {
           0,
           Math.min(
             1,
-            (((event.clientX - bounds.left) / bounds.width) * width - 40) /
+            (((event.clientX - bounds.left) / bounds.width) * width - 64) /
               plotWidth,
           ),
         ) *
