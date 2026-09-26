@@ -36,7 +36,7 @@ jobs:
         with:
           name: mqtt-coverage
           path: coverage.out
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: pip install -r tests/requirements.txt
@@ -54,7 +54,7 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: tests/ui/package-lock.json
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: pip install -r scripts/requirements-locales.txt
