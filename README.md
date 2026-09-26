@@ -100,7 +100,7 @@ go tool cover -html=coverage.out   # coverage report, after make check
 All `/api` routes require `Authorization: Bearer <CAJUI_API_TOKEN>`.
 
 - `GET /healthz`: 200 when the database is reachable, 503 otherwise.
-- `GET /`: dashboard with the latest readings and samples (no authentication, loopback only).
+- `GET /`, `/devices`, `/sensors`: local workspace pages (no login, loopback hosts only).
 - `GET /api/v1/readings`: JSON list, most recently received first.
 - `POST /api/v1/readings`: one JSON object, `Content-Type: application/json`.
 
@@ -118,8 +118,8 @@ no multi-metric transaction and no end-to-end delivery guarantee.
 
 ## Roadmap
 
-Next: TLS for producers on the local network. Not yet implemented: device registry,
-alerts beyond silence detection, automations, user authentication.
+Next: TLS for producers on the local network. Not yet implemented: alerts beyond
+silence detection, automations, user authentication or remote device provisioning.
 
 ## License
 
@@ -204,7 +204,8 @@ and subscription progress are logged.
 Authenticated `GET /api/v1/samples` returns the latest 100 sample envelopes with
 `received_at`; `GET /api/v1/devices` returns up to 100 most recently observed devices,
 with `last_received_at`, `expected_interval_seconds`, `stale`, and `sensor_error`.
-The dashboard shows both MQTT samples and the existing HTTP readings separately.
+The workspace scopes MQTT and HTTP identities separately and lets users place their
+registered sensors together on a dashboard.
 
 ### Connecting an existing broker
 
@@ -291,12 +292,39 @@ repository.
 
 ## Interface
 
-Central organizes observations as **devices → sensors → measurements**. One device
-with one temperature/humidity sensor appears as one device containing one sensor
-and two readings. The summary counts sensors separately from their measurements.
-Device identity is scoped by transport, source and device ID; repeated sensor IDs
-in different devices are never combined. Different units keep separate histories.
-Counts reflect the latest loaded records, not a persistent inventory of every sensor.
+The sidebar separates **Dashboard**, **Devices**, and **Sensors**. Setup and display
+are independent: a dashboard item references a registration, not a copy of its name
+or measurements. No frontend build or additional service is needed.
+
+1. Open **Devices → Add device**. Choose an observed device, name it, and optionally
+   assign a location.
+2. Open **Sensors → Add sensor**. Choose an observed sensor; the picker shows its
+   parent device and measurement types. Its device must be registered first.
+3. Open **Dashboard → Organize dashboard**. Create named sections, select devices,
+   complete sensors or individual measurements, and move sections/items up or down.
+   Save to persist the arrangement, or cancel to discard the draft.
+
+The automatic arrangement shows registered sensors and devices in separate sections.
+An explicitly empty arrangement remains empty. Removing a dashboard item or section
+never deletes its registration or history. Names and locations can be edited; their
+stable identities remain unchanged. There is no registration deletion or telemetry
+purge in this UI. Dashboard preferences are shared by this local Central instance,
+not per browser. The editor supports up to 20 sections, 50 items per section and 200
+items total; a repeated item is allowed in different sections but not twice within one.
+
+**Available** means observed in received telemetry, not physically scanned or paired.
+The protocol does not necessarily announce a component model. Registering an item
+neither pairs radios nor changes broker permissions. A temperature/humidity sensor
+has one registration and two measurements. Source, transport and device identity
+scope every sensor, so repeated IDs from different producers remain separate.
+
+SQLite schema version 3 adds durable observed devices, sensors, last measurements,
+registration settings and layout preferences. Migration backfills existing history
+transactionally, without guessing names or changing original readings. Observations
+and new telemetry commit together; duplicate retries never refresh inventory times.
+Known sensors remain listed when absent from the most recent 100 samples/readings.
+Back up before upgrading; an older binary cannot open a version 3 database. To roll
+back, restore a pre-upgrade backup together with the older binary.
 
 The product shows actual received data only. It has no brand pages, component
 catalog, simulated gallery or design-system navigation. The reference lives in
@@ -305,9 +333,9 @@ catalog, simulated gallery or design-system navigation. The reference lives in
 Readings use large values, identifiable icons and quantity accents. Sensor failures
 and device silence remain explicit, independent states; an accent does not imply a
 healthy range. Select a reading to open its history. Search matches devices and
-sensors while preserving their surrounding group; export includes sensor readings
-from the visible device groups. Friendly names and locations require a future
-persistent registry; otherwise the reported identifiers are shown.
+sensors by their registered names and locations. Export includes the visible sensor
+measurements, deduplicated when a measurement appears in multiple sections. The
+summary counts registered devices and sensors independently of dashboard placement.
 
 Radio diagnostics stay in each device's collapsed **Connection details**. The
 version 1 convention recognized here is `sensor_id: "radio"` with `rssi` in `dBm`
@@ -322,14 +350,17 @@ interval, so their status is **Recorded**, without a freshness guarantee. A devi
 reporting successfully does not mean its measurements are within a healthy range.
 
 History uses **arrival timestamps** from the latest loaded records (up to 100 MQTT
-samples and 100 HTTP readings), with one measurement/unit per chart. Period selection
+samples and 100 HTTP readings, plus each known channel’s last observation), with one
+measurement/unit per chart. Period selection
 filters that snapshot, not a full historical query. Missing observations and gaps
 beyond three expected intervals break the line. Pointer and keyboard inspection and
 a data table expose the same values. Unknown diagnostics are never replaced by zero.
 
 The dashboard refreshes every 30 seconds while visible and not being interacted
-with. Manual refresh remains available; a failed refresh retains the previous
-snapshot with a warning. Without JavaScript, read-only receipt tables remain.
+with. Inventory pages have an explicit Refresh button. A failed dashboard refresh
+retains the previous snapshot with a warning. Edits use revision checks: a stale
+window cannot silently overwrite a newer name or layout. A failed save keeps the
+draft visible. Without JavaScript, read-only receipt tables remain.
 
 The interface is embedded in the same executable and container image: local
 JavaScript modules, CSS, SVG icons and the licensed Manrope font. There is no frontend
@@ -355,13 +386,23 @@ schemas. Font license: `internal/httpapi/ui/assets/fonts/OFL-Manrope.txt`.
 
 ### Script policy and access
 
-The CSP permits scripts, styles, fonts, images and read requests from the same origin
+The CSP permits scripts, styles, fonts, images and fetch requests from the same origin
 only. Inline executable scripts, `eval`, external resources, frames and form submission
 remain blocked. The initial data snapshot is JSON escaped by Go's HTML template;
 telemetry text is escaped by the components. API tokens are never embedded in HTML,
 JavaScript or browser storage. Refresh reads the same public loopback-only document,
-without opening an unauthenticated API route. Existing authenticated APIs are unchanged.
-The dashboard still has **no login** and must remain on loopback.
+without exposing the ingestion credential. Existing authenticated APIs are unchanged.
+
+Local edits use `PUT /ui-api/devices/{id}`, `/ui-api/sensors/{id}` and
+`/ui-api/dashboard/layout`. These are browser-workspace endpoints, not ingestion APIs.
+They require an allowed loopback Host, an exactly matching Origin, a process-scoped
+`X-Cajui-Workspace` capability from the local page, JSON content type and bounded
+payloads. Cross-site fetch metadata is rejected. Names and optional locations are
+limited to 80 characters; edits require the current revision. Browser capabilities
+expire on server restart and are never stored in browser storage. Reload to recover.
+These controls prevent cross-site edits and reject rebinding hosts; they are **not
+user authentication**. Anyone with access to the local service can configure the
+workspace. The application must remain on loopback.
 
 ### Frontend development checks
 
@@ -374,10 +415,14 @@ npm --prefix tests/ui run format:check
 npm --prefix tests/ui run test:model
 python3 -m unittest discover -s tests -p test_brand_server.py -v
 (cd tests/ui && npx playwright install chromium)
-npm --prefix tests/ui test
+CAJUI_UI_API_TOKEN_FILE=/path/to/isolated-test-token npm --prefix tests/ui test
 ```
 
-Playwright starts the separate reference server automatically. It tests product grouping,
+The registration test writes simulated data and preferences to that isolated instance;
+never point it at a real workspace. CI uses `/tmp/cajui-ui-token` by default.
+
+Playwright starts the separate reference server automatically. It tests persistent
+registration, stale-edit conflicts, section ordering/removal, product grouping,
 reference isolation, desktop/tablet/mobile interactions, filtering, inspection, export, unavailable
 refresh, safe text handling and accessibility checks in both themes. The automatic
 accessibility audit covers selected WCAG A/AA rules, not a complete conformance review.

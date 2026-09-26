@@ -9,7 +9,7 @@
 </head>
 <body data-page="live">
 <a href="#main" class="skip-link">Skip to content</a>
-<div class="shell product-shell"><aside class="sidebar" id="sidebar"><a class="wordmark" href="/">Cajuí Central</a><nav class="nav" aria-label="Workspace"><a href="/" aria-current="page">Overview</a></nav></aside><div class="workspace"><header class="topbar" id="topbar">{{.Title}}</header>
+<div class="shell product-shell"><aside class="sidebar" id="sidebar"><a class="wordmark" href="/">Cajuí Central</a><nav class="nav" aria-label="Workspace"><a href="/" {{if eq .Title "Dashboard"}}aria-current="page"{{end}}>Dashboard</a><a href="/devices" {{if eq .Title "Devices"}}aria-current="page"{{end}}>Devices</a><a href="/sensors" {{if eq .Title "Sensors"}}aria-current="page"{{end}}>Sensors</a></nav></aside><div class="workspace"><header class="topbar" id="topbar">{{.Title}}</header>
 
 <main class="content" id="main"><div id="app">
 <h1>Received readings</h1><p class="muted">Recent data. Interactive views load when JavaScript is available.</p>

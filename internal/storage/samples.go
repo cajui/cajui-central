@@ -15,7 +15,12 @@ func (s *Store) InsertSample(ctx context.Context, sample telemetry.Sample, at ti
 	if err != nil {
 		return false, err
 	}
-	result, err := s.db.ExecContext(ctx, `INSERT INTO samples(source_id,device_id,sample_id,payload,received_at) VALUES(?,?,?,?,?) ON CONFLICT(source_id,device_id,sample_id) DO NOTHING`, sample.SourceID, sample.DeviceID, sample.SampleID, string(payload), at.UTC().Format(time.RFC3339Nano))
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `INSERT INTO samples(source_id,device_id,sample_id,payload,received_at) VALUES(?,?,?,?,?) ON CONFLICT(source_id,device_id,sample_id) DO NOTHING`, sample.SourceID, sample.DeviceID, sample.SampleID, string(payload), at.UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return false, err
 	}
@@ -24,10 +29,13 @@ func (s *Store) InsertSample(ctx context.Context, sample telemetry.Sample, at ti
 		return false, err
 	}
 	if n == 1 {
-		return true, nil
+		if err = observe(ctx, tx, "mqtt", sample.SourceID, sample.DeviceID, sample.Readings, at, sample.ExpectedIntervalSeconds); err != nil {
+			return false, err
+		}
+		return true, tx.Commit()
 	}
 	var previous string
-	if err = s.db.QueryRowContext(ctx, `SELECT payload FROM samples WHERE source_id=? AND device_id=? AND sample_id=?`, sample.SourceID, sample.DeviceID, sample.SampleID).Scan(&previous); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT payload FROM samples WHERE source_id=? AND device_id=? AND sample_id=?`, sample.SourceID, sample.DeviceID, sample.SampleID).Scan(&previous); err != nil {
 		return false, err
 	}
 	if previous != string(payload) {

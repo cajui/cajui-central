@@ -3,6 +3,7 @@ package httpapi
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	_ "embed"
@@ -16,9 +17,14 @@ import (
 	"time"
 
 	"github.com/cajui/cajui-central/internal/telemetry"
+	"github.com/cajui/cajui-central/internal/workspace"
 )
 
 type Repository interface {
+	Catalog(context.Context) (workspace.Catalog, error)
+	SaveDevice(context.Context, int64, workspace.Settings) error
+	SaveSensor(context.Context, int64, workspace.Settings) error
+	SaveLayout(context.Context, workspace.Layout) error
 	Insert(context.Context, telemetry.Reading, time.Time) (bool, error)
 	Recent(context.Context, int) ([]telemetry.Reading, error)
 	Ping(context.Context) error
@@ -31,9 +37,10 @@ var page string
 var dashboard = template.Must(template.New("index").Parse(page))
 
 type server struct {
-	repo   Repository
-	token  [32]byte
-	logger *slog.Logger
+	repo    Repository
+	uiToken string
+	token   [32]byte
+	logger  *slog.Logger
 }
 
 func New(repo Repository, token string, logger *slog.Logger) (http.Handler, error) {
@@ -43,10 +50,13 @@ func New(repo Repository, token string, logger *slog.Logger) (http.Handler, erro
 	if logger == nil {
 		logger = slog.Default()
 	}
-	s := &server{repo: repo, token: sha256.Sum256([]byte(token)), logger: logger}
+	s := &server{repo: repo, token: sha256.Sum256([]byte(token)), logger: logger, uiToken: rand.Text()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
-	mux.HandleFunc("GET /{$}", s.index)
+	mux.HandleFunc("GET /{$}", s.localPage(s.index))
+	mux.HandleFunc("GET /devices", s.localPage(s.index))
+	mux.HandleFunc("GET /sensors", s.localPage(s.index))
+	mux.HandleFunc("PUT /ui-api/{kind}/{id}", s.editWorkspace)
 	mux.HandleFunc("GET /ui/{path...}", serveUIAsset)
 
 	mux.Handle("GET /api/v1/readings", s.authorize(http.HandlerFunc(s.list)))
@@ -96,7 +106,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// The dashboard is read-only and local; API access always requires a token.
+// Pages and workspace edits are local; ingestion APIs require the API token.
 func (s *server) index(w http.ResponseWriter, r *http.Request) {
 	readings, err := s.repo.Recent(r.Context(), 100)
 	if err != nil {
@@ -114,7 +124,19 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	if err = dashboard.Execute(w, dashboardPage{Title: "Overview", State: dashboardState{Readings: readings, Samples: samples, Devices: devices, GeneratedAt: time.Now().UTC()}}); err != nil {
+	catalog, err := s.repo.Catalog(r.Context())
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	title := "Dashboard"
+	if r.URL.Path == "/devices" {
+		title = "Devices"
+	}
+	if r.URL.Path == "/sensors" {
+		title = "Sensors"
+	}
+	if err = dashboard.Execute(w, dashboardPage{Title: title, State: dashboardState{Readings: readings, Samples: samples, Devices: devices, Workspace: &catalog, UIToken: s.uiToken, GeneratedAt: time.Now().UTC()}}); err != nil {
 		s.logger.Error("render dashboard", "error", err)
 	}
 }

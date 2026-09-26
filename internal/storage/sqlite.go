@@ -30,7 +30,7 @@ func Open(path string) (*Store, error) {
 	return s, nil
 }
 func (s *Store) migrate() error {
-	if _, err := s.db.Exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;`); err != nil {
+	if _, err := s.db.Exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;`); err != nil {
 		return err
 	}
 	tx, err := s.db.Begin()
@@ -42,7 +42,7 @@ func (s *Store) migrate() error {
 	if err = tx.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return err
 	}
-	if version > 2 {
+	if version > 3 {
 		return fmt.Errorf("unsupported schema version %d", version)
 	}
 	if version == 0 {
@@ -67,6 +67,14 @@ func (s *Store) migrate() error {
 			return err
 		}
 	}
+	if version < 3 {
+		if _, err = tx.Exec(workspaceSchema); err != nil {
+			return err
+		}
+		if err = backfillWorkspace(tx); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 func (s *Store) Close() error                   { return s.db.Close() }
@@ -83,7 +91,12 @@ func (s *Store) Insert(ctx context.Context, r telemetry.Reading, receivedAt time
 	if err != nil {
 		return false, err
 	}
-	result, err := s.db.ExecContext(ctx, `INSERT INTO readings(node_id,sensor_id,session_id,sequence,metric,payload)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `INSERT INTO readings(node_id,sensor_id,session_id,sequence,metric,payload)
  VALUES(?,?,?,?,?,?) ON CONFLICT(node_id,sensor_id,session_id,sequence,metric) DO NOTHING`, r.NodeID, r.SensorID, r.SessionID, r.Sequence, r.Metric, string(payload))
 	if err != nil {
 		return false, err
@@ -93,10 +106,13 @@ func (s *Store) Insert(ctx context.Context, r telemetry.Reading, receivedAt time
 		return false, err
 	}
 	if count == 1 {
-		return true, nil
+		if err = observeReading(ctx, tx, r); err != nil {
+			return false, err
+		}
+		return true, tx.Commit()
 	}
 	var existing string
-	err = s.db.QueryRowContext(ctx, `SELECT payload FROM readings WHERE node_id=? AND sensor_id=? AND session_id=? AND sequence=? AND metric=?`, r.NodeID, r.SensorID, r.SessionID, r.Sequence, r.Metric).Scan(&existing)
+	err = tx.QueryRowContext(ctx, `SELECT payload FROM readings WHERE node_id=? AND sensor_id=? AND session_id=? AND sequence=? AND metric=?`, r.NodeID, r.SensorID, r.SessionID, r.Sequence, r.Metric).Scan(&existing)
 	if err != nil {
 		return false, err
 	}

@@ -123,7 +123,7 @@ test("live view refresh preserves data after a network failure", async ({
 }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Overview", exact: true }),
+    page.getByRole("heading", { name: "Dashboard", exact: true }),
   ).toBeVisible();
   await page.route("**/", (route) => route.abort());
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
@@ -326,6 +326,37 @@ async function liveWorkspace(page) {
         },
       ],
     });
+  snapshot.workspace = {
+    devices: [
+      {
+        id: 1,
+        transport: "mqtt",
+        source: "receiver",
+        device: "device-1",
+        name: "Device 1",
+        location: "",
+        revision: 1,
+        received_at: snapshot.samples[0].received_at,
+        interval: 300,
+      },
+    ],
+    sensors: ["sensor-1", "radio"].map((sensor, index) => ({
+      id: index + 1,
+      device_id: 1,
+      sensor,
+      name: sensor === "radio" ? "" : "Sensor 1",
+      location: "",
+      revision: sensor === "radio" ? 0 : 1,
+      measurements: snapshot.samples[0].readings
+        .filter((r) => r.sensor_id === sensor)
+        .map((r) => ({
+          ...r,
+          received_at: snapshot.samples[0].received_at,
+          interval: 300,
+        })),
+    })),
+    layout: { revision: 0, sections: null },
+  };
   const response = await page.request.get("/");
   const html = await response.text();
   const json = JSON.stringify(snapshot).replaceAll("<", "\\u003c");
@@ -347,7 +378,7 @@ for (const width of [390, 820, 1440]) {
   }) => {
     await page.setViewportSize({ width, height: 1180 });
     await liveWorkspace(page);
-    await expect(page.locator(".device-group")).toHaveCount(1);
+    await expect(page.locator(".dashboard-item")).toHaveCount(2);
     await expect(page.locator(".sensor-group")).toHaveCount(1);
     await expect(page.locator(".reading-button")).toHaveCount(2);
     await expect(page.locator("#summary")).toContainText(
@@ -430,4 +461,215 @@ test("product accessibility and isolated reference routes", async ({
   ]) {
     expect((await page.request.get(path)).status()).toBe(404);
   }
+});
+
+test("persistent registration, independent dashboard composition and safe edits", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const { readFile } = await import("node:fs/promises");
+  const apiToken = (
+    await readFile(
+      process.env.CAJUI_UI_API_TOKEN_FILE ?? "/tmp/cajui-ui-token",
+      "utf8",
+    )
+  ).trim();
+  const suffix = Date.now().toString(36),
+    node = `ui-${suffix}`,
+    deviceName = `Station ${suffix}`,
+    sensorName = `Ambient ${suffix}`,
+    renamed = `Ambient <img> ${suffix}`;
+  for (const [metric, value, unit] of [
+    ["temperature", 24.5, "degC"],
+    ["humidity", 52, "%"],
+  ]) {
+    const response = await page.request.post("/api/v1/readings", {
+      headers: { Authorization: `Bearer ${apiToken}` },
+      data: {
+        node_id: node,
+        sensor_id: "ambient",
+        session_id: "ui-test",
+        sequence: 0,
+        metric,
+        value,
+        unit,
+      },
+    });
+    expect(response.status()).toBe(201);
+  }
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await page.goto("/sensors");
+  await page.getByRole("button", { name: "Add sensor", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText("Register device first");
+  await page.keyboard.press("Escape");
+  await page.goto("/devices");
+  await page.getByRole("button", { name: "Add device", exact: true }).click();
+  await page
+    .getByRole("button", { name: `Select ${node}`, exact: true })
+    .click();
+  await page.getByLabel("Name", { exact: true }).fill(deviceName);
+  await page.getByLabel("Location", { exact: false }).fill("North");
+  await page.getByRole("button", { name: "Save device", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: `Edit ${deviceName}`, exact: true }),
+  ).toBeVisible();
+  await page.goto("/sensors");
+  await page.getByRole("button", { name: "Add sensor", exact: true }).click();
+  const available = page
+    .getByRole("dialog")
+    .getByRole("row")
+    .filter({ hasText: deviceName });
+  await available
+    .getByRole("button", { name: "Select ambient", exact: true })
+    .click();
+  await page.getByLabel("Name", { exact: true }).fill(sensorName);
+  await page.getByRole("button", { name: "Save sensor", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: `Edit ${sensorName}`, exact: true }),
+  ).toBeVisible();
+  // The second tab keeps an old revision; its edit must not overwrite the first.
+  const other = await context.newPage();
+  await other.goto("/sensors");
+  await other
+    .getByRole("button", { name: `Edit ${sensorName}`, exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: `Edit ${sensorName}`, exact: true })
+    .click();
+  await page.getByLabel("Name", { exact: true }).fill(renamed);
+  await page.getByRole("button", { name: "Save sensor", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: `Edit ${renamed}`, exact: true }),
+  ).toBeVisible();
+  await other.getByLabel("Name", { exact: true }).fill("Stale edit");
+  await other.getByRole("button", { name: "Save sensor", exact: true }).click();
+  await expect(other.getByRole("alert")).toContainText("changed");
+  await other.close();
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Organize dashboard", exact: true })
+    .click();
+  // Start with a deliberately empty composition, preserving all registrations.
+  while (
+    await page
+      .getByRole("button", { name: "Remove section", exact: true })
+      .count()
+  )
+    await page
+      .getByRole("button", { name: "Remove section", exact: true })
+      .first()
+      .click();
+  await page.getByRole("button", { name: "Add section", exact: true }).click();
+  await page.getByLabel("Section title", { exact: true }).fill("Climate");
+  await page
+    .getByRole("combobox", { name: "Add to this section", exact: true })
+    .selectOption({ label: `Sensor · ${renamed} · ${deviceName}` });
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  await page.getByRole("button", { name: "Add section", exact: true }).click();
+  await page
+    .getByLabel("Section title", { exact: true })
+    .last()
+    .fill("Equipment");
+  await page
+    .getByRole("combobox", { name: "Add to this section", exact: true })
+    .last()
+    .selectOption({ label: `Device · ${deviceName}` });
+  await page
+    .getByRole("button", { name: "Add item", exact: true })
+    .last()
+    .click();
+  await page
+    .getByRole("button", { name: "Move section 2 up", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Save dashboard", exact: true })
+    .click();
+  await expect(page.locator(".dashboard-section > h2")).toHaveText([
+    "Equipment",
+    "Climate",
+  ]);
+  await expect(page.locator(".sensor-group")).toContainText(renamed);
+  await expect(page.locator("cj-reading")).toHaveCount(2);
+  await expect(page.locator("#app img")).toHaveCount(0);
+  await page.getByRole("button", { name: /Inspect Humidity:/ }).click();
+  await expect(page.locator("#history-context")).toContainText(renamed);
+  await page.reload();
+  await expect(page.locator(".dashboard-section > h2")).toHaveText([
+    "Equipment",
+    "Climate",
+  ]);
+  for (const path of ["/devices", "/sensors", "/"]) {
+    await page.goto(path);
+    await page.locator("html.ready").waitFor();
+    for (const width of [390, 820, 1440]) {
+      await page.setViewportSize({ width, height: 1180 });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBeTruthy();
+    }
+    const audit = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    expect(
+      audit.violations.map((v) => ({
+        id: v.id,
+        nodes: v.nodes.map((n) => n.target),
+      })),
+    ).toEqual([]);
+  }
+  await page
+    .getByRole("button", { name: "Organize dashboard", exact: true })
+    .click();
+  // Select a single measurement independently of its physical sensor.
+  const climate = page.getByRole("group", { name: "Section 2", exact: true });
+  await climate
+    .getByRole("button", { name: "Remove item 1", exact: true })
+    .click();
+  await climate
+    .getByRole("combobox", { name: "Add to this section", exact: true })
+    .selectOption({ label: `Temperature (degC) · ${renamed} · ${deviceName}` });
+  await climate.getByRole("button", { name: "Add item", exact: true }).click();
+  const editorAudit = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(editorAudit.violations.map((v) => v.id)).toEqual([]);
+  await page
+    .getByRole("button", { name: "Save dashboard", exact: true })
+    .click();
+  await expect(page.locator("cj-reading")).toHaveCount(1);
+  await expect(page.locator("cj-reading")).toContainText("Temperature");
+  await page
+    .getByRole("button", { name: "Organize dashboard", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Remove section", exact: true })
+    .last()
+    .click();
+  await page
+    .getByRole("button", { name: "Save dashboard", exact: true })
+    .click();
+  await expect(page.locator("cj-reading")).toHaveCount(0);
+  await page.goto("/sensors");
+  await expect(
+    page.getByRole("button", { name: `Edit ${renamed}`, exact: true }),
+  ).toBeVisible();
+  // Failed saves retain the user's draft rather than reporting success.
+  await page
+    .getByRole("button", { name: `Edit ${renamed}`, exact: true })
+    .click();
+  await page.getByLabel("Name", { exact: true }).fill("Unsaved name");
+  await page.route("**/ui-api/sensors/*", (route) =>
+    route.fulfill({ status: 503 }),
+  );
+  await page.getByRole("button", { name: "Save sensor", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Could not save");
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue(
+    "Unsaved name",
+  );
+  expect(errors).toEqual([]);
 });
