@@ -5,7 +5,6 @@ en-US:
     devices: Devices
     sensors: Sensors
     device: Device
-    sensor: Sensor
     measurement: Measurement
     measurements: Measurements
     refresh: Refresh

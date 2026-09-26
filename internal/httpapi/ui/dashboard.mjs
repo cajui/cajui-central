@@ -238,7 +238,8 @@ export function mountDashboard(root, { state = {}, notify }) {
       });
       diagnostics.append(button);
     }
-    root.querySelector("#device-detail").append(diagnostics);
+    if (g.diagnostics.length)
+      root.querySelector("#device-detail").append(diagnostics);
     root.querySelector("#device-dialog").showModal();
   }
   function render() {

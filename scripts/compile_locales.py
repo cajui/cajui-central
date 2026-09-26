@@ -41,7 +41,7 @@ def flatten(value, prefix=""):
             result.update(flatten(entry, path))
         elif isinstance(entry, str) and entry:
             # Catalogs contain plain text only. Escaping remains the renderer's job.
-            if any(char in entry for char in "<>`") or "${" in entry:
+            if any(char in entry for char in "<>`\"&") or "${" in entry:
                 raise ValueError(f"Markup is not allowed: {path}")
             result[path] = entry
         else:
@@ -52,7 +52,7 @@ def flatten(value, prefix=""):
 def compile_catalogs():
     catalogs = {}
     for locale in LOCALES:
-        source = yaml.load((ROOT / "locales" / f"{locale}.yml").read_text(), Loader=CatalogLoader)
+        source = yaml.load((ROOT / "locales" / f"{locale}.yml").read_text(encoding="utf-8"), Loader=CatalogLoader)
         if not isinstance(source, dict) or list(source) != [locale]:
             raise ValueError(f"Expected a single {locale} root")
         catalogs[locale] = flatten(source[locale])
@@ -78,10 +78,10 @@ def main():
     args = parser.parse_args()
     for path, content in compile_catalogs().items():
         if args.check:
-            if not path.exists() or path.read_text() != content:
+            if not path.exists() or path.read_text(encoding="utf-8") != content:
                 raise SystemExit(f"Outdated catalog: {path.relative_to(ROOT)}; run scripts/compile_locales.py")
         else:
-            path.write_text(content)
+            path.write_text(content, encoding="utf-8")
 
 
 if __name__ == "__main__":

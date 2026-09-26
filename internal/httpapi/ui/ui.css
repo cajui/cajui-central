@@ -1558,22 +1558,6 @@ summary {
   margin-top: 6px;
   font-size: var(--text-body);
 }
-.device-arrival {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px 12px;
-  font-size: var(--text-body);
-  color: var(--muted);
-}
-.device-arrival .text-button {
-  flex-basis: 100%;
-  text-align: right;
-}
-.device-arrival .badge {
-  font-size: var(--text-body);
-}
 .device-notice {
   display: flex;
   gap: 12px;
@@ -1685,26 +1669,6 @@ cj-reading {
   color: var(--danger);
   font-weight: 700;
 }
-.device-diagnostics {
-  border-top: 1px solid var(--line);
-  padding-top: 8px;
-  margin-top: 24px;
-}
-.device-diagnostics summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--brand);
-  font-weight: 650;
-}
-.device-diagnostics summary::after {
-  content: "+";
-  margin-left: auto;
-  font-size: 24px;
-}
-.device-diagnostics[open] summary::after {
-  content: "−";
-}
 .diagnostic-readings {
   display: grid;
   gap: 12px;
@@ -1741,12 +1705,6 @@ cj-reading {
 @media (max-width: 1000px) {
   .device-group-heading {
     flex-wrap: wrap;
-  }
-  .device-arrival {
-    justify-content: flex-start;
-  }
-  .device-arrival .text-button {
-    flex-basis: auto;
   }
 }
 @media (max-width: 600px) {
@@ -1868,9 +1826,6 @@ cj-reading {
 .dashboard-item .reading-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
 }
-.dashboard-item .device-arrival {
-  align-items: start;
-}
 .dashboard-item.sensor-group {
   padding: 0;
   gap: 0;
@@ -1900,9 +1855,6 @@ cj-reading {
 }
 .dashboard-item .reading-history {
   margin-top: 10px;
-}
-.dashboard-item .device-diagnostics {
-  margin-top: 0;
 }
 /* Preserve configured order; dense packing can move cards ahead of earlier ones. */
 @container dashboard-section (min-width: 532px) {

@@ -42,6 +42,8 @@ wins for zero, then `Intl.PluralRules` chooses the CLDR category, with `other` a
 fallback. Missing translations fall back to English, then the key. Avoid sentence
 fragments and English-specific concatenated plurals. Catalogs contain **plain
 text**, never markup; escape the entire interpolated result when inserting HTML.
+Double quotes and ampersands are rejected so static messages stay safe inside
+quoted HTML attributes.
 User-supplied names must be interpolation values, never translation keys.
 
 Browser numbers, dates and times use `Intl` with the selected locale. Charts use
@@ -78,8 +80,8 @@ npm --prefix tests/ui run test:model
 ```
 
 Commit both YAML sources and generated artifacts. The generator rejects duplicate
-keys, invalid values, markup, mismatched keys/placeholders and missing plural
-fallbacks. The Node suite checks catalog parity with Go, display formatting, fallback,
+keys, invalid values, markup, double quotes, ampersands, mismatched keys/placeholders
+and missing plural fallbacks. The Node suite checks catalog parity with Go, display formatting, fallback,
 interpolation, stable identities/CSV and localized save failures. Go tests cover
 request negotiation, cookies, fallback HTML and access boundaries. Playwright
 covers switching languages, navigation, Portuguese registration, chart labels,

@@ -5,7 +5,6 @@ pt-BR:
     devices: Transmissores
     sensors: Sensores
     device: Transmissor
-    sensor: Sensor
     measurement: Medição
     measurements: Medições
     refresh: Atualizar

@@ -26,7 +26,7 @@ class LocaleCatalogs(unittest.TestCase):
 
     def test_nested_keys_and_plain_text(self):
         self.assertEqual(compiler.flatten({"devices": {"title": "Transmissores", "count": {"one": "%{count} transmissor", "other": "%{count} transmissores"}}}), {"devices.title": "Transmissores", "devices.count.one": "%{count} transmissor", "devices.count.other": "%{count} transmissores"})
-        for value in [{}, {"empty": ""}, {"number": 1}, {"value": None}, {"html": "<b>Title</b>"}, {"script": "${value}"}, {"bad.key": "Title"}]:
+        for value in [{}, {"empty": ""}, {"number": 1}, {"value": None}, {"html": "<b>Title</b>"}, {"quote": 'Say "hi"'}, {"entity": "A &amp; B"}, {"script": "${value}"}, {"bad.key": "Title"}]:
             with self.subTest(value=value), self.assertRaises(ValueError):
                 compiler.flatten(value)
 
