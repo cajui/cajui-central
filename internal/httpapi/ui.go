@@ -17,6 +17,7 @@ import (
 var uiFiles embed.FS
 
 type dashboardState struct {
+	Locale      string                   `json:"locale"`
 	Workspace   *workspace.Catalog       `json:"workspace,omitempty"`
 	UIToken     string                   `json:"ui_token,omitempty"`
 	Readings    []telemetry.Reading      `json:"readings"`
@@ -26,6 +27,7 @@ type dashboardState struct {
 }
 type dashboardPage struct {
 	Title string
+	Route string
 	State dashboardState
 }
 

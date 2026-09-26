@@ -129,14 +129,18 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	title := "Dashboard"
+	language := requestLocale(w, r)
+	w.Header().Set("Content-Language", language)
+	w.Header().Add("Vary", "Accept-Language")
+	w.Header().Add("Vary", "Cookie")
+	title := "common.dashboard"
 	if r.URL.Path == "/devices" {
-		title = "Devices"
+		title = "common.devices"
 	}
 	if r.URL.Path == "/sensors" {
-		title = "Sensors"
+		title = "common.sensors"
 	}
-	if err = dashboard.Execute(w, dashboardPage{Title: title, State: dashboardState{Readings: readings, Samples: samples, Devices: devices, Workspace: &catalog, UIToken: s.uiToken, GeneratedAt: time.Now().UTC()}}); err != nil {
+	if err = dashboard.Execute(w, dashboardPage{Title: catalogs[language][title], Route: r.URL.Path, State: dashboardState{Locale: language, Readings: readings, Samples: samples, Devices: devices, Workspace: &catalog, UIToken: s.uiToken, GeneratedAt: time.Now().UTC()}}); err != nil {
 		s.logger.Error("render dashboard", "error", err)
 	}
 }

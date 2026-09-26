@@ -1,14 +1,18 @@
+import { t, locale, setLocale } from "./i18n.mjs";
 import "./components.mjs";
 import { icon, mark } from "./icons.mjs";
 import { mountDashboard } from "./dashboard.mjs";
 import { mountRegistry } from "./registry.mjs";
+const state = JSON.parse(document.querySelector("#initial-state").textContent);
+setLocale(state.locale ?? document.documentElement.lang);
+document.documentElement.lang = locale();
 const route = location.pathname;
 const title =
   route === "/devices"
-    ? "Devices"
+    ? t("common.devices")
     : route === "/sensors"
-      ? "Sensors"
-      : "Dashboard";
+      ? t("common.sensors")
+      : t("common.dashboard");
 
 try {
   const theme = localStorage.getItem("cajui-theme");
@@ -18,10 +22,10 @@ try {
   /* Storage is optional. */
 }
 const sidebar = document.querySelector("#sidebar");
-sidebar.innerHTML = `<a class="wordmark" href="/" aria-label="Cajuí Central home">${mark()}<span>Cajuí<small>Central</small></span></a><p class="eyebrow sidebar-label">Workspace</p><nav class="nav" aria-label="Workspace">${[
-  ["/", "Dashboard", "overview"],
-  ["/devices", "Devices", "device"],
-  ["/sensors", "Sensors", "temperature"],
+sidebar.innerHTML = `<a class="wordmark" href="/" aria-label="${t("nav.home")}">${mark()}<span>Cajuí<small>Central</small></span></a><p class="eyebrow sidebar-label">${t("nav.workspace")}</p><nav class="nav" aria-label="${t("nav.workspace")}">${[
+  ["/", t("common.dashboard"), "overview"],
+  ["/devices", t("common.devices"), "device"],
+  ["/sensors", t("common.sensors"), "temperature"],
 ]
   .map(
     ([href, name, glyph]) =>
@@ -29,7 +33,16 @@ sidebar.innerHTML = `<a class="wordmark" href="/" aria-label="Cajuí Central hom
   )
   .join("")}</nav>`;
 document.querySelector("#topbar").innerHTML =
-  `<div class="crumb"><button class="icon-button mobile-menu" id="menu" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">${icon("menu")}</button><span class="muted">Cajuí Central</span><span class="muted">/</span><strong>${title}</strong></div><button class="icon-button" id="theme" aria-label="Switch color theme">${icon("moon")}</button>`;
+  `<div class="crumb"><button class="icon-button mobile-menu" id="menu" aria-label="${t("nav.open")}" aria-expanded="false" aria-controls="sidebar">${icon("menu")}</button><span class="muted">Cajuí Central</span><span class="muted">/</span><strong>${title}</strong></div><div class="top-actions"><label class="locale-picker"><span class="sr-only">${t("nav.language")}</span><select class="input" id="locale"><option value="en-US" lang="en-US">English (US)</option><option value="pt-BR" lang="pt-BR">Português (Brasil)</option></select></label><button class="icon-button" id="theme" aria-label="${t("nav.theme")}">${icon("moon")}</button></div>`;
+document.title = `${title} · Cajuí Central`;
+const language = document.querySelector("#locale");
+language.value = locale();
+language.addEventListener("change", () => {
+  // A validated query also works when cookies are disabled. No network mutation.
+  const url = new URL(location.href);
+  url.searchParams.set("lang", language.value);
+  location.assign(url);
+});
 const menu = document.querySelector("#menu");
 function closeMenu() {
   sidebar.dataset.open = "false";
@@ -56,8 +69,8 @@ function themeLabel() {
   themeButton.setAttribute(
     "aria-label",
     document.documentElement.dataset.theme === "dark"
-      ? "Switch to light theme"
-      : "Switch to dark theme",
+      ? t("nav.light")
+      : t("nav.dark"),
   );
 }
 themeLabel();
@@ -91,7 +104,6 @@ function notify(text) {
   }, 3000);
 }
 const root = document.querySelector("#app");
-const state = JSON.parse(document.querySelector("#initial-state").textContent);
 if (route === "/devices" || route === "/sensors")
   mountRegistry(root, { state, kind: route.slice(1) });
 else mountDashboard(root, { state, notify });

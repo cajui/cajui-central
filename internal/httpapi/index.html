@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{.State.Locale}}">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark"><meta name="theme-color" content="#265d48">
 <title>{{.Title}} · Cajuí Central</title>
@@ -8,16 +8,16 @@
 <script type="module" src="/ui/app.mjs"></script>
 </head>
 <body data-page="live">
-<a href="#main" class="skip-link">Skip to content</a>
-<div class="shell product-shell"><aside class="sidebar" id="sidebar"><a class="wordmark" href="/">Cajuí Central</a><nav class="nav" aria-label="Workspace"><a href="/" {{if eq .Title "Dashboard"}}aria-current="page"{{end}}>Dashboard</a><a href="/devices" {{if eq .Title "Devices"}}aria-current="page"{{end}}>Devices</a><a href="/sensors" {{if eq .Title "Sensors"}}aria-current="page"{{end}}>Sensors</a></nav></aside><div class="workspace"><header class="topbar" id="topbar">{{.Title}}</header>
+<a href="#main" class="skip-link">{{$.Text "nav.skip"}}</a>
+<div class="shell product-shell"><aside class="sidebar" id="sidebar"><a class="wordmark" href="/">Cajuí Central</a><nav class="nav" aria-label="{{$.Text "nav.workspace"}}"><a href="/" {{if eq .Route "/"}}aria-current="page"{{end}}>{{$.Text "common.dashboard"}}</a><a href="/devices" {{if eq .Route "/devices"}}aria-current="page"{{end}}>{{$.Text "common.devices"}}</a><a href="/sensors" {{if eq .Route "/sensors"}}aria-current="page"{{end}}>{{$.Text "common.sensors"}}</a></nav></aside><div class="workspace"><header class="topbar" id="topbar">{{.Title}}</header>
 
 <main class="content" id="main"><div id="app">
-<h1>Received readings</h1><p class="muted">Recent data. Interactive views load when JavaScript is available.</p>
-{{with .State}}{{if .Readings}}<div class="scroll"><table><thead><tr><th>Node / sensor</th><th>Metric</th><th>Value</th><th>Received (UTC)</th></tr></thead><tbody>{{range .Readings}}<tr><td>{{.NodeID}} / {{.SensorID}}</td><td>{{.Metric}}</td><td>{{.Value}} {{.Unit}}</td><td>{{.ReceivedAt.Format "2006-01-02 15:04:05"}}</td></tr>{{end}}</tbody></table></div>{{else}}<p>No readings received yet. Connect a device to start receiving measurements.</p>{{end}}
-<h2>Known devices</h2><p>Up to 100 devices. Silence means no new unique sample received for three expected intervals. Error readings still count as communication.</p>
-<table><tr><th>Source / device</th><th>Arrival status</th><th>Sensor status</th></tr>{{range .Devices}}<tr><td>{{.SourceID}} / {{.DeviceID}}</td><td>{{if .Stale}}No recent samples{{else}}Recent sample{{end}}</td><td>{{if .SensorError}}Reading error{{else}}No reported error{{end}}</td></tr>{{else}}<tr><td colspan="3">No MQTT devices received yet.</td></tr>{{end}}</table>
-<h2>MQTT samples</h2><p>Last 100 samples. Values below are reported measurements; missing values are not zero.</p>
-<table><tr><th>Source / device</th><th>Sensor / metric</th><th>Value / status</th><th>Received (UTC)</th></tr>{{range .Samples}}{{$sample := .}}{{range .Readings}}<tr><td>{{$sample.SourceID}} / {{$sample.DeviceID}}</td><td>{{.SensorID}} / {{.Metric}}</td><td>{{if eq .Status "ok"}}{{.Value}} {{.Unit}}{{else}}{{.Status}}{{end}}</td><td>{{$sample.ReceivedAt.Format "2006-01-02 15:04:05"}}</td></tr>{{end}}{{end}}</table>
+<h1>{{$.Text "ssr.heading"}}</h1><p class="muted">{{$.Text "ssr.description"}}</p>
+{{with .State}}{{if .Readings}}<div class="scroll"><table><thead><tr><th>{{$.Text "ssr.node_sensor"}}</th><th>{{$.Text "ssr.metric"}}</th><th>{{$.Text "ssr.value"}}</th><th>{{$.Text "ssr.received"}}</th></tr></thead><tbody>{{range .Readings}}<tr><td>{{.NodeID}} / {{.SensorID}}</td><td>{{$.Metric .Metric}}</td><td>{{$.Number .Value}} {{.Unit}}</td><td>{{$.Date .ReceivedAt}}</td></tr>{{end}}</tbody></table></div>{{else}}<p>{{$.Text "ssr.empty"}}</p>{{end}}
+<h2>{{$.Text "ssr.known"}}</h2><p>{{$.Text "ssr.silence"}}</p>
+<table><tr><th>{{$.Text "ssr.source_device"}}</th><th>{{$.Text "dashboard.arrival_status"}}</th><th>{{$.Text "ssr.sensor_status"}}</th></tr>{{range .Devices}}<tr><td>{{.SourceID}} / {{.DeviceID}}</td><td>{{if .Stale}}{{$.Text "ssr.no_recent"}}{{else}}{{$.Text "ssr.recent"}}{{end}}</td><td>{{if .SensorError}}{{$.Text "states.error"}}{{else}}{{$.Text "ssr.no_error"}}{{end}}</td></tr>{{else}}<tr><td colspan="3">{{$.Text "ssr.no_mqtt"}}</td></tr>{{end}}</table>
+<h2>{{$.Text "ssr.samples"}}</h2><p>{{$.Text "ssr.sample_note"}}</p>
+<table><tr><th>{{$.Text "ssr.source_device"}}</th><th>{{$.Text "ssr.sensor_metric"}}</th><th>{{$.Text "ssr.value_status"}}</th><th>{{$.Text "ssr.received"}}</th></tr>{{range .Samples}}{{$sample := .}}{{range .Readings}}<tr><td>{{$sample.SourceID}} / {{$sample.DeviceID}}</td><td>{{.SensorID}} / {{$.Metric .Metric}}</td><td>{{if eq .Status "ok"}}{{$.Number .Value}} {{.Unit}}{{else}}{{$.Status .Status}}{{end}}</td><td>{{$.Date $sample.ReceivedAt}}</td></tr>{{end}}{{end}}</table>
 {{end}}
 
 </div></main></div></div>

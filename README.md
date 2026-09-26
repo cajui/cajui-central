@@ -337,7 +337,8 @@ sensors by their registered names and locations. Export includes the visible sen
 measurements, deduplicated when a measurement appears in multiple sections. The
 summary counts registered devices and sensors independently of dashboard placement.
 
-Radio diagnostics stay in each device's collapsed **Connection details**. The
+Device cards summarize identity, sensor count and last arrival, with one **Details**
+action. Radio diagnostics and links to their histories live in that dialog. The
 version 1 convention recognized here is `sensor_id: "radio"` with `rssi` in `dBm`
 or `snr` in `dB`. These exact channels are excluded from environmental sensor counts
 and the sensor CSV. Their values, data quality and histories remain available.
@@ -367,6 +368,19 @@ JavaScript modules, CSS, SVG icons and the licensed Manrope font. There is no fr
 compilation, runtime CDN or additional installation step. Theme preference stays in
 browser storage without credentials or telemetry. Outdoor legibility still needs
 evaluation on the intended tablet under actual lighting conditions.
+
+### Languages
+
+The UI supports **Brazilian Portuguese (`pt-BR`)** and **US English (`en-US`)**,
+including registration, chart controls, reading states, dates and numbers. Select a
+language in the header; the choice is remembered in a browser preference cookie.
+Without a saved preference, Central follows the browser language, falling back to
+English. Names you assign to devices, sensors and dashboard sections stay unchanged.
+
+Translations are authored in Rails-like YAML catalogs and embedded as committed
+assets. There is no additional installation or frontend build requirement.
+See [localization](docs/localization.md) for preference rules, catalog conventions,
+development checks and the stable API/CSV boundary.
 
 ### Brand and component documentation
 
@@ -424,7 +438,8 @@ never point it at a real workspace. CI uses `/tmp/cajui-ui-token` by default.
 Playwright starts the separate reference server automatically. It tests persistent
 registration, stale-edit conflicts, section ordering/removal, product grouping,
 reference isolation, desktop/tablet/mobile interactions, filtering, inspection, export, unavailable
-refresh, safe text handling and accessibility checks in both themes. The automatic
+refresh, safe text handling, language selection and localized registration/charts, plus
+accessibility checks in both themes. The automatic
 accessibility audit covers selected WCAG A/AA rules, not a complete conformance review.
 The Go suite checks asset routing, CSP, escaped snapshot data and API compatibility.
 These tests run in CI. Prettier is a development formatter, not a compilation step.

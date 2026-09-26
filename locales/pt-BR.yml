@@ -1,0 +1,270 @@
+# Plain-text messages. Interpolation uses Rails-style %{name} placeholders.
+pt-BR:
+  common:
+    dashboard: Painel
+    devices: Transmissores
+    sensors: Sensores
+    device: Transmissor
+    measurement: Medição
+    measurements: Medições
+    refresh: Atualizar
+    history: Histórico
+    cancel: Cancelar
+    unknown: Desconhecido
+    source: Origem
+    transport: Transporte
+    last_report: Último envio
+    status: Estado
+    actions: Ações
+    action: Ação
+    edit: Editar
+    select: Selecionar
+    name: Nome
+    location: Localização
+    optional: (opcional)
+    no_location: Sem localização
+    waiting: Aguardando dados
+  nav:
+    workspace: Área de trabalho
+    home: Página inicial do Cajuí Central
+    open: Abrir navegação
+    theme: Alterar tema de cores
+    light: Usar tema claro
+    dark: Usar tema escuro
+    skip: Pular para o conteúdo
+    language: Idioma
+  states:
+    ok: Atualizado
+    recorded: Registrado
+    stale: Desatualizado
+    error: Erro de leitura
+    skipped: Não amostrado
+    empty: Sem dados
+    loading: Carregando
+    warning: Atenção
+    info: Exemplo
+  age:
+    unknown: Horário desconhecido
+    now: Agora
+    minutes: Há %{count} min
+    hours: Há %{count} h
+    days: Há %{count} d
+  metrics:
+    temperature: Temperatura
+    humidity: Umidade
+    co2: Dióxido de carbono
+    pressure: Pressão
+    battery: Bateria
+    voltage: Tensão
+    soil_moisture: Umidade do solo
+    illuminance: Iluminância
+    level: Nível
+    rssi: RSSI
+    snr: SNR
+  dashboard:
+    description: As medições e os transmissores que você escolheu acompanhar.
+    organize: Organizar painel
+    export: Exportar leituras
+    summary: Resumo da área de trabalho
+    filter: Filtrar transmissores
+    all: Todos os transmissores
+    attention: Precisam de atenção
+    search_label: Buscar transmissores e sensores
+    search: Buscar transmissores…
+    items: Transmissores e sensores
+    period: Período do gráfico
+    hours24: Últimas 24 horas
+    hours6: Últimas 6 horas
+    hour: Última hora
+    all_data: Todos os dados carregados
+    retention: 'Histórico: últimas 100 amostras + 100 leituras HTTP · últimos valores conhecidos preservados'
+    details: Detalhes do transmissor
+    close_details: Fechar detalhes
+    last_report: 'Último envio: %{age}'
+    inspect_history: Ver histórico de %{measurement} de %{device}
+    no_items: Nenhum item corresponde ao filtro nesta seção.
+    make_yours: Personalize seu painel
+    get_started: Cadastre seus transmissores e sensores e escolha o que mostrar aqui.
+    manage_devices: Gerenciar transmissores
+    manage_sensors: Gerenciar sensores
+    inspect: 'Ver %{measurement}: %{value} %{unit}, %{status}, sensor %{sensor}, transmissor %{device}'
+    history_title: Histórico de %{measurement}
+    history_context: Transmissor %{device} · %{sensor} · Origem %{source}
+    radio: Enlace de rádio
+    sensor_context: Sensor %{sensor}
+    device_id: ID do transmissor
+    interval: Intervalo esperado
+    not_reported: Não informado
+    registered_sensors: Sensores cadastrados
+    arrival_status: Estado de recebimento
+    identity_note: Os identificadores de transmissores e sensores vêm dos dados recebidos. Um envio recente não
+      garante que o transmissor esteja conectado agora. Os nomes são rótulos locais; o cadastro não concede acesso
+      à rede.
+    no_issues: Nenhum problema informado
+    updated: Atualizado às %{time} · Atualiza a cada 30 s
+    refresh_error: Não foi possível atualizar. Exibindo os últimos dados carregados; as leituras podem estar desatualizadas.
+    exported: Medições dos sensores visíveis exportadas.
+    details_short: Detalhes
+    details_for: Detalhes de %{name}
+  registry:
+    devices:
+      description: Dê um nome aos transmissores que enviam suas medições.
+      add: Adicionar transmissor
+      edit: Editar transmissor
+      save: Salvar transmissor
+      search: Buscar transmissores
+      discovery: Os transmissores aparecem após enviar dados. Cadastrá-los aqui não pareia os rádios nem concede
+        acesso à rede.
+      empty: Nenhum transmissor cadastrado
+      choose: Escolha Adicionar transmissor para selecionar um dos transmissores disponíveis.
+      registered: Transmissores cadastrados
+      select: Selecione um transmissor detectado para dar um nome a ele.
+      available: Transmissores disponíveis
+      no_new: Nenhum novo transmissor detectado
+      count:
+        one: '%{count} transmissor disponível para adicionar.'
+        other: '%{count} transmissores disponíveis para adicionar.'
+        zero: '%{count} transmissores disponíveis para adicionar.'
+    sensors:
+      description: Dê um nome aos sensores e veja qual transmissor envia cada medição.
+      add: Adicionar sensor
+      edit: Editar sensor
+      save: Salvar sensor
+      search: Buscar sensores
+      discovery: Os sensores disponíveis vêm das medições recebidas; cadastre primeiro o transmissor correspondente.
+      empty: Nenhum sensor cadastrado
+      choose: Escolha Adicionar sensor para selecionar um dos sensores disponíveis.
+      registered: Sensores cadastrados
+      select: Selecione um sensor detectado para dar um nome a ele.
+      available: Sensores disponíveis
+      no_new: Nenhum novo sensor detectado
+      count:
+        one: '%{count} sensor disponível para adicionar.'
+        other: '%{count} sensores disponíveis para adicionar.'
+        zero: '%{count} sensores disponíveis para adicionar.'
+    no_matches: Nenhum resultado
+    try_search: Tente outro nome ou localização.
+    name_location: Nome / localização
+    counts: '%{registered} cadastrados / %{detected} detectados'
+    edit_name: Editar %{name}
+    select_name: Selecionar %{name}
+    sensor_identity: 'Transmissor: %{device} · Sensor: %{sensor}'
+    identity_note: Os nomes podem mudar. A identidade e o histórico registrado permanecem os mesmos.
+    sensor_measurements: Sensor / medições
+    device_source: Transmissor / origem
+    register_parent: Cadastre o transmissor primeiro
+    send: Envie medições de um transmissor e atualize esta página.
+  layout:
+    help: Crie seções e escolha transmissores, sensores completos ou medições individuais. Remover um item daqui
+      preserva seu cadastro e histórico.
+    add_section: Adicionar seção
+    automatic: Usar organização automática
+    save: Salvar painel
+    automatic_note: 'Organização automática: sensores e transmissores cadastrados aparecerão em seções separadas.'
+    empty: Ainda não há seções. Adicione uma para começar ou salve um painel vazio.
+    section: Seção %{number}
+    title: Título da seção
+    section_up: Mover seção %{number} para cima
+    section_down: Mover seção %{number} para baixo
+    up: Mover para cima
+    down: Mover para baixo
+    remove_section: Remover seção
+    add_to: Adicionar a esta seção
+    choose: Escolha um item…
+    add_item: Adicionar item
+    unavailable: Item indisponível
+    item_up: Mover item %{number} para cima
+    item_down: Mover item %{number} para baixo
+    remove_item: Remover item %{number}
+    remove: Remover
+    device_choice: Transmissor · %{name}
+    sensor_choice: Sensor · %{name} · %{device}
+  errors:
+    conflict: Estas configurações mudaram ou o transmissor ainda não está cadastrado. Recarregue a página antes
+      de salvar novamente.
+    session: Sua sessão de edição expirou. Recarregue esta página local e tente novamente.
+    invalid: Confira os nomes e os itens selecionados e tente novamente.
+    save: Não foi possível salvar. Suas alterações continuam aqui; confira a conexão e tente novamente.
+    required: Preencha este campo.
+    too_long: Use no máximo %{count} caracteres.
+  components:
+    no_sensor: Nenhum sensor selecionado
+    view_history: Ver histórico
+    latest: Última leitura
+    reported: Último valor recebido
+    known: Último valor conhecido
+    unavailable: Valor indisponível
+    skipped: Leitura não realizada
+    waiting: Aguardando leituras
+    battery: bateria
+    signal: intensidade do sinal recebido
+    fill: Nível de preenchimento
+    empty: Vazio
+    full: Cheio
+    binary: Sensor binário
+  chart:
+    empty: Nenhuma leitura neste período
+    choose_period: Escolha um período maior ou aguarde uma nova amostra.
+    description: '%{label} em %{unit}; %{observations}. Use o controle deslizante ou a tabela para ver os valores
+      exatos.'
+    inspect: Examinar leitura
+    observations: Examinar observações de %{label}
+    table: Ver tabela de dados
+    data: Dados de %{label}
+    time: Horário (local)
+    value: Valor (%{unit})
+    no_reading: Sem leitura
+  ssr:
+    heading: Leituras recebidas
+    description: Dados recentes. As visualizações interativas carregam quando o JavaScript está disponível.
+    node_sensor: Nó / sensor
+    metric: Métrica
+    value: Valor
+    received: Recebido (UTC)
+    empty: Nenhuma leitura recebida ainda. Conecte um transmissor para começar a receber medições.
+    known: Transmissores conhecidos
+    silence: Até 100 transmissores. Silêncio significa que nenhuma nova amostra única foi recebida durante três
+      intervalos esperados. Leituras com erro também contam como comunicação.
+    source_device: Origem / transmissor
+    sensor_status: Estado do sensor
+    no_recent: Sem amostras recentes
+    recent: Amostra recente
+    no_error: Nenhum erro informado
+    no_mqtt: Nenhum transmissor MQTT recebido ainda.
+    samples: Amostras MQTT
+    sample_note: Últimas 100 amostras. Os valores abaixo são medições recebidas; valores ausentes não são zero.
+    sensor_metric: Sensor / métrica
+    value_status: Valor / estado
+  counts:
+    devices:
+      one: '%{count} transmissor'
+      other: '%{count} transmissores'
+      zero: '%{count} transmissores'
+    sensors:
+      one: '%{count} sensor'
+      other: '%{count} sensores'
+      zero: '%{count} sensores'
+    measurements:
+      one: '%{count} medição'
+      other: '%{count} medições'
+      zero: '%{count} medições'
+    observations:
+      one: '%{count} observação'
+      other: '%{count} observações'
+      zero: '%{count} observações'
+    registered:
+      one: '%{count} sensor cadastrado'
+      other: '%{count} sensores cadastrados'
+      zero: '%{count} sensores cadastrados'
+    detected:
+      one: '%{count} transmissor detectado está pronto para receber um nome.'
+      other: '%{count} transmissores detectados estão prontos para receber um nome.'
+      zero: '%{count} transmissores detectados estão prontos para receber um nome.'
+    issues:
+      one: '%{count} transmissor precisa de atenção'
+      other: '%{count} transmissores precisam de atenção'
+      zero: '%{count} transmissores precisam de atenção'
+    seconds:
+      one: '%{count} segundo'
+      other: '%{count} segundos'
+      zero: '%{count} segundos'

@@ -57,6 +57,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - run: pip install -r scripts/requirements-locales.txt
+      - run: python3 scripts/compile_locales.py --check
+      - run: python3 -m unittest discover -s tests -p test_locales.py -v
       - run: npm ci --prefix tests/ui --ignore-scripts
       - run: npm --prefix tests/ui run format:check
       - run: npm --prefix tests/ui run test:model

@@ -1,6 +1,11 @@
+import { t } from "./i18n.mjs";
 import { escapeHTML as e } from "./model.mjs";
 import { automaticSections, itemChoices } from "./workspace-model.mjs";
-import { createDialog, saveWorkspace } from "./workspace-api.mjs";
+import {
+  createDialog,
+  saveWorkspace,
+  localizeValidation,
+} from "./workspace-api.mjs";
 
 export function openLayoutEditor(root, state) {
   const catalog = state.workspace,
@@ -8,12 +13,12 @@ export function openLayoutEditor(root, state) {
   let sections = structuredClone(
     catalog.layout.sections ?? automaticSections(catalog),
   );
-  const dialog = createDialog(root, "Organize dashboard");
+  const dialog = createDialog(root, t("dashboard.organize"));
   dialog.classList.add("layout-dialog");
   const form = document.createElement("form");
   form.className = "workspace-form";
-  form.innerHTML =
-    '<p>Create sections and choose devices, complete sensors or individual measurements. Removing an item here keeps its registration and history.</p><div id="section-editor"></div><div class="top-actions"><button class="button" type="button" id="add-section">Add section</button><button class="button" type="button" id="automatic-layout">Use automatic layout</button></div><p class="form-error" role="alert"></p><button class="button primary" type="submit">Save dashboard</button>';
+  localizeValidation(form);
+  form.innerHTML = `<p>${t("layout.help")}</p><div id="section-editor"></div><div class="top-actions"><button class="button" type="button" id="add-section">${t("layout.add_section")}</button><button class="button" type="button" id="automatic-layout">${t("layout.automatic")}</button></div><p class="form-error" role="alert"></p><button class="button primary" type="submit">${t("layout.save")}</button>`;
   dialog.append(form);
   const target = form.querySelector("#section-editor");
   function move(list, index, delta) {
@@ -23,17 +28,14 @@ export function openLayoutEditor(root, state) {
   function render() {
     target.innerHTML = "";
     if (sections === null) {
-      target.innerHTML =
-        '<p class="notice">Automatic layout: registered sensors and devices will appear in separate sections.</p>';
+      target.innerHTML = `<p class="notice">${t("layout.automatic_note")}</p>`;
       return;
     }
-    if (!sections.length)
-      target.innerHTML =
-        "<p>No sections yet. Add one to start, or save an empty dashboard.</p>";
+    if (!sections.length) target.innerHTML = `<p>${t("layout.empty")}</p>`;
     sections.forEach((section, i) => {
       const field = document.createElement("fieldset");
       field.className = "section-editor";
-      field.innerHTML = `<legend>Section ${i + 1}</legend><label>Section title<input class="input" maxlength="80" required value="${e(section.title)}"></label><div class="top-actions"><button class="button" type="button" data-up ${i === 0 ? "disabled" : ""} aria-label="Move section ${i + 1} up">Move up</button><button class="button" type="button" data-down ${i === sections.length - 1 ? "disabled" : ""} aria-label="Move section ${i + 1} down">Move down</button><button class="button" type="button" data-remove>Remove section</button></div><ol class="layout-items"></ol><div class="item-picker"><label>Add to this section<select class="input" ${choices.length ? "" : "disabled"}><option value="">Choose an item…</option>${choices.map((c, n) => `<option value="${n}">${e(c.label)}</option>`).join("")}</select></label><button class="button" type="button" data-add>Add item</button></div>`;
+      field.innerHTML = `<legend>${t("layout.section", { number: i + 1 })}</legend><label>${t("layout.title")}<input class="input" maxlength="80" required value="${e(section.title)}"></label><div class="top-actions"><button class="button" type="button" data-up ${i === 0 ? "disabled" : ""} aria-label="${t("layout.section_up", { number: i + 1 })}">${t("layout.up")}</button><button class="button" type="button" data-down ${i === sections.length - 1 ? "disabled" : ""} aria-label="${t("layout.section_down", { number: i + 1 })}">${t("layout.down")}</button><button class="button" type="button" data-remove>${t("layout.remove_section")}</button></div><ol class="layout-items"></ol><div class="item-picker"><label>${t("layout.add_to")}<select class="input" ${choices.length ? "" : "disabled"}><option value="">${t("layout.choose")}</option>${choices.map((c, n) => `<option value="${n}">${e(c.label)}</option>`).join("")}</select></label><button class="button" type="button" data-add>${t("layout.add_item")}</button></div>`;
       field
         .querySelector("input")
         .addEventListener(
@@ -56,7 +58,7 @@ export function openLayoutEditor(root, state) {
           (c) => JSON.stringify(c.item) === JSON.stringify(item),
         );
         const li = document.createElement("li");
-        li.innerHTML = `<span>${e(choice?.label ?? "Unavailable item")}</span><div class="top-actions"><button class="button" type="button" ${j === 0 ? "disabled" : ""} aria-label="Move item ${j + 1} up">↑</button><button class="button" type="button" ${j === section.items.length - 1 ? "disabled" : ""} aria-label="Move item ${j + 1} down">↓</button><button class="button" type="button" aria-label="Remove item ${j + 1}">Remove</button></div>`;
+        li.innerHTML = `<span>${e(choice?.label ?? t("layout.unavailable"))}</span><div class="top-actions"><button class="button" type="button" ${j === 0 ? "disabled" : ""} aria-label="${t("layout.item_up", { number: j + 1 })}">↑</button><button class="button" type="button" ${j === section.items.length - 1 ? "disabled" : ""} aria-label="${t("layout.item_down", { number: j + 1 })}">↓</button><button class="button" type="button" aria-label="${t("layout.remove_item", { number: j + 1 })}">${t("layout.remove")}</button></div>`;
         const [up, down, remove] = li.querySelectorAll("button");
         up.addEventListener("click", () => move(section.items, j, -1));
         down.addEventListener("click", () => move(section.items, j, 1));
