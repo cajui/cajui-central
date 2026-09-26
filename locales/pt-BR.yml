@@ -81,10 +81,8 @@ pt-BR:
     retention: 'Histórico: últimas 100 amostras + 100 leituras HTTP · últimos valores conhecidos preservados'
     details: Detalhes do transmissor
     close_details: Fechar detalhes
-    connection: Detalhes da conexão
     last_report: 'Último envio: %{age}'
     inspect_history: Ver histórico de %{measurement} de %{device}
-    no_link: Nenhuma medição do enlace recebida.
     no_items: Nenhum item corresponde ao filtro nesta seção.
     make_yours: Personalize seu painel
     get_started: Cadastre seus transmissores e sensores e escolha o que mostrar aqui.
@@ -107,6 +105,8 @@ pt-BR:
     updated: Atualizado às %{time} · Atualiza a cada 30 s
     refresh_error: Não foi possível atualizar. Exibindo os últimos dados carregados; as leituras podem estar desatualizadas.
     exported: Medições dos sensores visíveis exportadas.
+    details_short: Detalhes
+    details_for: Detalhes de %{name}
   registry:
     devices:
       description: Dê um nome aos transmissores que enviam suas medições.

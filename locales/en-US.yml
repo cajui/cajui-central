@@ -81,10 +81,8 @@ en-US:
     retention: 'History: latest 100 samples + 100 HTTP readings · latest known values retained'
     details: Device details
     close_details: Close details
-    connection: Connection details
     last_report: Last report %{age}
     inspect_history: Inspect %{measurement} history for %{device}
-    no_link: No link measurements reported.
     no_items: No matching items in this section.
     make_yours: Make this dashboard yours
     get_started: Register your devices and sensors, then choose what to show here.
@@ -106,6 +104,8 @@ en-US:
     updated: Updated %{time} · Refreshes every 30 s
     refresh_error: Could not refresh. Showing the last loaded snapshot; its readings may be out of date.
     exported: Exported the visible sensor measurements.
+    details_short: Details
+    details_for: Details for %{name}
   registry:
     devices:
       description: Name the devices that send your measurements.

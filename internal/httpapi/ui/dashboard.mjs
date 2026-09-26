@@ -26,7 +26,6 @@ export function mountDashboard(root, { state = {}, notify }) {
     selected = "",
     hours = 24,
     pending = false;
-  const openDetails = new Set();
   root.innerHTML = `<header class="page-heading"><div><h1>${t("common.dashboard")}</h1><p>${t("dashboard.description")}</p></div><div class="top-actions"><button class="button" id="organize">${t("dashboard.organize")}</button><button class="button" id="export">${icon("download")}${t("dashboard.export")}</button><button class="button primary" id="refresh">${icon("refresh")}${t("common.refresh")}</button></div></header>
     <div id="fetch-error" class="notice hidden" role="status"></div>
     <section id="summary" class="device-summary" aria-label="${t("dashboard.summary")}"></section>
@@ -103,37 +102,15 @@ export function mountDashboard(root, { state = {}, notify }) {
         const card = document.createElement("article");
         card.className = "panel dashboard-item";
         if (item.kind === "device") {
-          card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("device")}</span><div><p class="eyebrow">${t("common.device")}</p><h3>${e(g.name)}</h3><p class="muted">${e(g.location || t("counts.registered", { count: g.sensors.length }))}</p></div></div><div class="device-arrival"><cj-badge state="${deviceStatus(g)}"></cj-badge><span>${e(t("dashboard.last_report", { age: age(g.at, Date.parse(snapshot.generated_at)) }))}</span></div><button class="button" data-details>${t("dashboard.details")}</button><details class="device-diagnostics"><summary>${t("dashboard.connection")}</summary><div class="diagnostic-readings"></div></details>`;
+          card.classList.add("transmitter-card");
+          card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("device")}</span><div><h3>${e(g.name)}</h3><p class="muted">${e(t("counts.registered", { count: g.sensors.length }))}${g.location ? ` · ${e(g.location)}` : ""}</p></div></div><p class="device-last-report">${e(t("dashboard.last_report", { age: age(g.at, Date.parse(snapshot.generated_at)) }))}</p><div class="transmitter-footer"><cj-badge state="${deviceStatus(g)}"></cj-badge><button class="text-button" data-details aria-label="${e(t("dashboard.details_for", { name: g.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></div>`;
           card
             .querySelector("[data-details]")
             .addEventListener("click", () => showDevice(g));
-          const details = card.querySelector("details");
-          details.open = openDetails.has(g.key);
-          details.addEventListener("toggle", () => {
-            if (!details.isConnected) return;
-            if (details.open) openDetails.add(g.key);
-            else openDetails.delete(g.key);
-          });
-          const diagnostics = card.querySelector(".diagnostic-readings");
-          for (const c of g.diagnostics) {
-            const button = document.createElement("button");
-            button.className = "diagnostic-button";
-            button.setAttribute(
-              "aria-label",
-              t("dashboard.inspect_history", {
-                measurement: c.title,
-                device: g.name,
-              }),
-            );
-            button.textContent = `${c.title}: ${formatValue(c.value)} ${formatUnit(c.unit)}`;
-            button.addEventListener("click", () => selectHistory(c.key));
-            diagnostics.append(button);
-          }
-          if (!g.diagnostics.length)
-            diagnostics.textContent = t("dashboard.no_link");
         } else {
           card.classList.add("sensor-group");
-          card.innerHTML = `<header class="sensor-group-heading"><div><p class="eyebrow">${t("common.sensor")}</p><h3>${e(sensor.name)}</h3><p class="muted">${e(g.name)}${sensor.location ? ` · ${e(sensor.location)}` : ""}</p></div></header><div class="reading-grid"></div>`;
+          if (readings.length > 1) card.classList.add("sensor-group-wide");
+          card.innerHTML = `<header class="sensor-group-heading"><div><h3>${e(sensor.name)}</h3><p class="muted">${e(g.name)}${sensor.location ? ` · ${e(sensor.location)}` : ""}</p></div></header><div class="reading-grid"></div>`;
           for (const c of readings)
             card.querySelector(".reading-grid").append(readingButton(c, g));
         }
@@ -240,6 +217,28 @@ export function mountDashboard(root, { state = {}, notify }) {
     ];
     root.querySelector("#device-detail").innerHTML =
       `<h3>${e(g.name)}</h3><dl class="detail-list">${values.map(([k, v]) => `<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join("")}</dl><p class="dialog-note">${t("dashboard.identity_note")}</p>`;
+    const diagnostics = document.createElement("div");
+    diagnostics.className = "diagnostic-readings";
+    for (const c of g.diagnostics) {
+      const button = document.createElement("button");
+      button.className = "diagnostic-button";
+      button.setAttribute(
+        "aria-label",
+        t("dashboard.inspect_history", {
+          measurement: c.title,
+          device: g.name,
+        }),
+      );
+      button.textContent = t("dashboard.history_title", {
+        measurement: c.title,
+      });
+      button.addEventListener("click", () => {
+        root.querySelector("#device-dialog").close();
+        selectHistory(c.key);
+      });
+      diagnostics.append(button);
+    }
+    root.querySelector("#device-detail").append(diagnostics);
     root.querySelector("#device-dialog").showModal();
   }
   function render() {

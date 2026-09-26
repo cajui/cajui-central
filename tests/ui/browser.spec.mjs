@@ -391,19 +391,19 @@ for (const width of [390, 820, 1440]) {
     await page.getByRole("button", { name: /Inspect Humidity:/ }).click();
     await expect(page.locator("#history-heading")).toBeFocused();
     await expect(page.locator("#chart-legend")).toContainText("Humidity");
-    await page.locator(".device-diagnostics summary").click();
+    await page
+      .getByRole("button", { name: "Details for Device 1", exact: true })
+      .click();
     await expect(page.locator(".diagnostic-button")).toHaveCount(2);
     await page.getByRole("button", { name: /Inspect RSSI history/ }).click();
     await expect(page.locator("#chart-legend")).toContainText("RSSI");
     await page.locator("#refresh").click();
-    await expect(page.locator(".device-diagnostics")).toHaveAttribute(
-      "open",
-      "",
-    );
+    await expect(page.getByRole("dialog")).not.toBeVisible();
+    await expect(page.locator(".transmitter-card button")).toHaveCount(1);
     await page.getByRole("searchbox").fill("Humidity");
     await expect(page.locator(".reading-button")).toHaveCount(2);
     await page
-      .getByRole("button", { name: "Device details", exact: true })
+      .getByRole("button", { name: "Details for Device 1", exact: true })
       .click();
     await expect(page.getByRole("dialog")).toContainText("device-1");
     await page.keyboard.press("Escape");

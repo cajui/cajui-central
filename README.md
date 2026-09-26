@@ -337,7 +337,8 @@ sensors by their registered names and locations. Export includes the visible sen
 measurements, deduplicated when a measurement appears in multiple sections. The
 summary counts registered devices and sensors independently of dashboard placement.
 
-Radio diagnostics stay in each device's collapsed **Connection details**. The
+Device cards summarize identity, sensor count and last arrival, with one **Details**
+action. Radio diagnostics and links to their histories live in that dialog. The
 version 1 convention recognized here is `sensor_id: "radio"` with `rssi` in `dBm`
 or `snr` in `dB`. These exact channels are excluded from environmental sensor counts
 and the sensor CSV. Their values, data quality and histories remain available.
