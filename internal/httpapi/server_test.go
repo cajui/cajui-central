@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/cajui/cajui-central/internal/storage"
 	"github.com/cajui/cajui-central/internal/telemetry"
+	"github.com/cajui/cajui-central/internal/workspace"
 	"io"
 	"log/slog"
 	"net/http"
@@ -33,7 +34,7 @@ func testHandler(t *testing.T) http.Handler {
 	return h
 }
 func request(h http.Handler, method, path, body, auth, content string) *httptest.ResponseRecorder {
-	r := httptest.NewRequest(method, path, strings.NewReader(body))
+	r := httptest.NewRequest(method, "http://localhost"+path, strings.NewReader(body))
 	r.Header.Set("Authorization", auth)
 	r.Header.Set("Content-Type", content)
 	w := httptest.NewRecorder()
@@ -173,7 +174,7 @@ func TestMQTTSampleRoutesAndDashboard(t *testing.T) {
 		}
 	}
 	out := httptest.NewRecorder()
-	h.ServeHTTP(out, httptest.NewRequest("GET", "/", nil))
+	h.ServeHTTP(out, httptest.NewRequest("GET", "http://localhost/", nil))
 	for _, want := range []string{"No recent samples", "21.5", "source"} {
 		if !strings.Contains(out.Body.String(), want) {
 			t.Fatal(out.Body.String())
@@ -189,4 +190,17 @@ func TestMQTTSampleRoutesAndDashboard(t *testing.T) {
 			t.Fatal(out.Code)
 		}
 	}
+}
+
+func (brokenRepo) Catalog(context.Context) (workspace.Catalog, error) {
+	return workspace.Catalog{}, errors.New("private database failure")
+}
+func (brokenRepo) SaveDevice(context.Context, int64, workspace.Settings) error {
+	return errors.New("private database failure")
+}
+func (brokenRepo) SaveSensor(context.Context, int64, workspace.Settings) error {
+	return errors.New("private database failure")
+}
+func (brokenRepo) SaveLayout(context.Context, workspace.Layout) error {
+	return errors.New("private database failure")
 }

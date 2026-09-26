@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cajui/cajui-central/internal/telemetry"
+	"github.com/cajui/cajui-central/internal/workspace"
 )
 
 // Assets are plain source files: no frontend build or external runtime request.
@@ -16,6 +17,8 @@ import (
 var uiFiles embed.FS
 
 type dashboardState struct {
+	Workspace   *workspace.Catalog       `json:"workspace,omitempty"`
+	UIToken     string                   `json:"ui_token,omitempty"`
 	Readings    []telemetry.Reading      `json:"readings"`
 	Samples     []telemetry.StoredSample `json:"samples"`
 	Devices     []telemetry.Device       `json:"devices"`

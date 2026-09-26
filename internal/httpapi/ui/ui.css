@@ -1786,3 +1786,159 @@ cj-reading {
     height: 64px;
   }
 }
+
+/* Inventory and composition are product features, independent of reference pages. */
+.registry-search {
+  max-width: 36rem;
+  margin-block: 24px;
+}
+.registry-table {
+  width: 100%;
+  text-align: left;
+}
+.registry-table th,
+.registry-table td {
+  padding: 18px;
+  vertical-align: middle;
+}
+.registry-table strong {
+  display: block;
+  font-size: 18px;
+}
+.registry-secondary {
+  display: block;
+  color: var(--muted);
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.registry-table td {
+  min-width: 140px;
+  overflow-wrap: anywhere;
+}
+.workspace-dialog {
+  width: min(850px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+}
+.workspace-form {
+  display: grid;
+  gap: 24px;
+}
+.workspace-form label {
+  display: grid;
+  gap: 8px;
+}
+.workspace-form .input {
+  width: 100%;
+  min-width: 0;
+}
+.form-error {
+  color: var(--danger);
+  margin: 0;
+}
+.form-error:empty {
+  display: none;
+}
+.dashboard-section {
+  display: grid;
+  gap: 20px;
+}
+.dashboard-section > h2 {
+  margin: 12px 0 0;
+  font-size: 26px;
+}
+.dashboard-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 370px), 1fr));
+  gap: 20px;
+}
+.dashboard-item {
+  padding: 24px;
+  min-width: 0;
+  display: grid;
+  gap: 20px;
+  align-content: start;
+}
+.dashboard-item h3 {
+  font-size: 23px;
+  overflow-wrap: anywhere;
+}
+.dashboard-item .reading-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+}
+.dashboard-item .device-arrival {
+  align-items: start;
+}
+.dashboard-item.sensor-group {
+  border-top: 0;
+}
+.layout-dialog {
+  width: min(960px, calc(100vw - 32px));
+}
+#section-editor {
+  display: grid;
+  gap: 24px;
+}
+.section-editor {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  display: grid;
+  gap: 18px;
+}
+.section-editor legend {
+  padding: 0 8px;
+  font-weight: 700;
+}
+.layout-items {
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+.layout-items li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+.item-picker {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+.item-picker label {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .workspace-dialog {
+    padding: 20px;
+  }
+  .dashboard-item {
+    padding: 18px;
+  }
+  .item-picker {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .item-picker label {
+    width: 100%;
+  }
+}
+
+.product-shell .top-actions {
+  flex-wrap: wrap;
+}
+.product-shell .scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
+}
+.workspace-dialog {
+  overflow-wrap: anywhere;
+}
