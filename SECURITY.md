@@ -21,3 +21,10 @@ token or password in issues, logs or screenshots.
 Reporting: private vulnerability reporting is not enabled yet. Contact the maintainer
 directly; do not open a public issue for a vulnerability. Dependabot proposes
 dependency updates; CI does not replace security review.
+
+The interface runs same-origin JavaScript modules and local styles/fonts. The CSP
+blocks inline executable scripts, evaluation, external resources and framing. The
+read-only HTML snapshot contains telemetry but never an API token. Scripts refresh
+that same loopback-only document; authenticated API access remains separate.
+Component text is escaped, and spreadsheet exports protect text fields from formula
+interpretation. Browser storage contains only the selected color theme.

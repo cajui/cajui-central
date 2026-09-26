@@ -41,3 +41,37 @@ jobs:
           python-version: '3.12'
       - run: pip install -r tests/requirements.txt
       - run: python -m unittest discover -s tests -v
+
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/ui/package-lock.json
+      - run: npm ci --prefix tests/ui --ignore-scripts
+      - run: npm --prefix tests/ui run format:check
+      - run: npm --prefix tests/ui run test:model
+      - run: npx playwright install --with-deps chromium
+        working-directory: tests/ui
+      - run: |
+          make build
+          openssl rand -hex 32 > /tmp/cajui-ui-token
+          CAJUI_API_TOKEN_FILE=/tmp/cajui-ui-token CAJUI_ADDR=127.0.0.1:8091 CAJUI_DB=/tmp/cajui-ui.db ./bin/cajui > /tmp/cajui-ui.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8091/healthz >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/cajui-ui.log
+          exit 1
+      - run: npm --prefix tests/ui test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ui-test-results
+          path: tests/ui/test-results
