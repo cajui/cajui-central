@@ -41,16 +41,20 @@ already carries a transmit power command in the receiver's ACK.
      receiver update.
    - *Command results* (device → consumers): applied, rejected with a reason, or pending.
 5. **Commands to sleeping nodes are relayed by the receiver in the ACK,** following the
-   version 2 power command: the receiver stores the command, returns it in the ACK of
-   the node's next DATA frame, and the node confirms it in a later frame. The interface
+   version 2 power command: the receiver returns the command in the ACK of the node's
+   next DATA frame. Today's DATA frame carries no confirmation, so a later protocol
+   change adds one and lets the receiver keep a command until it is confirmed. The interface
    shows such changes as pending until confirmed and states the expected delay (up to
    one interval to apply, another to confirm). Node commands stay compact codes and
    values; node firmware updates over radio remain out of scope.
 6. **Home Assistant Discovery, when added, is published by the receiver,** not by
-   Central, so installations without Central get the same automatic setup.
+   Central, so installations without Central get the same automatic setup. Its topics
+   sit outside the per-receiver namespace, so the Discovery work also defines how the
+   broker keeps one receiver from overwriting another's configuration.
 
-Topic layout, payload schemas, ACL rules and command authentication are specified
-before implementation, in the firmware documentation and in this repository's README.
+Topic layout, payload schemas and ACL rules are specified before implementation, in the
+firmware's [management channel contract](https://github.com/cajui/cajui-firmware/blob/main/docs/management-v1.md)
+and in this repository's README.
 
 ## Alternatives
 
@@ -65,8 +69,12 @@ before implementation, in the firmware documentation and in this repository's RE
 ## Consequences
 
 - Central gains publish permission on the broker, which it deliberately lacks today. The
-  management specification must scope it with per-topic ACLs, authenticate commands and
-  require explicit confirmation for revoking a node or updating firmware.
+  broker cannot tell a subscriber who published a message, so the broker's
+  authentication and per-topic ACL are the whole authorization of a command: Central gets
+  `write` on `manage/v1/+/+/commands` and `read` on the state, availability and results
+  topics in `mosquitto/acl`, and `broker.sh` grants each producer its own management
+  topics. The interface requires explicit confirmation before revoking a node or updating
+  firmware, and firmware updates still require the release signature.
 - Central and firmware versions become coupled. The descriptor is versioned, Central
   supports at least the previous firmware release, and missing capabilities degrade to
   the current behaviour instead of failing.
