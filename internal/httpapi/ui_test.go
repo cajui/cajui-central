@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http/httptest"
 	"regexp"
@@ -15,32 +16,26 @@ import (
 	"github.com/cajui/cajui-central/internal/telemetry"
 )
 
-func TestDesignPagesAndEmbeddedAssets(t *testing.T) {
+func TestProductAssetsExcludeDesignDocumentation(t *testing.T) {
 	handler, err := New(brokenRepo{}, token, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/design/brand", "/design/components", "/design/dashboard", "/design/research"} {
-		response := request(handler, "GET", path, "", "", "")
-		if response.Code != 200 {
-			t.Fatalf("%s: %d", path, response.Code)
-		}
-		if !strings.Contains(response.Body.String(), `src="/ui/app.mjs"`) {
-			t.Fatal("missing local module")
-		}
-		csp := response.Header().Get("Content-Security-Policy")
-		for _, want := range []string{"script-src 'self'", "connect-src 'self'", "base-uri 'none'", "frame-ancestors 'none'"} {
-			if !strings.Contains(csp, want) {
-				t.Fatal(csp)
-			}
-		}
-		if strings.Contains(csp, "unsafe-inline") || strings.Contains(csp, "unsafe-eval") {
-			t.Fatal("unsafe script policy")
+	for _, path := range []string{"/design/brand", "/design/components", "/design/dashboard", "/design/research", "/docs/brand/", "/ui/design.mjs", "/ui/demo.mjs"} {
+		if response := request(handler, "GET", path, "", "", ""); response.Code != 404 {
+			t.Fatal(path, response.Code)
 		}
 	}
-	demo := request(handler, "GET", "/design/dashboard", "", "", "")
-	if !strings.Contains(demo.Body.String(), "simulated") {
-		t.Fatal("unlabeled demo")
+	if err := fs.WalkDir(uiFiles, ".", func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if strings.Contains(path, "demo") || strings.Contains(path, "design") {
+			t.Fatalf("reference embedded in product: %s", path)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 	for path, kind := range map[string]string{"/ui/app.mjs": "text/javascript", "/ui/ui.css": "text/css", "/ui/assets/cajui-mark.svg": "image/svg+xml", "/ui/assets/fonts/manrope-variable.ttf": "font/ttf", "/ui/assets/fonts/OFL-Manrope.txt": "text/plain"} {
 		response := request(handler, "GET", path, "", "", "")
@@ -79,6 +74,18 @@ func TestSnapshotEscapesUntrustedTelemetryAndContainsNoToken(t *testing.T) {
 	body := response.Body.String()
 	if response.Code != 200 || strings.Contains(body, token) || strings.Contains(body, reading.Unit) {
 		t.Fatal("unsafe dashboard response")
+	}
+	if strings.Contains(body, "/design/") || strings.Contains(body, "Design system") {
+		t.Fatal("reference navigation in product")
+	}
+	csp := response.Header().Get("Content-Security-Policy")
+	for _, want := range []string{"script-src 'self'", "connect-src 'self'", "base-uri 'none'", "frame-ancestors 'none'"} {
+		if !strings.Contains(csp, want) {
+			t.Fatal(csp)
+		}
+	}
+	if strings.Contains(csp, "unsafe-inline") || strings.Contains(csp, "unsafe-eval") {
+		t.Fatal("unsafe script policy")
 	}
 	found := regexp.MustCompile(`(?s)<script type="application/json" id="initial-state">(.*?)</script>`).FindStringSubmatch(body)
 	if len(found) != 2 {

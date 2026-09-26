@@ -48,9 +48,7 @@ func New(repo Repository, token string, logger *slog.Logger) (http.Handler, erro
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("GET /{$}", s.index)
 	mux.HandleFunc("GET /ui/{path...}", serveUIAsset)
-	for path, mode := range map[string]string{"/design/brand": "brand", "/design/components": "components", "/design/dashboard": "demo", "/design/research": "research"} {
-		mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) { s.design(w, r, mode) })
-	}
+
 	mux.Handle("GET /api/v1/readings", s.authorize(http.HandlerFunc(s.list)))
 	mux.Handle("GET /api/v1/samples", s.authorize(http.HandlerFunc(s.samples)))
 	mux.Handle("GET /api/v1/devices", s.authorize(http.HandlerFunc(s.devices)))
@@ -116,7 +114,7 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	if err = dashboard.Execute(w, dashboardPage{Mode: "live", Title: "Overview", State: dashboardState{Readings: readings, Samples: samples, Devices: devices, GeneratedAt: time.Now().UTC()}}); err != nil {
+	if err = dashboard.Execute(w, dashboardPage{Title: "Overview", State: dashboardState{Readings: readings, Samples: samples, Devices: devices, GeneratedAt: time.Now().UTC()}}); err != nil {
 		s.logger.Error("render dashboard", "error", err)
 	}
 }

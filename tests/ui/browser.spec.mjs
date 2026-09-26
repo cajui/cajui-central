@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect } from "@playwright/test";
+const referenceURL = "http://127.0.0.1:8092";
 
 for (const viewport of [
   { width: 1440, height: 1000 },
@@ -16,7 +17,7 @@ for (const viewport of [
       requests = [];
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("request", (request) => requests.push(request.url()));
-    await page.goto("/design/dashboard");
+    await page.goto(referenceURL + "/design/dashboard");
     await expect(page.locator("cj-sensor")).toHaveCount(4);
     await expect(
       page.getByText(
@@ -64,13 +65,13 @@ for (const viewport of [
       await page.keyboard.press("Escape");
     }
     expect(errors).toEqual([]);
-    expect(requests.every((url) => url.startsWith(baseURL))).toBeTruthy();
+    expect(requests.every((url) => url.startsWith(referenceURL))).toBeTruthy();
   });
 }
 test("component states, literal text and keyboard chart inspection", async ({
   page,
 }) => {
-  await page.goto("/design/components");
+  await page.goto(referenceURL + "/design/components");
   await expect(page.locator("#playground")).toBeVisible();
   await page.locator("#play-value").fill("0");
   await expect(page.locator("#playground .measurement")).toContainText("0");
@@ -101,7 +102,7 @@ test("component states, literal text and keyboard chart inspection", async ({
 test("brand contrast audit updates with theme and navigation works", async ({
   page,
 }) => {
-  await page.goto("/design/brand");
+  await page.goto(referenceURL + "/design/brand");
   await expect(page.locator("#contrast-audit tr")).toHaveCount(11);
   await expect(page.locator("#contrast-audit")).not.toContainText(
     "Below target",
@@ -138,7 +139,7 @@ for (const path of [
   "/design/dashboard",
 ]) {
   test(`accessibility audit ${path}`, async ({ page }) => {
-    await page.goto(path);
+    await page.goto(referenceURL + path);
     await page.locator("html.ready").waitFor();
     for (const theme of ["light", "dark"]) {
       if (theme === "dark")
@@ -161,7 +162,7 @@ for (const path of [
 test("isolated chart observations and invalid binary states remain visible", async ({
   page,
 }) => {
-  await page.goto("/design/components");
+  await page.goto(referenceURL + "/design/components");
   await page.locator("#catalog-chart").evaluate(
     (el) =>
       (el.data = {
@@ -190,7 +191,7 @@ test("tablet recognition, touch targets and history keep quantity separate from 
     baseURL,
   });
   const page = await context.newPage();
-  await page.goto("/design/dashboard");
+  await page.goto(referenceURL + "/design/dashboard");
   const temperature = page.locator("#sensors cj-sensor").nth(0);
   const humidity = page.locator("#sensors cj-sensor").nth(1);
   const accent = (locator) =>
@@ -241,7 +242,7 @@ test("tablet recognition, touch targets and history keep quantity separate from 
 test("measurement identity survives failures and unknown metric names stay neutral", async ({
   page,
 }) => {
-  await page.goto("/design/components");
+  await page.goto(referenceURL + "/design/components");
   const card = page.locator("#playground");
   const before = await card
     .locator(".metric-icon")
@@ -268,4 +269,165 @@ test("measurement identity survives failures and unknown metric names stay neutr
     await expect(card.locator("img")).toHaveCount(0);
   }
   expect(await page.evaluate(() => window.pwned)).toBeUndefined();
+});
+
+async function liveWorkspace(page) {
+  const now = Date.now();
+  const snapshot = {
+    generated_at: new Date(now).toISOString(),
+    readings: [],
+    devices: [
+      {
+        source_id: "receiver",
+        device_id: "device-1",
+        last_received_at: new Date(now - 60000).toISOString(),
+        expected_interval_seconds: 300,
+        stale: false,
+        sensor_error: false,
+      },
+    ],
+    samples: [],
+  };
+  for (let i = 0; i < 4; i++)
+    snapshot.samples.push({
+      source_id: "receiver",
+      device_id: "device-1",
+      sample_id: `sample-${i}`,
+      received_at: new Date(now - 60000 - i * 300000).toISOString(),
+      expected_interval_seconds: 300,
+      readings: [
+        {
+          sensor_id: "sensor-1",
+          metric: "temperature",
+          unit: "degC",
+          value: 24 + i,
+          status: "ok",
+        },
+        {
+          sensor_id: "sensor-1",
+          metric: "humidity",
+          unit: "%",
+          value: 60 + i,
+          status: "ok",
+        },
+        {
+          sensor_id: "radio",
+          metric: "rssi",
+          unit: "dBm",
+          value: -85,
+          status: "ok",
+        },
+        {
+          sensor_id: "radio",
+          metric: "snr",
+          unit: "dB",
+          value: 12,
+          status: "ok",
+        },
+      ],
+    });
+  const response = await page.request.get("/");
+  const html = await response.text();
+  const json = JSON.stringify(snapshot).replaceAll("<", "\\u003c");
+  await page.route("**/", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: html.replace(
+        /(<script type="application\/json" id="initial-state">)[\s\S]*?(<\/script>)/,
+        `$1${json}$2`,
+      ),
+    }),
+  );
+  await page.goto("/");
+  await page.locator("html.ready").waitFor();
+}
+for (const width of [390, 820, 1440]) {
+  test(`product groups one device and one sensor at ${width}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 1180 });
+    await liveWorkspace(page);
+    await expect(page.locator(".device-group")).toHaveCount(1);
+    await expect(page.locator(".sensor-group")).toHaveCount(1);
+    await expect(page.locator(".reading-button")).toHaveCount(2);
+    await expect(page.locator("#summary")).toContainText(
+      "1 device / 1 sensor / 2 measurements",
+    );
+    await expect(page.locator('a[href^="/design/"]')).toHaveCount(0);
+    await expect(page.locator(".diagnostic-button").first()).not.toBeVisible();
+    await expect(page.locator("#history-panel")).not.toBeVisible();
+    await page.getByRole("button", { name: /Inspect Humidity:/ }).click();
+    await expect(page.locator("#history-heading")).toBeFocused();
+    await expect(page.locator("#chart-legend")).toContainText("Humidity");
+    await page.locator(".device-diagnostics summary").click();
+    await expect(page.locator(".diagnostic-button")).toHaveCount(2);
+    await page.getByRole("button", { name: /Inspect RSSI history/ }).click();
+    await expect(page.locator("#chart-legend")).toContainText("RSSI");
+    await page.locator("#refresh").click();
+    await expect(page.locator(".device-diagnostics")).toHaveAttribute(
+      "open",
+      "",
+    );
+    await page.getByRole("searchbox").fill("Humidity");
+    await expect(page.locator(".reading-button")).toHaveCount(2);
+    await page
+      .getByRole("button", { name: "Device details", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toContainText("device-1");
+    await page.keyboard.press("Escape");
+    const download = page.waitForEvent("download");
+    await page.locator("#export").click();
+    expect((await download).suggestedFilename()).toBe("cajui-readings.csv");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBeTruthy();
+  });
+}
+test("product accessibility and isolated reference routes", async ({
+  page,
+}) => {
+  await liveWorkspace(page);
+  for (const theme of ["light", "dark"]) {
+    if (theme === "dark")
+      await page.getByRole("button", { name: "Switch to dark theme" }).click();
+    const audit = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    expect(
+      audit.violations.map((v) => ({
+        id: v.id,
+        nodes: v.nodes.map((n) => n.target),
+      })),
+    ).toEqual([]);
+  }
+  const tile = page.locator("cj-reading").first();
+  await tile.evaluate(
+    (el) =>
+      (el.data = {
+        title: '<img src=x onerror="window.pwned=true">',
+        metric: "constructor",
+        unit: "<svg>",
+        state: "ok",
+        value: 0,
+      }),
+  );
+  await expect(tile.locator("img, svg:not(.icon)")).toHaveCount(0);
+  await expect(tile.locator(".reading-title")).toHaveText(
+    '<img src=x onerror="window.pwned=true">',
+  );
+  await expect(tile.locator(".reading-tile")).toHaveAttribute(
+    "data-kind",
+    "device",
+  );
+  expect(await page.evaluate(() => window.pwned)).toBeUndefined();
+  for (const path of [
+    "/design/brand",
+    "/design/dashboard",
+    "/ui/demo.mjs",
+    "/ui/design.mjs",
+  ]) {
+    expect((await page.request.get(path)).status()).toBe(404);
+  }
 });

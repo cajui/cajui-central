@@ -11,8 +11,10 @@ import {
   plotGeometry,
   csvRows,
   contrast,
+  buildDeviceGroups,
+  isLinkDiagnostic,
 } from "../../internal/httpapi/ui/model.mjs";
-import { demoData } from "../../internal/httpapi/ui/demo.mjs";
+import { demoData } from "../../docs/brand/demo.mjs";
 
 test("missing, zero and failures remain distinct", () => {
   assert.equal(numeric(null), null);
@@ -164,4 +166,122 @@ test("CSV keeps negative measurements numeric and escapes whitespace formulas", 
   assert.ok(csv.includes('"-5"'));
   assert.ok(csv.includes('"\'  =SUM(1)"'));
   assert.ok(csv.includes('"\'\n=1"'));
+});
+
+test("device groups keep physical sensors together and isolate radio diagnostics", () => {
+  const now = Date.parse("2026-01-01T00:00:00Z");
+  const sample = {
+    source_id: "source-a",
+    device_id: "node-1",
+    received_at: new Date(now).toISOString(),
+    expected_interval_seconds: 300,
+    readings: [
+      {
+        sensor_id: "sensor-1",
+        metric: "temperature",
+        unit: "degC",
+        value: 24,
+        status: "ok",
+      },
+      {
+        sensor_id: "sensor-1",
+        metric: "humidity",
+        unit: "%",
+        value: 0,
+        status: "ok",
+      },
+      {
+        sensor_id: "radio",
+        metric: "rssi",
+        unit: "dBm",
+        value: -85,
+        status: "ok",
+      },
+      {
+        sensor_id: "radio",
+        metric: "snr",
+        unit: "dB",
+        value: 12,
+        status: "ok",
+      },
+    ],
+  };
+  const channels = buildChannels({ samples: [sample] }, now);
+  const [group] = buildDeviceGroups(channels, [
+    {
+      source_id: "source-a",
+      device_id: "node-1",
+      last_received_at: sample.received_at,
+      expected_interval_seconds: 300,
+    },
+  ]);
+  assert.equal(group.sensors.length, 1);
+  assert.equal(group.sensors[0].channels.length, 2);
+  assert.equal(group.sensors[0].channels[0].metric, "temperature");
+  assert.equal(group.sensors[0].channels[1].value, 0);
+  assert.equal(group.diagnostics.length, 2);
+  assert.equal(group.attention, false);
+  assert.equal(
+    isLinkDiagnostic({ sensor: "noise", metric: "rssi", unit: "dBm" }),
+    false,
+  );
+  assert.equal(
+    isLinkDiagnostic({ sensor: "radio", metric: "rssi", unit: "V" }),
+    false,
+  );
+  const independent = buildChannels(
+    {
+      samples: [sample, { ...sample, source_id: "source-b" }],
+      readings: [
+        {
+          node_id: "node-1",
+          sensor_id: "sensor-1",
+          metric: "temperature",
+          unit: "degC",
+          value: 0,
+          received_at: sample.received_at,
+        },
+      ],
+    },
+    now,
+  );
+  assert.equal(buildDeviceGroups(independent).length, 3);
+});
+
+test("grouped views preserve units, unknown metrics, errors and silent devices", () => {
+  const base = {
+    transport: "mqtt",
+    source: "s",
+    device: "d",
+    sensor: "sensor-1",
+    metric: "temperature",
+    unit: "degC",
+    at: "2026-01-01T00:00:00Z",
+    state: "ok",
+    value: 0,
+  };
+  const groups = buildDeviceGroups(
+    [
+      base,
+      { ...base, unit: "degF" },
+      {
+        ...base,
+        sensor: "sensor-2",
+        metric: "custom",
+        state: "error",
+        value: null,
+      },
+    ],
+    [
+      { source_id: "s", device_id: "d", stale: true },
+      { source_id: "s", device_id: "silent", stale: true },
+    ],
+  );
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].sensors.length, 2);
+  assert.equal(groups[0].sensors[0].channels.length, 2);
+  assert.equal(groups[0].error, true);
+  assert.equal(groups[0].stale, true);
+  assert.equal(groups[1].sensors.length, 0);
+  assert.equal(groups[1].attention, true);
 });

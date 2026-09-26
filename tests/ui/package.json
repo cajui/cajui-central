@@ -5,7 +5,7 @@
   "scripts": {
     "test": "playwright test",
     "test:model": "node --test model.test.mjs",
-    "format:check": "prettier --check \"../../internal/httpapi/ui/*.{css,mjs}\" \"*.mjs\" package.json"
+    "format:check": "prettier --check \"../../internal/httpapi/ui/*.{css,mjs}\" \"../../docs/brand/*.{css,mjs}\" \"*.mjs\" package.json"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

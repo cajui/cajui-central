@@ -84,6 +84,23 @@ function iconText(state) {
     }[state] ?? "Waiting for data"
   );
 }
+// A measurement inside a sensor group. Device and sensor context belong to the group.
+class Reading extends Component {
+  render() {
+    const d = this.data;
+    const state = Object.hasOwn(states, d.state) ? d.state : "empty";
+    const value = ["ok", "stale", "recorded"].includes(state)
+      ? numeric(d.value)
+      : null;
+    const kind = metricIcon(d.metric);
+    this.innerHTML = `<div class="reading-tile" data-kind="${kind}" data-state="${state}">
+      <div class="reading-heading"><span class="metric-icon">${icon(kind)}</span><span class="reading-title">${e(d.title ?? "Measurement")}</span></div>
+      <p class="measurement">${formatValue(value)}<span class="unit">${e(formatUnit(d.unit))}</span></p>
+      <div class="reading-quality"><cj-badge state="${state}"></cj-badge><span class="reading-age">${e(d.updated ?? "Time unknown")}</span></div>
+      ${["ok", "recorded"].includes(state) ? "" : `<p class="reading-note">${e(iconText(state))}</p>`}
+      <span class="reading-history" aria-hidden="true">History ${icon("arrow")}</span></div>`;
+  }
+}
 class Battery extends Component {
   static observedAttributes = ["value"];
   render() {
@@ -228,6 +245,7 @@ class Chart extends Component {
 for (const [name, component] of Object.entries({
   "cj-badge": Badge,
   "cj-sensor": Sensor,
+  "cj-reading": Reading,
   "cj-battery": Battery,
   "cj-signal": Signal,
   "cj-level": Level,
