@@ -1780,3 +1780,9 @@ cj-reading {
 .product-shell .wordmark {
   font-size: 25px;
 }
+
+@media (max-width: 1000px) {
+  .product-shell .topbar {
+    height: 64px;
+  }
+}
