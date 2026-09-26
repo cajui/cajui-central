@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
-    "test:model": "node --test model.test.mjs",
+    "test:model": "node --test *.test.mjs",
     "format:check": "prettier --check \"../../internal/httpapi/ui/*.{css,mjs}\" \"../../docs/brand/*.{css,mjs}\" \"*.mjs\" package.json"
   },
   "devDependencies": {

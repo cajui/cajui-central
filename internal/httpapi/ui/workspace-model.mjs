@@ -1,3 +1,4 @@
+import { t, metricLabel } from "./i18n.mjs";
 import {
   buildChannels,
   buildDeviceGroups,
@@ -34,7 +35,7 @@ export function workspaceGroups(state, now = Date.parse(state.generated_at)) {
         sensor: sensor.sensor,
         metric: m.metric,
         unit: m.unit,
-        title: label(m.metric),
+        title: metricLabel(m.metric, label(m.metric)),
         value: m.value,
         state: channelState(m, m.received_at, m.interval, now),
         at: m.received_at,
@@ -116,8 +117,8 @@ export function automaticSections(catalog) {
     .filter((d) => d.name)
     .map((d) => ({ kind: "device", device_id: d.id }));
   return [
-    ...(sensors.length ? [{ title: "Sensors", items: sensors }] : []),
-    ...(devices.length ? [{ title: "Devices", items: devices }] : []),
+    ...(sensors.length ? [{ title: t("common.sensors"), items: sensors }] : []),
+    ...(devices.length ? [{ title: t("common.devices"), items: devices }] : []),
   ];
 }
 export function itemChoices(catalog) {
@@ -126,20 +127,23 @@ export function itemChoices(catalog) {
     ...catalog.devices
       .filter((d) => d.name)
       .map((d) => ({
-        label: `Device · ${d.name}`,
+        label: t("layout.device_choice", { name: d.name }),
         item: { kind: "device", device_id: d.id },
       })),
     ...environmentalSensors(catalog)
       .filter((s) => s.name)
       .flatMap((s) => [
         {
-          label: `Sensor · ${s.name} · ${devices.get(s.device_id)?.name}`,
+          label: t("layout.sensor_choice", {
+            name: s.name,
+            device: devices.get(s.device_id)?.name,
+          }),
           item: { kind: "sensor", sensor_id: s.id },
         },
         ...s.measurements
           .filter((m) => !isLinkDiagnostic({ sensor: s.sensor, ...m }))
           .map((m) => ({
-            label: `${label(m.metric)} (${m.unit}) · ${s.name} · ${devices.get(s.device_id)?.name}`,
+            label: `${metricLabel(m.metric, label(m.metric))} (${m.unit}) · ${s.name} · ${devices.get(s.device_id)?.name}`,
             item: {
               kind: "measurement",
               sensor_id: s.id,

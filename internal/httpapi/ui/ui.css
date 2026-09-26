@@ -1942,3 +1942,21 @@ cj-reading {
 .workspace-dialog {
   overflow-wrap: anywhere;
 }
+
+/* Allow full language names without crowding navigation on narrow screens. */
+.product-shell .topbar {
+  height: auto;
+  min-height: 88px;
+  padding-block: 12px;
+  flex-wrap: wrap;
+}
+.locale-picker .input {
+  width: auto;
+  min-height: var(--touch-target);
+  max-width: 100%;
+}
+@media (max-width: 1000px) {
+  .product-shell .topbar {
+    min-height: 64px;
+  }
+}

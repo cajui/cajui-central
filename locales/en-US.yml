@@ -1,0 +1,267 @@
+# Plain-text messages. Interpolation uses Rails-style %{name} placeholders.
+en-US:
+  common:
+    dashboard: Dashboard
+    devices: Devices
+    sensors: Sensors
+    device: Device
+    sensor: Sensor
+    measurement: Measurement
+    measurements: Measurements
+    refresh: Refresh
+    history: History
+    cancel: Cancel
+    unknown: Unknown
+    source: Source
+    transport: Transport
+    last_report: Last report
+    status: Status
+    actions: Actions
+    action: Action
+    edit: Edit
+    select: Select
+    name: Name
+    location: Location
+    optional: (optional)
+    no_location: No location
+    waiting: Waiting for data
+  nav:
+    workspace: Workspace
+    home: Cajuí Central home
+    open: Open navigation
+    theme: Switch color theme
+    light: Switch to light theme
+    dark: Switch to dark theme
+    skip: Skip to content
+    language: Language
+  states:
+    ok: Updated
+    recorded: Recorded
+    stale: Stale
+    error: Reading error
+    skipped: Not sampled
+    empty: No data
+    loading: Loading
+    warning: Attention
+    info: Example
+  age:
+    unknown: Time unknown
+    now: Just now
+    minutes: '%{count} min ago'
+    hours: '%{count} h ago'
+    days: '%{count} d ago'
+  metrics:
+    temperature: Temperature
+    humidity: Humidity
+    co2: Carbon dioxide
+    pressure: Pressure
+    battery: Battery
+    voltage: Voltage
+    soil_moisture: Soil moisture
+    illuminance: Illuminance
+    level: Level
+    rssi: RSSI
+    snr: SNR
+  dashboard:
+    description: The measurements and devices you choose to follow.
+    organize: Organize dashboard
+    export: Export readings
+    summary: Workspace summary
+    filter: Filter devices
+    all: All devices
+    attention: Needs attention
+    search_label: Search devices and sensors
+    search: Search devices…
+    items: Devices and sensors
+    period: Chart period
+    hours24: Last 24 hours
+    hours6: Last 6 hours
+    hour: Last hour
+    all_data: All loaded data
+    retention: 'History: latest 100 samples + 100 HTTP readings · latest known values retained'
+    details: Device details
+    close_details: Close details
+    connection: Connection details
+    last_report: Last report %{age}
+    inspect_history: Inspect %{measurement} history for %{device}
+    no_link: No link measurements reported.
+    no_items: No matching items in this section.
+    make_yours: Make this dashboard yours
+    get_started: Register your devices and sensors, then choose what to show here.
+    manage_devices: Manage devices
+    manage_sensors: Manage sensors
+    inspect: 'Inspect %{measurement}: %{value} %{unit}, %{status}, sensor %{sensor}, device %{device}'
+    history_title: '%{measurement} history'
+    history_context: Device %{device} · %{sensor} · Source %{source}
+    radio: Radio link
+    sensor_context: Sensor %{sensor}
+    device_id: Device ID
+    interval: Expected interval
+    not_reported: Not reported
+    registered_sensors: Registered sensors
+    arrival_status: Arrival status
+    identity_note: Device and sensor identifiers come from received data. A recent report does not guarantee that
+      a device is currently online. Names are local labels; registration does not grant network access.
+    no_issues: No reported issues
+    updated: Updated %{time} · Refreshes every 30 s
+    refresh_error: Could not refresh. Showing the last loaded snapshot; its readings may be out of date.
+    exported: Exported the visible sensor measurements.
+  registry:
+    devices:
+      description: Name the devices that send your measurements.
+      add: Add device
+      edit: Edit device
+      save: Save device
+      search: Search devices
+      discovery: Devices appear after sending data. Adding a device here does not pair radios or grant network access.
+      empty: No registered devices yet
+      choose: Choose Add device to select one from the available devices.
+      registered: Registered devices
+      select: Select a detected device to give it a name.
+      available: Available devices
+      no_new: No new devices detected
+      count:
+        one: '%{count} device available to add.'
+        other: '%{count} devices available to add.'
+        zero: '%{count} devices available to add.'
+    sensors:
+      description: Name your sensors and see which device reports each measurement.
+      add: Add sensor
+      edit: Edit sensor
+      save: Save sensor
+      search: Search sensors
+      discovery: Available sensors come from received measurements; register their device first.
+      empty: No registered sensors yet
+      choose: Choose Add sensor to select one from the available sensors.
+      registered: Registered sensors
+      select: Select a detected sensor to give it a name.
+      available: Available sensors
+      no_new: No new sensors detected
+      count:
+        one: '%{count} sensor available to add.'
+        other: '%{count} sensors available to add.'
+        zero: '%{count} sensors available to add.'
+    no_matches: No matches
+    try_search: Try a different name or location.
+    name_location: Name / location
+    counts: '%{registered} registered / %{detected} detected'
+    edit_name: Edit %{name}
+    select_name: Select %{name}
+    sensor_identity: 'Device: %{device} · Sensor: %{sensor}'
+    identity_note: Names can change. Identity and recorded history stay the same.
+    sensor_measurements: Sensor / measurements
+    device_source: Device / source
+    register_parent: Register device first
+    send: Send measurements from a device, then refresh this page.
+  layout:
+    help: Create sections and choose devices, complete sensors or individual measurements. Removing an item here
+      keeps its registration and history.
+    add_section: Add section
+    automatic: Use automatic layout
+    save: Save dashboard
+    automatic_note: 'Automatic layout: registered sensors and devices will appear in separate sections.'
+    empty: No sections yet. Add one to start, or save an empty dashboard.
+    section: Section %{number}
+    title: Section title
+    section_up: Move section %{number} up
+    section_down: Move section %{number} down
+    up: Move up
+    down: Move down
+    remove_section: Remove section
+    add_to: Add to this section
+    choose: Choose an item…
+    add_item: Add item
+    unavailable: Unavailable item
+    item_up: Move item %{number} up
+    item_down: Move item %{number} down
+    remove_item: Remove item %{number}
+    remove: Remove
+    device_choice: Device · %{name}
+    sensor_choice: Sensor · %{name} · %{device}
+  errors:
+    conflict: These settings changed or the parent is not registered. Reload this page before saving again.
+    session: Your editing session expired. Reload this local page and try again.
+    invalid: Check the names and selected items, then try again.
+    save: Could not save. Your changes remain here; check the connection and retry.
+    required: Complete this field.
+    too_long: Use at most %{count} characters.
+  components:
+    no_sensor: No sensor selected
+    view_history: View history
+    latest: Latest reading
+    reported: Last reported value
+    known: Last known value
+    unavailable: Value unavailable
+    skipped: Reading skipped
+    waiting: Waiting for readings
+    battery: battery
+    signal: received signal strength
+    fill: Fill level
+    empty: Empty
+    full: Full
+    binary: Binary sensor
+  chart:
+    empty: No readings in this period
+    choose_period: Choose a longer period or wait for a new sample.
+    description: '%{label} in %{unit}; %{observations}. Use the slider or data table for exact values.'
+    inspect: Inspect reading
+    observations: Inspect %{label} observations
+    table: View data table
+    data: '%{label} data'
+    time: Time (local)
+    value: Value (%{unit})
+    no_reading: No reading
+  ssr:
+    heading: Received readings
+    description: Recent data. Interactive views load when JavaScript is available.
+    node_sensor: Node / sensor
+    metric: Metric
+    value: Value
+    received: Received (UTC)
+    empty: No readings received yet. Connect a device to start receiving measurements.
+    known: Known devices
+    silence: Up to 100 devices. Silence means no new unique sample received for three expected intervals. Error
+      readings still count as communication.
+    source_device: Source / device
+    sensor_status: Sensor status
+    no_recent: No recent samples
+    recent: Recent sample
+    no_error: No reported error
+    no_mqtt: No MQTT devices received yet.
+    samples: MQTT samples
+    sample_note: Last 100 samples. Values below are reported measurements; missing values are not zero.
+    sensor_metric: Sensor / metric
+    value_status: Value / status
+  counts:
+    devices:
+      one: '%{count} device'
+      other: '%{count} devices'
+      zero: '%{count} devices'
+    sensors:
+      one: '%{count} sensor'
+      other: '%{count} sensors'
+      zero: '%{count} sensors'
+    measurements:
+      one: '%{count} measurement'
+      other: '%{count} measurements'
+      zero: '%{count} measurements'
+    observations:
+      one: '%{count} observation'
+      other: '%{count} observations'
+      zero: '%{count} observations'
+    registered:
+      one: '%{count} registered sensor'
+      other: '%{count} registered sensors'
+      zero: '%{count} registered sensors'
+    detected:
+      one: '%{count} detected device is ready to name.'
+      other: '%{count} detected devices are ready to name.'
+      zero: '%{count} detected devices are ready to name.'
+    issues:
+      one: '%{count} device needs attention'
+      other: '%{count} devices need attention'
+      zero: '%{count} devices need attention'
+    seconds:
+      one: '%{count} second'
+      other: '%{count} seconds'
+      zero: '%{count} seconds'

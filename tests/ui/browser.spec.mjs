@@ -271,9 +271,10 @@ test("measurement identity survives failures and unknown metric names stay neutr
   expect(await page.evaluate(() => window.pwned)).toBeUndefined();
 });
 
-async function liveWorkspace(page) {
+async function liveWorkspace(page, language = "en-US") {
   const now = Date.now();
   const snapshot = {
+    locale: language,
     generated_at: new Date(now).toISOString(),
     readings: [],
     devices: [
@@ -357,7 +358,7 @@ async function liveWorkspace(page) {
     })),
     layout: { revision: 0, sections: null },
   };
-  const response = await page.request.get("/");
+  const response = await page.request.get(`/?lang=${language}`);
   const html = await response.text();
   const json = JSON.stringify(snapshot).replaceAll("<", "\\u003c");
   await page.route("**/", (route) =>
@@ -672,4 +673,179 @@ test("persistent registration, independent dashboard composition and safe edits"
     "Unsaved name",
   );
   expect(errors).toEqual([]);
+});
+
+test("language selection persists across navigation and server-rendered pages", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/?lang=en-US");
+  await page
+    .getByRole("combobox", { name: "Language", exact: true })
+    .selectOption("pt-BR");
+  await expect(page.locator("html")).toHaveAttribute("lang", "pt-BR");
+  await expect(
+    page.getByRole("heading", { name: "Painel", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "Transmissores", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Transmissores", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Adicionar transmissor", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText("Adicionar transmissor");
+  await page.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "Sensores", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Sensores", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Adicionar sensor", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText("Adicionar sensor");
+  await page.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await page.reload();
+  await expect(
+    page.getByRole("combobox", { name: "Idioma", exact: true }),
+  ).toHaveValue("pt-BR");
+  const response = await page.request.get("/");
+  expect(response.headers()["content-language"]).toBe("pt-BR");
+  expect(await response.text()).toContain("Leituras recebidas");
+  await page
+    .getByRole("combobox", { name: "Idioma", exact: true })
+    .selectOption("en-US");
+  await expect(
+    page.getByRole("heading", { name: "Sensors", exact: true }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+for (const language of ["pt-BR", "en-US"]) {
+  test(`localized readings, chart, editor and tablet layout ${language}`, async ({
+    page,
+  }) => {
+    const pt = language === "pt-BR";
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await liveWorkspace(page, language);
+    await expect(page.locator(".reading-title").first()).toHaveText(
+      pt ? "Temperatura" : "Temperature",
+    );
+    await expect(page.locator(".sensor-group h3")).toHaveText("Sensor 1");
+    await expect(page.locator("#summary")).toContainText(
+      pt ? "1 transmissor" : "1 device",
+    );
+    await page.locator(".reading-button").first().click();
+    await expect(page.locator("#history-heading")).toHaveText(
+      pt ? "Histórico de Temperatura" : "Temperature history",
+    );
+    await expect(page.locator("#history svg.plot")).toHaveAttribute(
+      "aria-label",
+      pt ? /4 observações/ : /4 observations/,
+    );
+    await page.locator("#history summary").click();
+    await expect(page.locator("#history table th").first()).toHaveText(
+      pt ? "Horário (local)" : "Time (local)",
+    );
+    await page
+      .getByRole("button", {
+        name: pt ? "Organizar painel" : "Organize dashboard",
+        exact: true,
+      })
+      .click();
+    await expect(page.getByRole("dialog")).toContainText(
+      pt ? "Título da seção" : "Section title",
+    );
+    await page
+      .getByRole("button", { name: pt ? "Cancelar" : "Cancel", exact: true })
+      .click();
+    // Native input attributes remain protocol-neutral when visible text changes.
+    await page.evaluate(async () => {
+      const device = document.createElement("cj-device");
+      device.setAttribute("battery", "72");
+      device.setAttribute("signal", "-85");
+      document.querySelector("#app").append(device);
+    });
+    await expect(page.locator("cj-device cj-battery")).toContainText("72%");
+    await expect(page.locator("cj-device cj-signal")).toContainText("-85 dBm");
+    expect(
+      (
+        await new AxeBuilder({ page })
+          .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+          .analyze()
+      ).violations,
+    ).toEqual([]);
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBeTruthy();
+    expect(errors).toEqual([]);
+  });
+}
+
+test("Portuguese registration keeps typed names and translates save failures", async ({
+  page,
+}) => {
+  // Read-only UI fixture: no changes to the service's persisted inventory.
+  const response = await page.request.get("/devices?lang=pt-BR");
+  const html = await response.text();
+  const state = JSON.parse(
+    html.match(
+      /<script type="application\/json" id="initial-state">([\s\S]*?)<\/script>/,
+    )[1],
+  );
+  state.workspace.devices = [
+    {
+      id: 1,
+      transport: "mqtt",
+      source: "receiver",
+      device: "temperature",
+      name: "",
+      location: "",
+      revision: 0,
+      received_at: state.generated_at,
+      interval: 300,
+    },
+  ];
+  state.workspace.sensors = [];
+  const fixture = html.replace(
+    /(<script type="application\/json" id="initial-state">)[\s\S]*?(<\/script>)/,
+    `$1${JSON.stringify(state).replaceAll("<", "\\u003c")}$2`,
+  );
+  await page.route("**/devices", (route) =>
+    route.fulfill({ contentType: "text/html", body: fixture }),
+  );
+  await page.route("**/ui-api/devices/1", (route) =>
+    route.fulfill({ status: 409, contentType: "application/json", body: "{}" }),
+  );
+  await page.goto("/devices");
+  await page
+    .getByRole("button", { name: "Adicionar transmissor", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Selecionar temperature", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Nome", exact: true })
+    .fill("Temperature <custom>");
+  await page
+    .getByRole("button", { name: "Salvar transmissor", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Estas configurações mudaram",
+  );
+  await expect(
+    page.getByRole("textbox", { name: "Nome", exact: true }),
+  ).toHaveValue("Temperature <custom>");
 });

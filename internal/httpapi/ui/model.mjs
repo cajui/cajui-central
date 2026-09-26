@@ -1,14 +1,33 @@
-// Pure presentation helpers. No network, DOM, credentials, or persistent telemetry.
+import { t, locale, metricLabel } from "./i18n.mjs";
+// Presentation helpers. No network, DOM, credentials, or persistent telemetry.
 export const states = Object.freeze({
-  ok: "Updated",
-  recorded: "Recorded",
-  stale: "Stale",
-  error: "Reading error",
-  skipped: "Not sampled",
-  empty: "No data",
-  loading: "Loading",
-  warning: "Attention",
-  info: "Example",
+  get ok() {
+    return t("states.ok");
+  },
+  get recorded() {
+    return t("states.recorded");
+  },
+  get stale() {
+    return t("states.stale");
+  },
+  get error() {
+    return t("states.error");
+  },
+  get skipped() {
+    return t("states.skipped");
+  },
+  get empty() {
+    return t("states.empty");
+  },
+  get loading() {
+    return t("states.loading");
+  },
+  get warning() {
+    return t("states.warning");
+  },
+  get info() {
+    return t("states.info");
+  },
 });
 export const escapeHTML = (value) =>
   String(value ?? "").replace(
@@ -24,7 +43,7 @@ export function numeric(value) {
 export function formatValue(value, digits = 1) {
   return numeric(value) === null
     ? "—"
-    : new Intl.NumberFormat("en", {
+    : new Intl.NumberFormat(locale(), {
         maximumFractionDigits: digits,
         notation: Math.abs(value) >= 1e7 ? "scientific" : "standard",
       }).format(value);
@@ -38,16 +57,16 @@ export function label(value) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 export function age(value, now = Date.now()) {
-  const t = Date.parse(value);
-  if (!Number.isFinite(t)) return "Time unknown";
-  const seconds = Math.max(0, Math.floor((now - t) / 1000));
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return t("age.unknown");
+  const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
   return seconds < 60
-    ? "Just now"
+    ? t("age.now")
     : seconds < 3600
-      ? `${Math.floor(seconds / 60)} min ago`
+      ? t("age.minutes", { count: Math.floor(seconds / 60) })
       : seconds < 86400
-        ? `${Math.floor(seconds / 3600)} h ago`
-        : `${Math.floor(seconds / 86400)} d ago`;
+        ? t("age.hours", { count: Math.floor(seconds / 3600) })
+        : t("age.days", { count: Math.floor(seconds / 86400) });
 }
 export function channelState(reading, at, interval, now = Date.now()) {
   if (!reading) return "empty";
@@ -78,7 +97,7 @@ export function buildChannels(data, now = Date.now()) {
         sensor: reading.sensor_id,
         metric: reading.metric,
         unit: reading.unit,
-        title: label(reading.metric),
+        title: metricLabel(reading.metric, label(reading.metric)),
         points: [],
         latestTime: -Infinity,
       });
@@ -296,4 +315,8 @@ export function buildDeviceGroups(channels, reportedDevices = []) {
   return [...groups.values()].sort(
     (a, b) => a.name.localeCompare(b.name) || a.key.localeCompare(b.key),
   );
+}
+
+export function measurementLabel(value) {
+  return metricLabel(value, label(value));
 }
