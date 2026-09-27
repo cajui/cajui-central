@@ -235,13 +235,17 @@ export function contrast(foreground, background) {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
-// Version 1 producers can report these exact radio channels as link diagnostics.
-// Do not infer diagnostics from a unit alone: an arbitrary sensor may measure dB.
+// Version 1 producers can report these exact channels as device diagnostics: the radio
+// link and the node's own battery. Do not infer diagnostics from a unit alone: an arbitrary
+// sensor may measure dB or volts.
 export function isLinkDiagnostic(channel) {
   return (
-    channel.sensor === "radio" &&
-    ((channel.metric === "rssi" && channel.unit === "dBm") ||
-      (channel.metric === "snr" && channel.unit === "dB"))
+    (channel.sensor === "radio" &&
+      ((channel.metric === "rssi" && channel.unit === "dBm") ||
+        (channel.metric === "snr" && channel.unit === "dB"))) ||
+    (channel.sensor === "battery" &&
+      channel.metric === "voltage" &&
+      channel.unit === "V")
   );
 }
 export function buildDeviceGroups(channels, reportedDevices = []) {
