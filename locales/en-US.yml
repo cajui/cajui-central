@@ -297,6 +297,9 @@ en-US:
     queue_notice:
       one: "%{count} reading is waiting to be sent to the broker."
       other: "%{count} readings are waiting to be sent to the broker."
+    dropped_notice:
+      one: "%{count} old reading was given up because the queue was full, since the receiver started."
+      other: "%{count} old readings were given up because the queue was full, since the receiver started."
     pairing_notice:
       zero: Pairing is open; no transmitter has asked to join yet.
       one: Pairing is open; %{count} transmitter asked to join.

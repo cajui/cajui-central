@@ -65,6 +65,7 @@ func TestInvalidStatesAreRejected(t *testing.T) {
 		`{` + base + `,"role":"receiver","radio":{"profile":70000}}`,
 		`{` + base + `,"role":"receiver","wifi":{"rssi_dbm":10}}`,
 		`{` + base + `,"role":"receiver","queue":{"depth":-1}}`,
+		`{` + base + `,"role":"receiver","queue":{"dropped":-1}}`,
 		`{` + base + `,"role":"receiver","forwarding":{"retries":-1}}`,
 		`{` + base + `,"role":"receiver","pairing":{"open":true,"remaining_s":90000,"requests":[]}}`,
 		`{` + base + `,"role":"receiver","pairing":{"open":true,"requests":[{"node_id":"xyz","conflict":false}]}}`,

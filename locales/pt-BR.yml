@@ -301,6 +301,9 @@ pt-BR:
     queue_notice:
       one: "%{count} leitura aguarda envio ao broker."
       other: "%{count} leituras aguardam envio ao broker."
+    dropped_notice:
+      one: "%{count} leitura antiga foi descartada por fila cheia desde que o receptor ligou."
+      other: "%{count} leituras antigas foram descartadas por fila cheia desde que o receptor ligou."
     pairing_notice:
       zero: Pareamento aberto; nenhum transmissor pediu para entrar ainda.
       one: Pareamento aberto; %{count} transmissor pediu para entrar.

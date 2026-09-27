@@ -366,6 +366,12 @@ export function receiverSummary(state) {
       level: "warning",
       text: t("receivers.queue_notice", { count: depth }),
     });
+  const dropped = numeric(state.queue?.dropped);
+  if (dropped)
+    notices.push({
+      level: "warning",
+      text: t("receivers.dropped_notice", { count: dropped }),
+    });
   if (state.pairing?.open)
     notices.push({
       level: "info",

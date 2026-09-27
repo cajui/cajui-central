@@ -523,6 +523,11 @@ test("receiver state keeps unknown values unknown and names actionable notices",
     ["warning", "info", "info", "info"],
   );
   assert.match(busy.notices[0].text, /3 readings are waiting/);
+  assert.match(
+    receiverSummary({ availability: "online", queue: { depth: 0, dropped: 2 } })
+      .notices[0].text,
+    /2 old readings were given up/,
+  );
   const offline = receiverSummary({
     availability: "offline",
     queue: { depth: 3 },
