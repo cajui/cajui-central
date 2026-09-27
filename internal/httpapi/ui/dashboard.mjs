@@ -17,6 +17,7 @@ import {
   workspaceGroups,
   registeredGroups,
   automaticSections,
+  withoutRevoked,
   resolveItem,
 } from "./workspace-model.mjs";
 import { openLayoutEditor } from "./layout-editor.mjs";
@@ -147,7 +148,7 @@ export function mountDashboard(root, { state = {}, notify }) {
   function renderSections(target) {
     const sections =
       snapshot.workspace.layout.sections ??
-      automaticSections(snapshot.workspace);
+      automaticSections(withoutRevoked(snapshot));
     const matching = matchingGroups();
     for (const section of sections) {
       const block = document.createElement("section");
@@ -179,11 +180,11 @@ export function mountDashboard(root, { state = {}, notify }) {
         items.append(card);
       }
       if (!items.children.length)
-        items.innerHTML = `<p class="muted">${t("dashboard.no_items")}</p>`;
+        items.innerHTML = `<p class="muted">${t(query.trim() || filter !== "all" ? "dashboard.no_items" : "dashboard.section_empty")}</p>`;
       target.append(block);
     }
     if (!sections.length) {
-      const available = snapshot.workspace.devices.filter(
+      const available = withoutRevoked(snapshot).devices.filter(
         (d) => !d.name,
       ).length;
       target.innerHTML = `<div class="empty">${icon("overview")}<h2>${t("dashboard.make_yours")}</h2><p>${available ? t("counts.detected", { count: available }) + " " : ""}${t("dashboard.get_started")}</p><div class="top-actions"><a class="button primary" href="/devices">${t("dashboard.manage_devices")}</a><a class="button" href="/sensors">${t("dashboard.manage_sensors")}</a></div></div>`;
@@ -376,9 +377,12 @@ export function mountDashboard(root, { state = {}, notify }) {
   }
 
   root.querySelector("#organize").hidden = !snapshot.workspace;
-  root
-    .querySelector("#organize")
-    .addEventListener("click", () => openLayoutEditor(root, snapshot));
+  root.querySelector("#organize").addEventListener("click", () =>
+    openLayoutEditor(root, {
+      ...snapshot,
+      workspace: withoutRevoked(snapshot),
+    }),
+  );
   root.querySelectorAll("[data-filter]").forEach((button) =>
     button.addEventListener("click", () => {
       filter = button.dataset.filter;

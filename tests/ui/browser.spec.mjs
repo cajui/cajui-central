@@ -1308,4 +1308,8 @@ test("a revoked transmitter leaves the dashboard", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".dashboard-item")).toHaveCount(0);
   await expect(page.locator("#summary")).toContainText("0 devices");
+  await expect(
+    page.getByText("No matching items in this section."),
+  ).toHaveCount(0);
+  await expect(page.locator("#devices .empty")).toBeVisible();
 });

@@ -5,6 +5,7 @@ import {
   isLinkDiagnostic,
   label,
   channelState,
+  deviceStateFor,
 } from "./model.mjs";
 
 export function workspaceGroups(state, now = Date.parse(state.generated_at)) {
@@ -108,6 +109,26 @@ export function environmentalSensors(catalog) {
   return catalog.sensors.filter((s) =>
     s.measurements.some((m) => !isLinkDiagnostic({ sensor: s.sensor, ...m })),
   );
+}
+// The catalog without revoked transmitters and their sensors: what the dashboard and
+// its layout choices offer. The layout itself is kept as saved.
+export function withoutRevoked(state) {
+  const catalog = state.workspace;
+  const states = state.device_states ?? [];
+  const revoked = new Set(
+    catalog.devices
+      .filter(
+        (d) =>
+          d.transport === "mqtt" &&
+          deviceStateFor(states, d.source, d.device)?.binding === "revoked",
+      )
+      .map((d) => d.id),
+  );
+  return {
+    ...catalog,
+    devices: catalog.devices.filter((d) => !revoked.has(d.id)),
+    sensors: catalog.sensors.filter((s) => !revoked.has(s.device_id)),
+  };
 }
 export function automaticSections(catalog) {
   const sensors = environmentalSensors(catalog)

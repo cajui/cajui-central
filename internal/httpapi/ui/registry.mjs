@@ -139,8 +139,10 @@ export function mountRegistry(root, { state, kind, notify }) {
       list.innerHTML = `<div class="empty">${icon(sensors ? "temperature" : "device")}<h2>${query ? t("registry.no_matches") : message("empty")}</h2><p>${query ? t("registry.try_search") : message("choose")}</p></div>`;
       return;
     }
+    // On the sensors page a sensor follows its transmitter.
     const revoked = (entry) =>
-      !sensors && bindingOf(entry)?.binding === "revoked";
+      bindingOf(sensors ? devices.get(entry.device_id) : entry)?.binding ===
+      "revoked";
     const rowsFor = (items) =>
       items.map((entry) => {
         const { device, group, sensor } = dataFor(entry);
@@ -192,7 +194,7 @@ export function mountRegistry(root, { state, kind, notify }) {
           ],
           [
             t("common.actions"),
-            `<span class="row-actions"><button class="button" data-edit="${entry.id}" aria-label="${e(t("registry.edit_name", { name: entry.name }))}">${t("common.edit")}</button>${revoked(entry) ? `<button class="button" data-repair aria-label="${e(t("registry.pairing.repair_name", { name: entry.name }))}">${t("registry.pairing.repair")}</button>` : ""}</span>`,
+            `<span class="row-actions"><button class="button" data-edit="${entry.id}" aria-label="${e(t("registry.edit_name", { name: entry.name }))}">${t("common.edit")}</button>${revoked(entry) && !sensors ? `<button class="button" data-repair="${entry.id}" aria-label="${e(t("registry.pairing.repair_name", { name: entry.name }))}">${t("registry.pairing.repair")}</button>` : ""}</span>`,
           ],
         ];
         return cells;
@@ -209,9 +211,11 @@ export function mountRegistry(root, { state, kind, notify }) {
     const active = registered.filter((entry) => !revoked(entry));
     const gone = registered.filter(revoked);
     // Revoked devices keep their name and history but sit apart, below the working ones.
-    list.innerHTML = `${active.length ? table(active, message("registered")) : ""}${gone.length ? `<section class="registry-revoked" aria-labelledby="revoked-heading"><h2 id="revoked-heading">${e(t("registry.pairing.revoked_heading"))}</h2><p class="muted">${e(t("registry.pairing.revoked_note"))}</p>${table(gone, t("registry.pairing.revoked_heading"))}</section>` : ""}`;
+    list.innerHTML = `${active.length ? table(active, message("registered")) : ""}${gone.length ? `<section class="registry-revoked" aria-labelledby="revoked-heading"><h2 id="revoked-heading">${e(t("registry.pairing.revoked_heading"))}</h2><p class="muted">${e(t(sensors ? "registry.pairing.revoked_sensors_note" : "registry.pairing.revoked_note"))}</p>${table(gone, t("registry.pairing.revoked_heading"))}</section>` : ""}`;
     for (const b of list.querySelectorAll("[data-repair]"))
-      b.addEventListener("click", openAdd);
+      b.addEventListener("click", () =>
+        openAdd(`[data-repair="${CSS.escape(b.dataset.repair)}"]`),
+      );
     for (const b of list.querySelectorAll("[data-edit]"))
       b.addEventListener("click", () =>
         edit(entries.find((d) => d.id === Number(b.dataset.edit))),
@@ -262,7 +266,7 @@ export function mountRegistry(root, { state, kind, notify }) {
   }
   // Revocation is management, not monitoring: it lives with the device's name.
   function bindingOf(entry) {
-    return entry.transport === "mqtt"
+    return entry?.transport === "mqtt"
       ? deviceStateFor(snapshot.device_states ?? [], entry.source, entry.device)
       : null;
   }
@@ -358,11 +362,18 @@ export function mountRegistry(root, { state, kind, notify }) {
     if (focused)
       body.querySelector(`[data-focus="${CSS.escape(focused)}"]`)?.focus();
   }
-  function openAdd() {
+  // opener names the list button that opened the dialog, which a refresh may replace.
+  function openAdd(opener) {
     addDialog = createDialog(root, message("add"));
     const dialog = addDialog;
     dialog.addEventListener("close", () => {
       if (addDialog === dialog) addDialog = null;
+      const focus = document.activeElement;
+      if (
+        typeof opener === "string" &&
+        (!focus || focus === document.body || dialog.contains(focus))
+      )
+        root.querySelector(opener)?.focus();
     });
     renderAdd();
     dialog.showModal();
@@ -376,11 +387,15 @@ export function mountRegistry(root, { state, kind, notify }) {
     try {
       snapshot = await fetchSnapshot(location.pathname);
       root.querySelector("#fetch-error").classList.add("hidden");
-      const edit = document.activeElement?.dataset?.edit;
+      const { edit, repair } = document.activeElement?.dataset ?? {};
       update();
       render();
-      if (edit)
-        root.querySelector(`[data-edit="${CSS.escape(edit)}"]`)?.focus();
+      const again = edit
+        ? `[data-edit="${CSS.escape(edit)}"]`
+        : repair
+          ? `[data-repair="${CSS.escape(repair)}"]`
+          : "";
+      if (again) root.querySelector(again)?.focus();
       renderAdd();
     } catch {
       root.querySelector("#fetch-error").textContent = t(
