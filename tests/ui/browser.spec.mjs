@@ -547,7 +547,7 @@ test("persistent registration, independent dashboard composition and safe edits"
   await page.setViewportSize({ width: 820, height: 1180 });
   await page.goto("/sensors");
   await page.getByRole("button", { name: "Add sensor", exact: true }).click();
-  await expect(page.getByRole("dialog")).toContainText("Register device first");
+  await expect(page.getByRole("dialog")).toContainText("Name the device first");
   await page.keyboard.press("Escape");
   await page.goto("/devices");
   await page.getByRole("button", { name: "Add device", exact: true }).click();

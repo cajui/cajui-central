@@ -83,7 +83,7 @@ pt-BR:
     inspect_history: Ver histórico de %{measurement} de %{device}
     no_items: Nenhum item corresponde ao filtro nesta seção.
     make_yours: Personalize seu painel
-    get_started: Cadastre seus transmissores e sensores e escolha o que mostrar aqui.
+    get_started: Dê um nome aos seus transmissores e sensores e escolha o que mostrar aqui.
     manage_devices: Gerenciar transmissores
     manage_sensors: Gerenciar sensores
     inspect: 'Ver %{measurement}: %{value} %{unit}, %{status}, sensor %{sensor}, transmissor %{device}'
@@ -94,11 +94,9 @@ pt-BR:
     device_id: ID do transmissor
     interval: Intervalo esperado
     not_reported: Não informado
-    registered_sensors: Sensores cadastrados
+    registered_sensors: Sensores com nome
     arrival_status: Estado de recebimento
-    identity_note: Os identificadores de transmissores e sensores vêm dos dados recebidos. Um envio recente não
-      garante que o transmissor esteja conectado agora. Os nomes são rótulos locais; o cadastro não concede acesso
-      à rede.
+    identity_note: Os nomes são rótulos locais. Um envio recente não garante que o transmissor esteja no ar agora.
     no_issues: Nenhum problema informado
     updated: Atualizado às %{time} · Atualiza a cada 30 s
     refresh_error: Não foi possível atualizar. Exibindo os últimos dados carregados; as leituras podem estar desatualizadas.
@@ -113,9 +111,9 @@ pt-BR:
       save: Salvar transmissor
       search: Buscar transmissores
       discovery: Escolha Adicionar transmissor para dar um nome a eles.
-      empty: Nenhum transmissor cadastrado
+      empty: Nenhum transmissor com nome ainda
       choose: Escolha Adicionar transmissor para selecionar um dos transmissores disponíveis.
-      registered: Transmissores cadastrados
+      registered: Transmissores com nome
       select: Selecione um transmissor detectado para dar um nome a ele.
       available: Transmissores disponíveis
       no_new: Nenhum novo transmissor detectado
@@ -129,10 +127,10 @@ pt-BR:
       edit: Editar sensor
       save: Salvar sensor
       search: Buscar sensores
-      discovery: Os sensores disponíveis vêm das medições recebidas; cadastre primeiro o transmissor correspondente.
-      empty: Nenhum sensor cadastrado
+      discovery: Os sensores disponíveis vêm das medições recebidas; dê um nome primeiro ao transmissor correspondente.
+      empty: Nenhum sensor com nome ainda
       choose: Escolha Adicionar sensor para selecionar um dos sensores disponíveis.
-      registered: Sensores cadastrados
+      registered: Sensores com nome
       select: Selecione um sensor detectado para dar um nome a ele.
       available: Sensores disponíveis
       no_new: Nenhum novo sensor detectado
@@ -143,12 +141,12 @@ pt-BR:
     no_matches: Nenhum resultado
     try_search: Tente outro nome ou localização.
     name_location: Nome / localização
-    counts: '%{registered} cadastrados / %{detected} detectados'
+    counts: '%{registered} com nome / %{detected} detectados'
     edit_name: Editar %{name}
     select_name: Selecionar %{name}
     sensor_identity: 'Transmissor: %{device} · Sensor: %{sensor}'
     identity_note: Os nomes podem mudar. A identidade e o histórico registrado permanecem os mesmos.
-    register_parent: Cadastre o transmissor primeiro
+    register_parent: Dê um nome ao transmissor primeiro
     name_action: Dar nome
     pairing:
       heading: Parear pelo rádio
@@ -166,11 +164,11 @@ pt-BR:
     send: Transmissores e sensores aparecem aqui após a primeira medição.
   layout:
     help: Crie seções e escolha transmissores, sensores completos ou medições individuais. Remover um item daqui
-      preserva seu cadastro e histórico.
+      preserva seu nome e histórico.
     add_section: Adicionar seção
     automatic: Usar organização automática
     save: Salvar painel
-    automatic_note: 'Organização automática: sensores e transmissores cadastrados aparecerão em seções separadas.'
+    automatic_note: 'Organização automática: sensores e transmissores com nome aparecerão em seções separadas.'
     empty: Ainda não há seções. Adicione uma para começar ou salve um painel vazio.
     section: Seção %{number}
     title: Título da seção
@@ -190,7 +188,7 @@ pt-BR:
     device_choice: Transmissor · %{name}
     sensor_choice: Sensor · %{name} · %{device}
   errors:
-    conflict: Estas configurações mudaram ou o transmissor ainda não está cadastrado. Recarregue a página antes
+    conflict: Estas configurações mudaram ou o transmissor ainda não tem nome. Recarregue a página antes
       de salvar novamente.
     session: Sua sessão de edição expirou. Recarregue esta página local e tente novamente.
     invalid: Confira os nomes e os itens selecionados e tente novamente.
@@ -263,9 +261,9 @@ pt-BR:
       other: '%{count} observações'
       zero: '%{count} observações'
     registered:
-      one: '%{count} sensor cadastrado'
-      other: '%{count} sensores cadastrados'
-      zero: '%{count} sensores cadastrados'
+      one: '%{count} sensor com nome'
+      other: '%{count} sensores com nome'
+      zero: '%{count} sensores com nome'
     detected:
       one: '%{count} transmissor detectado está pronto para receber um nome.'
       other: '%{count} transmissores detectados estão prontos para receber um nome.'
@@ -325,7 +323,7 @@ pt-BR:
     retained_notice: Estado recebido do broker quando o Central se conectou; a idade é desconhecida.
     binding: Pareamento
     binding_active: Pareado
-    binding_pending: Cadastrado, ainda não ativo
+    binding_pending: Aguardando confirmação do transmissor
     binding_revoked: Revogado
     receiver: Receptor
     last_frame: Último quadro de rádio
