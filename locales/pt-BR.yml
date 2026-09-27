@@ -161,6 +161,10 @@ pt-BR:
       searching_left: Buscando · faltam %{time}
       no_requests: Nenhum pedido ainda.
       awaiting_data: Pareado, aguardando a primeira leitura
+      revoked_heading: Revogados
+      revoked_note: O receptor não aceita mais estes transmissores. O nome e o histórico continuam.
+      repair: Parear de novo
+      repair_name: Parear %{name} de novo
       revoked: 'Revogado: o receptor não aceita mais este transmissor. Para ele voltar, use Adicionar transmissor e segure o botão PRG dele por três segundos.'
       known: Já pareado. Adicionar de novo refaz o pareamento; o nome e o histórico continuam.
       after_add: Depois de adicionado, um transmissor novo aparece aqui para receber um nome.

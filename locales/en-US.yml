@@ -161,6 +161,10 @@ en-US:
       searching_left: Searching · %{time} left
       no_requests: No requests yet.
       awaiting_data: Paired, waiting for its first reading
+      revoked_heading: Revoked
+      revoked_note: The receiver no longer accepts these devices. Their names and history stay.
+      repair: Pair again
+      repair_name: Pair %{name} again
       revoked: 'Revoked: the receiver no longer accepts this transmitter. To bring it back, use Add device and hold its PRG button for three seconds.'
       known: Already paired. Adding it again pairs it anew; its name and history stay.
       after_add: After you add it, a new device appears here to be named.

@@ -139,62 +139,79 @@ export function mountRegistry(root, { state, kind, notify }) {
       list.innerHTML = `<div class="empty">${icon(sensors ? "temperature" : "device")}<h2>${query ? t("registry.no_matches") : message("empty")}</h2><p>${query ? t("registry.try_search") : message("choose")}</p></div>`;
       return;
     }
-    const rows = registered.map((entry) => {
-      const { device, group, sensor } = dataFor(entry);
-      const status = group?.stale
-        ? "stale"
-        : sensor?.channels.some((c) =>
-              ["error", "skipped", "stale"].includes(c.state),
-            )
-          ? "error"
-          : group?.transport === "http"
-            ? "recorded"
-            : "ok";
-      const detail = sensors
-        ? entry.measurements
-            .filter((m) => !isLinkDiagnostic({ sensor: entry.sensor, ...m }))
-            .map(
-              (m) =>
-                `${measurementLabel(m.metric)}: ${m.status === "ok" ? formatValue(m.value) + " " + formatUnit(m.unit) : (states[m.status] ?? m.status)}`,
-            )
-            .join(" · ")
-        : age(device.received_at, Date.parse(snapshot.generated_at));
-      const cells = [
-        [
-          t("registry.name_location"),
-          `<strong>${e(entry.name)}</strong><span class="registry-secondary">${e(entry.location || t("common.no_location"))}</span>`,
-        ],
-        [
-          sensors ? t("common.device") : t("common.sensors"),
-          sensors
-            ? `<a href="/devices">${e(device.name || device.device)}</a>`
-            : e(
-                t("registry.counts", {
-                  registered:
-                    group?.sensors.filter((s) => s.registered).length ?? 0,
-                  detected: group?.sensors.length ?? 0,
-                }),
-              ),
-        ],
-        [
-          sensors ? t("common.measurements") : t("common.last_report"),
-          e(detail),
-        ],
-        ...(sensors ? [] : health(entry, group)),
-        [t("common.status"), `<cj-badge state="${status}"></cj-badge>`],
-        [
-          t("common.actions"),
-          `<button class="button" data-edit="${entry.id}" aria-label="${e(t("registry.edit_name", { name: entry.name }))}">${t("common.edit")}</button>`,
-        ],
-      ];
-      return cells;
-    });
-    list.innerHTML = `<div class="panel scroll"><table class="registry-table" role="table"><caption class="sr-only">${message("registered")}</caption><thead role="rowgroup"><tr role="row">${rows[0].map(([label]) => `<th scope="col" role="columnheader">${e(label)}</th>`).join("")}</tr></thead><tbody role="rowgroup">${rows
-      .map(
-        (cells) =>
-          `<tr role="row">${cells.map(([label, html]) => `<td role="cell" data-label="${e(label)}">${html}</td>`).join("")}</tr>`,
-      )
-      .join("")}</tbody></table></div>`;
+    const revoked = (entry) =>
+      !sensors && bindingOf(entry)?.binding === "revoked";
+    const rowsFor = (items) =>
+      items.map((entry) => {
+        const { device, group, sensor } = dataFor(entry);
+        const status = group?.stale
+          ? "stale"
+          : sensor?.channels.some((c) =>
+                ["error", "skipped", "stale"].includes(c.state),
+              )
+            ? "error"
+            : group?.transport === "http"
+              ? "recorded"
+              : "ok";
+        const detail = sensors
+          ? entry.measurements
+              .filter((m) => !isLinkDiagnostic({ sensor: entry.sensor, ...m }))
+              .map(
+                (m) =>
+                  `${measurementLabel(m.metric)}: ${m.status === "ok" ? formatValue(m.value) + " " + formatUnit(m.unit) : (states[m.status] ?? m.status)}`,
+              )
+              .join(" · ")
+          : age(device.received_at, Date.parse(snapshot.generated_at));
+        const cells = [
+          [
+            t("registry.name_location"),
+            `<strong>${e(entry.name)}</strong><span class="registry-secondary">${e(entry.location || t("common.no_location"))}</span>`,
+          ],
+          [
+            sensors ? t("common.device") : t("common.sensors"),
+            sensors
+              ? `<a href="/devices">${e(device.name || device.device)}</a>`
+              : e(
+                  t("registry.counts", {
+                    registered:
+                      group?.sensors.filter((s) => s.registered).length ?? 0,
+                    detected: group?.sensors.length ?? 0,
+                  }),
+                ),
+          ],
+          [
+            sensors ? t("common.measurements") : t("common.last_report"),
+            e(detail),
+          ],
+          ...(sensors ? [] : health(entry, group)),
+          [
+            t("common.status"),
+            revoked(entry)
+              ? `<span class="badge" data-state="empty">${e(t("receivers.binding_revoked"))}</span>`
+              : `<cj-badge state="${status}"></cj-badge>`,
+          ],
+          [
+            t("common.actions"),
+            `<span class="row-actions"><button class="button" data-edit="${entry.id}" aria-label="${e(t("registry.edit_name", { name: entry.name }))}">${t("common.edit")}</button>${revoked(entry) ? `<button class="button" data-repair aria-label="${e(t("registry.pairing.repair_name", { name: entry.name }))}">${t("registry.pairing.repair")}</button>` : ""}</span>`,
+          ],
+        ];
+        return cells;
+      });
+    const table = (items, caption) => {
+      const rows = rowsFor(items);
+      return `<div class="panel scroll"><table class="registry-table" role="table"><caption class="sr-only">${e(caption)}</caption><thead role="rowgroup"><tr role="row">${rows[0].map(([label]) => `<th scope="col" role="columnheader">${e(label)}</th>`).join("")}</tr></thead><tbody role="rowgroup">${rows
+        .map(
+          (cells) =>
+            `<tr role="row">${cells.map(([label, html]) => `<td role="cell" data-label="${e(label)}">${html}</td>`).join("")}</tr>`,
+        )
+        .join("")}</tbody></table></div>`;
+    };
+    const active = registered.filter((entry) => !revoked(entry));
+    const gone = registered.filter(revoked);
+    // Revoked devices keep their name and history but sit apart, below the working ones.
+    list.innerHTML = `${active.length ? table(active, message("registered")) : ""}${gone.length ? `<section class="registry-revoked" aria-labelledby="revoked-heading"><h2 id="revoked-heading">${e(t("registry.pairing.revoked_heading"))}</h2><p class="muted">${e(t("registry.pairing.revoked_note"))}</p>${table(gone, t("registry.pairing.revoked_heading"))}</section>` : ""}`;
+    for (const b of list.querySelectorAll("[data-repair]"))
+      b.addEventListener("click", openAdd);
     for (const b of list.querySelectorAll("[data-edit]"))
       b.addEventListener("click", () =>
         edit(entries.find((d) => d.id === Number(b.dataset.edit))),
@@ -341,7 +358,7 @@ export function mountRegistry(root, { state, kind, notify }) {
     if (focused)
       body.querySelector(`[data-focus="${CSS.escape(focused)}"]`)?.focus();
   }
-  root.querySelector("#add-entry").addEventListener("click", () => {
+  function openAdd() {
     addDialog = createDialog(root, message("add"));
     const dialog = addDialog;
     dialog.addEventListener("close", () => {
@@ -349,7 +366,8 @@ export function mountRegistry(root, { state, kind, notify }) {
     });
     renderAdd();
     dialog.showModal();
-  });
+  }
+  root.querySelector("#add-entry").addEventListener("click", openAdd);
   async function refresh() {
     if (pending) return;
     pending = true;

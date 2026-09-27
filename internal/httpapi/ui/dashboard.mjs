@@ -52,6 +52,21 @@ export function mountDashboard(root, { state = {}, notify }) {
     const now = Date.parse(snapshot.generated_at);
     groups = workspaceGroups(snapshot, now);
     if (snapshot.workspace) groups = registeredGroups(groups);
+    // A transmitter whose receiver is offline cannot report: that needs attention too.
+    const deviceStates = snapshot.device_states ?? [];
+    for (const g of groups) {
+      if (g.transport !== "mqtt") continue;
+      const state = deviceStateFor(deviceStates, g.source, g.device);
+      const receiver = state?.receiver_id
+        ? deviceStateFor(deviceStates, g.source, state.receiver_id)
+        : null;
+      g.state = state;
+      g.receiver = receiver;
+      g.receiverOffline = receiver?.availability === "offline";
+      if (g.receiverOffline) g.attention = true;
+    }
+    // A revoked transmitter no longer reports; it stays on the devices page only.
+    groups = groups.filter((g) => g.state?.binding !== "revoked");
     channels = groups.flatMap((g) => [
       ...g.sensors.flatMap((s) => s.channels),
       ...g.diagnostics,
@@ -66,20 +81,8 @@ export function mountDashboard(root, { state = {}, notify }) {
             : c.metric.toUpperCase();
     }
     if (!channels.some((c) => c.key === selected)) selected = "";
-    // A transmitter whose receiver is offline cannot report: that needs attention too.
-    const deviceStates = snapshot.device_states ?? [];
-    for (const g of groups) {
-      if (g.transport !== "mqtt") continue;
-      const state = deviceStateFor(deviceStates, g.source, g.device);
-      const receiver = state?.receiver_id
-        ? deviceStateFor(deviceStates, g.source, state.receiver_id)
-        : null;
-      g.state = state;
-      g.receiver = receiver;
-      g.receiverOffline = receiver?.availability === "offline";
-      if (g.receiverOffline) g.attention = true;
-    }
   }
+
   // A layout may show the same reading or device in several sections, so a card
   // button is identified by its key and its position among equal keys.
   function focusSpot(element) {

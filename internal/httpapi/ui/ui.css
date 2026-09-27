@@ -1777,6 +1777,23 @@ cj-reading {
   min-width: 160px;
   overflow-wrap: anywhere;
 }
+.registry-revoked {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-8);
+}
+.registry-revoked > h2 {
+  font-size: var(--text-label);
+  margin: 0;
+}
+.registry-revoked .registry-table {
+  color: var(--muted);
+}
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
 .registry-table cj-badge {
   white-space: nowrap;
 }
