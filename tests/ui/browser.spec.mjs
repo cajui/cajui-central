@@ -564,7 +564,7 @@ test("persistent registration, independent dashboard composition and safe edits"
   await page.getByRole("button", { name: "Add sensor", exact: true }).click();
   const available = page
     .getByRole("dialog")
-    .getByRole("row")
+    .getByRole("listitem")
     .filter({ hasText: deviceName });
   await available
     .getByRole("button", { name: "Select ambient", exact: true })
@@ -891,4 +891,169 @@ test("Portuguese registration keeps typed names and translates save failures", a
   await expect(
     page.getByRole("textbox", { name: "Nome", exact: true }),
   ).toHaveValue("Temperature <custom>");
+});
+
+// A receiver that pairs by radio, and the devices page following it live.
+async function liveDevices(page, snapshot) {
+  const html = await (await page.request.get("/devices?lang=en-US")).text();
+  const serve = (state) => {
+    const json = JSON.stringify(state).replaceAll("<", "\\u003c");
+    return page.route("**/devices", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: html.replace(
+          /(<script type="application\/json" id="initial-state">)[\s\S]*?(<\/script>)/,
+          `$1${json}$2`,
+        ),
+      }),
+    );
+  };
+  await serve(snapshot);
+  await page.goto("/devices");
+  await page.locator("html.ready").waitFor();
+  return serve;
+}
+function pairingSnapshot() {
+  const now = new Date().toISOString();
+  return {
+    locale: "en-US",
+    ui_token: "test",
+    generated_at: now,
+    readings: [],
+    samples: [],
+    devices: [],
+    device_states: [
+      {
+        source_id: "site",
+        device_id: "000048ca433c5e10",
+        role: "receiver",
+        availability: "online",
+        capabilities: ["pairing", "revoke"],
+        received_at: now,
+        pairing: { open: false, requests: [] },
+      },
+    ],
+    workspace: {
+      devices: [],
+      sensors: [],
+      layout: { revision: 0, sections: null },
+    },
+  };
+}
+test("one dialog pairs a transmitter by radio and names it as it appears", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const state = pairingSnapshot();
+  const serve = await liveDevices(page, state);
+  await page.route("**/ui-api/commands", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        command_id: "c1",
+        status: "applied",
+        type: JSON.parse(route.request().postData()).type,
+      }),
+    }),
+  );
+  await page.getByRole("button", { name: "Add device", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Pair by radio");
+  await expect(dialog).toContainText("hold the PRG button");
+  await expect(dialog).toContainText("No new devices detected");
+  const receiver = state.device_states[0];
+  receiver.pairing = {
+    open: true,
+    remaining_s: 120,
+    requests: [{ node_id: "000048ca433c776c", rssi_dbm: -60, conflict: false }],
+  };
+  await serve(state);
+  await dialog
+    .getByRole("button", { name: "Search for transmitters", exact: true })
+    .click();
+  await expect(page.locator("#toast")).toHaveText(
+    "Search started for two minutes.",
+  );
+  await expect(dialog).toContainText("Searching · 2:00 left");
+  await expect(dialog).toContainText("Transmitter 776C");
+  receiver.pairing = { open: false, requests: [] };
+  state.device_states.push({
+    source_id: "site",
+    device_id: "000048ca433c776c",
+    role: "transmitter",
+    receiver_id: receiver.device_id,
+    binding: "pending",
+    received_at: state.generated_at,
+  });
+  await serve(state);
+  await dialog.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.locator("#toast")).toHaveText("Transmitter paired.");
+  await expect(dialog).toContainText("Paired, waiting for its first reading");
+  state.workspace.devices.push({
+    id: 7,
+    transport: "mqtt",
+    source: "site",
+    device: "000048ca433c776c",
+    name: "",
+    location: "",
+    revision: 0,
+    received_at: state.generated_at,
+    interval: 300,
+  });
+  await serve(state);
+  await page.clock.fastForward(3100);
+  await expect(dialog).not.toContainText("waiting for its first reading");
+  await dialog
+    .getByRole("button", { name: "Select 000048ca433c776c", exact: true })
+    .click();
+  await expect(dialog.getByLabel("Name")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+  await expect(page.locator("#discovery-note")).toContainText(
+    "1 device available to add.",
+  );
+});
+test("revocation lives with the device name, not on the dashboard", async ({
+  page,
+}) => {
+  const state = pairingSnapshot();
+  state.device_states.push({
+    source_id: "site",
+    device_id: "000048ca433c776c",
+    role: "transmitter",
+    receiver_id: "000048ca433c5e10",
+    binding: "active",
+    received_at: state.generated_at,
+  });
+  state.workspace.devices.push({
+    id: 7,
+    transport: "mqtt",
+    source: "site",
+    device: "000048ca433c776c",
+    name: "Coop",
+    location: "",
+    revision: 1,
+    received_at: state.generated_at,
+    interval: 300,
+  });
+  await liveDevices(page, state);
+  await page.getByRole("button", { name: "Edit Coop", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Revoke transmitter", exact: true }),
+  ).toBeVisible();
+  const home = await (await page.request.get("/?lang=en-US")).text();
+  await page.route("**/", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: home.replace(
+        /(<script type="application\/json" id="initial-state">)[\s\S]*?(<\/script>)/,
+        `$1${JSON.stringify(state).replaceAll("<", "\\u003c")}$2`,
+      ),
+    }),
+  );
+  await page.goto("/");
+  await expect(page.locator(".receiver-card")).toHaveCount(1);
+  await expect(
+    page.getByRole("button", { name: "Search for transmitters" }),
+  ).toHaveCount(0);
 });

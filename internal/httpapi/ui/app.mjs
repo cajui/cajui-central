@@ -105,6 +105,6 @@ function notify(text) {
 }
 const root = document.querySelector("#app");
 if (route === "/devices" || route === "/sensors")
-  mountRegistry(root, { state, kind: route.slice(1) });
+  mountRegistry(root, { state, kind: route.slice(1), notify });
 else mountDashboard(root, { state, notify });
 document.documentElement.classList.add("ready");

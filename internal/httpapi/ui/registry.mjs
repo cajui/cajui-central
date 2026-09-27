@@ -7,6 +7,7 @@ import {
   formatValue,
   formatUnit,
   isLinkDiagnostic,
+  deviceStateFor,
 } from "./model.mjs";
 import { environmentalSensors, workspaceGroups } from "./workspace-model.mjs";
 import {
@@ -15,23 +16,44 @@ import {
   localizeValidation,
 } from "./workspace-api.mjs";
 import { icon } from "./icons.mjs";
+import { fetchSnapshot } from "./snapshot-api.mjs";
+import { commandRunner } from "./command-api.mjs";
+import {
+  offers,
+  shortID,
+  awaitingFirstReading,
+  pairingSection,
+} from "./pairing.mjs";
 
-export function mountRegistry(root, { state, kind }) {
+export function mountRegistry(root, { state, kind, notify }) {
   const sensors = kind === "sensors";
-  const catalog = state.workspace;
-  const entries = sensors ? environmentalSensors(catalog) : catalog.devices;
-  const groups = workspaceGroups(state);
-  const devices = new Map(catalog.devices.map((d) => [d.id, d]));
   const title = sensors ? t("common.sensors") : t("common.devices");
   const message = (key, values) => t(`registry.${kind}.${key}`, values);
-  let query = "";
-  root.innerHTML = `<header class="page-heading"><div><h1>${title}</h1><p>${message("description")}</p></div><div class="top-actions"><button class="button" id="refresh">${icon("refresh")}${t("common.refresh")}</button><button class="button primary" id="add-entry">${message("add")}</button></div></header><div class="notice" id="discovery-note"></div><label class="search registry-search">${icon("search")}<span class="sr-only">${message("search")}</span><input type="search" placeholder="${message("search")}…"></label><div id="registry-list"></div>`;
-  root
-    .querySelector("#refresh")
-    .addEventListener("click", () => location.reload());
-  const available = entries.filter((d) => !d.name);
-  root.querySelector("#discovery-note").textContent =
-    `${message("count", { count: available.length })} ${message("discovery")}`;
+  let snapshot = state,
+    query = "",
+    entries = [],
+    groups = [],
+    devices = new Map(),
+    available = [],
+    addDialog = null,
+    pending = false;
+  const commands = commandRunner({
+    session: () => snapshot,
+    notify,
+    done: () => refresh(),
+  });
+  root.innerHTML = `<header class="page-heading"><div><h1>${title}</h1><p>${message("description")}</p></div><div class="top-actions"><button class="button" id="refresh">${icon("refresh")}${t("common.refresh")}</button><button class="button primary" id="add-entry">${message("add")}</button></div></header><div id="fetch-error" class="notice hidden" role="status"></div><div class="notice hidden" id="discovery-note"></div><label class="search registry-search">${icon("search")}<span class="sr-only">${message("search")}</span><input type="search" placeholder="${message("search")}…"></label><div id="registry-list"></div>`;
+  root.querySelector("#refresh").addEventListener("click", () => refresh());
+  function update() {
+    const catalog = snapshot.workspace;
+    entries = sensors ? environmentalSensors(catalog) : catalog.devices;
+    groups = workspaceGroups(snapshot);
+    devices = new Map(catalog.devices.map((d) => [d.id, d]));
+    available = entries.filter((d) => !d.name);
+    const note = root.querySelector("#discovery-note");
+    note.classList.toggle("hidden", !available.length);
+    note.textContent = `${message("count", { count: available.length })} ${message("discovery")}`;
+  }
   function dataFor(entry) {
     const device = sensors ? devices.get(entry.device_id) : entry;
     const group = groups.find((g) => g.registryID === device?.id);
@@ -74,7 +96,7 @@ export function mountRegistry(root, { state, kind }) {
                   `${measurementLabel(m.metric)}: ${m.status === "ok" ? formatValue(m.value) + " " + formatUnit(m.unit) : (states[m.status] ?? m.status)}`,
               )
               .join(" · ")
-          : age(device.received_at, Date.parse(state.generated_at));
+          : age(device.received_at, Date.parse(snapshot.generated_at));
         return `<tr><td><strong>${e(entry.name)}</strong><span class="registry-secondary">${e(entry.location || t("common.no_location"))}</span></td><td>${sensors ? `<a href="/devices">${e(device.name || device.device)}</a>` : t("registry.counts", { registered: group?.sensors.filter((s) => s.registered).length ?? 0, detected: group?.sensors.length ?? 0 })}</td><td>${e(detail)}</td><td><cj-badge state="${status}"></cj-badge></td><td><button class="button" data-edit="${entry.id}" aria-label="${e(t("registry.edit_name", { name: entry.name }))}">${t("common.edit")}</button></td></tr>`;
       })
       .join("")}</tbody></table></div>`;
@@ -90,6 +112,7 @@ export function mountRegistry(root, { state, kind }) {
     dialog.querySelector("h2").textContent = message(
       entry.name ? "edit" : "add",
     );
+    dialog.dataset.mode = "form";
     dialog.querySelector(".dialog-body")?.remove();
     const body = document.createElement("div");
     body.className = "dialog-body";
@@ -104,7 +127,7 @@ export function mountRegistry(root, { state, kind }) {
       button.disabled = true;
       const data = new FormData(form);
       try {
-        await saveWorkspace(state, `${kind}/${entry.id}`, {
+        await saveWorkspace(snapshot, `${kind}/${entry.id}`, {
           name: data.get("name").trim(),
           location: data.get("location").trim(),
           revision: entry.revision,
@@ -115,31 +138,87 @@ export function mountRegistry(root, { state, kind }) {
         button.disabled = false;
       }
     });
+    const revoke = sensors ? null : revokeButton(entry, dialog);
+    if (revoke) body.append(revoke);
     if (!dialog.open) dialog.showModal();
     form.elements.name.focus();
   }
-  root.querySelector("#add-entry").addEventListener("click", () => {
-    const dialog = createDialog(root, message("add"));
+  // Revocation is management, not monitoring: it lives with the device's name.
+  function revokeButton(entry, dialog) {
+    if (entry.transport !== "mqtt") return null;
+    const states = snapshot.device_states ?? [];
+    const node = deviceStateFor(states, entry.source, entry.device);
+    const receiver = node?.receiver_id
+      ? deviceStateFor(states, entry.source, node.receiver_id)
+      : null;
+    if (!offers(receiver, "revoke") || node.binding === "revoked") return null;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button danger";
+    button.textContent = t("commands.revoke");
+    button.addEventListener("click", () => {
+      const name = entry.name || entry.device;
+      if (!window.confirm(t("commands.revoke_confirm", { name }))) return;
+      dialog.close();
+      commands.run(button, {
+        source_id: entry.source,
+        device_id: node.receiver_id,
+        type: "node.revoke",
+        node_id: entry.device,
+      });
+    });
+    return button;
+  }
+  // Short ID for a first-party node; other sources keep the identifier they send.
+  function deviceLabel(entry) {
+    return entry.transport === "mqtt" && /^[0-9a-f]{16}$/.test(entry.device)
+      ? t("commands.request_name", { id: shortID(entry.device) })
+      : entry.device;
+  }
+  function availableItems() {
+    return available
+      .map((entry) => {
+        const { device } = dataFor(entry);
+        const blocked = sensors && !device.name;
+        const secondary = sensors
+          ? [
+              device.name || device.device,
+              ...entry.measurements
+                .filter(
+                  (m) => !isLinkDiagnostic({ sensor: entry.sensor, ...m }),
+                )
+                .map((m) => measurementLabel(m.metric)),
+            ].join(" · ")
+          : `${entry.source} · ${entry.transport.toUpperCase()}`;
+        const action = blocked
+          ? `<a href="/devices">${t("registry.register_parent")}</a>`
+          : `<button class="button" data-select="${entry.id}" data-focus="select/${entry.id}" aria-label="${e(t("registry.select_name", { name: sensors ? entry.sensor : entry.device }))}">${t("registry.name_action")}</button>`;
+        return `<li><span><strong>${e(sensors ? entry.sensor : deviceLabel(entry))}</strong><span class="muted">${e(secondary)}</span></span>${action}</li>`;
+      })
+      .join("");
+  }
+  // The add dialog follows the live snapshot until a form replaces its list.
+  function renderAdd() {
+    const dialog = addDialog;
+    if (!dialog || dialog.dataset.mode === "form") return;
+    const focused = dialog.contains(document.activeElement)
+      ? document.activeElement.dataset.focus
+      : undefined;
+    dialog.querySelector(".dialog-body")?.remove();
     const body = document.createElement("div");
     body.className = "dialog-body";
-    body.innerHTML = available.length
-      ? `<p>${message("select")}</p><div class="scroll"><table class="registry-table"><caption class="sr-only">${message("available")}</caption><thead><tr><th scope="col">${sensors ? t("registry.sensor_measurements") : t("registry.device_source")}</th><th scope="col">${sensors ? t("common.device") : t("common.transport")}</th><th scope="col">${t("common.action")}</th></tr></thead><tbody>${available
-          .map((entry) => {
-            const { device } = dataFor(entry);
-            const blocked = sensors && !device.name;
-            return `<tr><td><strong>${e(sensors ? entry.sensor : entry.device)}</strong><span class="registry-secondary">${e(
-              sensors
-                ? entry.measurements
-                    .filter(
-                      (m) => !isLinkDiagnostic({ sensor: entry.sensor, ...m }),
-                    )
-                    .map((m) => measurementLabel(m.metric))
-                    .join(" · ")
-                : entry.source,
-            )}</span></td><td>${e(sensors ? device.name || device.device : entry.transport.toUpperCase())}</td><td>${blocked ? `<a href="/devices">${t("registry.register_parent")}</a>` : `<button class="button" data-select="${entry.id}" aria-label="${e(t("registry.select_name", { name: sensors ? entry.sensor : entry.device }))}">${t("common.select")}</button>`}</td></tr>`;
-          })
-          .join("")}</tbody></table></div>`
-      : `<div class="empty"><h3>${message("no_new")}</h3><p>${t("registry.send")}</p></div>`;
+    if (!sensors) body.append(pairingSection(snapshot, commands.run));
+    const naming = document.createElement("section");
+    naming.className = "add-step";
+    const waiting = sensors ? [] : awaitingFirstReading(snapshot);
+    const heading = sensors
+      ? ""
+      : `<h3>${e(t("registry.pairing.naming_heading"))}</h3>`;
+    naming.innerHTML =
+      available.length || waiting.length
+        ? `${heading}<p>${message("select")}</p><ul class="add-list" aria-label="${e(message("available"))}">${availableItems()}${waiting.map((s) => `<li><span><strong>${e(t("commands.request_name", { id: shortID(s.device_id) }))}</strong><span class="muted">${e(t("registry.pairing.awaiting_data"))}</span></span></li>`).join("")}</ul>`
+        : `${heading}<div class="empty"><h3>${message("no_new")}</h3><p>${message("send")}</p></div>`;
+    body.append(naming);
     dialog.append(body);
     for (const b of body.querySelectorAll("[data-select]"))
       b.addEventListener("click", () =>
@@ -148,13 +227,65 @@ export function mountRegistry(root, { state, kind }) {
           dialog,
         ),
       );
+    if (focused)
+      body.querySelector(`[data-focus="${CSS.escape(focused)}"]`)?.focus();
+  }
+  root.querySelector("#add-entry").addEventListener("click", () => {
+    addDialog = createDialog(root, message("add"));
+    const dialog = addDialog;
+    dialog.addEventListener("close", () => {
+      if (addDialog === dialog) addDialog = null;
+    });
+    renderAdd();
     dialog.showModal();
   });
+  async function refresh() {
+    if (pending) return;
+    pending = true;
+    const button = root.querySelector("#refresh");
+    button.disabled = true;
+    try {
+      snapshot = await fetchSnapshot(location.pathname);
+      root.querySelector("#fetch-error").classList.add("hidden");
+      const edit = document.activeElement?.dataset?.edit;
+      update();
+      render();
+      if (edit)
+        root.querySelector(`[data-edit="${CSS.escape(edit)}"]`)?.focus();
+      renderAdd();
+    } catch {
+      root.querySelector("#fetch-error").textContent = t(
+        "dashboard.refresh_error",
+      );
+      root.querySelector("#fetch-error").classList.remove("hidden");
+    } finally {
+      pending = false;
+      button.disabled = false;
+    }
+  }
   root
     .querySelector('input[type="search"]')
     .addEventListener("input", (event) => {
       query = event.target.value.toLowerCase();
       render();
     });
+  update();
   render();
+  // New devices and pairing requests appear within seconds while the add dialog is
+  // open; the list itself follows the dashboard's 30 s cadence.
+  const idle = () => !document.hidden && !commands.running;
+  const timer = setInterval(() => {
+    if (idle()) refresh();
+  }, 30000);
+  const addTimer = setInterval(() => {
+    if (idle() && addDialog && addDialog.dataset.mode !== "form") refresh();
+  }, 3000);
+  window.addEventListener(
+    "pagehide",
+    () => {
+      clearInterval(timer);
+      clearInterval(addTimer);
+    },
+    { once: true },
+  );
 }

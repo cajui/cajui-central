@@ -16,9 +16,7 @@ pt-BR:
     last_report: Último envio
     status: Estado
     actions: Ações
-    action: Ação
     edit: Editar
-    select: Selecionar
     name: Nome
     location: Localização
     optional: (opcional)
@@ -113,8 +111,7 @@ pt-BR:
       edit: Editar transmissor
       save: Salvar transmissor
       search: Buscar transmissores
-      discovery: Os transmissores aparecem após enviar dados. Cadastrá-los aqui não pareia os rádios nem concede
-        acesso à rede.
+      discovery: Escolha Adicionar transmissor para dar um nome a eles.
       empty: Nenhum transmissor cadastrado
       choose: Escolha Adicionar transmissor para selecionar um dos transmissores disponíveis.
       registered: Transmissores cadastrados
@@ -150,10 +147,22 @@ pt-BR:
     select_name: Selecionar %{name}
     sensor_identity: 'Transmissor: %{device} · Sensor: %{sensor}'
     identity_note: Os nomes podem mudar. A identidade e o histórico registrado permanecem os mesmos.
-    sensor_measurements: Sensor / medições
-    device_source: Transmissor / origem
     register_parent: Cadastre o transmissor primeiro
-    send: Envie medições de um transmissor e atualize esta página.
+    name_action: Dar nome
+    pairing:
+      heading: Parear pelo rádio
+      naming_heading: Dar um nome
+      no_receiver: Nenhum receptor está conectado ao Central. Ligue um receptor para parear transmissores pelo rádio.
+      offline: Sem conexão. Ligue o receptor para parear.
+      step_search: Toque em Buscar transmissores.
+      step_button: No transmissor, segure o botão PRG por três segundos.
+      step_accept: Toque em Adicionar no pedido que aparecer aqui e dê um nome a ele.
+      searching: Buscando
+      searching_left: Buscando · faltam %{time}
+      no_requests: Nenhum pedido ainda.
+      awaiting_data: Pareado, aguardando a primeira leitura
+      signal: Sinal %{value} dBm
+    send: Transmissores e sensores aparecem aqui após a primeira medição.
   layout:
     help: Crie seções e escolha transmissores, sensores completos ou medições individuais. Remover um item daqui
       preserva seu cadastro e histórico.
