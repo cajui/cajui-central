@@ -2053,11 +2053,75 @@ cj-reading {
   margin-top: 2px;
 }
 
-/* Management commands: pairing on the receiver card, revocation in device details. */
-.receiver-actions {
+/* Adding a device: radio pairing first, then naming, both in one dialog. */
+.add-step {
+  display: grid;
+  gap: var(--space-3);
+  padding-bottom: var(--space-6);
+}
+.add-step + .add-step {
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--line);
+}
+.add-step > h3 {
+  margin: 0;
+  font-size: var(--text-body);
+}
+.pairing-receiver {
   display: grid;
   gap: var(--space-3);
   justify-items: start;
+}
+.pairing-receiver-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+.pairing-steps {
+  margin: 0;
+  padding-left: 1.3em;
+  display: grid;
+  gap: var(--space-1);
+}
+.pairing-open {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+}
+.pairing-open p {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+.add-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.add-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+}
+.add-list li > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.add-list li > .button,
+.add-list li > a {
+  flex: none;
 }
 .pairing-requests {
   display: grid;

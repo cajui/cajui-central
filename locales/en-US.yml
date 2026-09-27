@@ -16,9 +16,7 @@ en-US:
     last_report: Last report
     status: Status
     actions: Actions
-    action: Action
     edit: Edit
-    select: Select
     name: Name
     location: Location
     optional: (optional)
@@ -112,7 +110,7 @@ en-US:
       edit: Edit device
       save: Save device
       search: Search devices
-      discovery: Devices appear after sending data. Adding a device here does not pair radios or grant network access.
+      discovery: Choose Add device to name them.
       empty: No registered devices yet
       choose: Choose Add device to select one from the available devices.
       registered: Registered devices
@@ -148,10 +146,22 @@ en-US:
     select_name: Select %{name}
     sensor_identity: 'Device: %{device} · Sensor: %{sensor}'
     identity_note: Names can change. Identity and recorded history stay the same.
-    sensor_measurements: Sensor / measurements
-    device_source: Device / source
     register_parent: Register device first
-    send: Send measurements from a device, then refresh this page.
+    name_action: Name it
+    pairing:
+      heading: Pair by radio
+      naming_heading: Give it a name
+      no_receiver: No receiver is connected to Central. Turn a receiver on to pair devices by radio.
+      offline: Offline. Turn the receiver on to pair.
+      step_search: Choose Search for transmitters.
+      step_button: On the transmitter, hold the PRG button for three seconds.
+      step_accept: Choose Add on the request that appears here, then give it a name.
+      searching: Searching
+      searching_left: Searching · %{time} left
+      no_requests: No requests yet.
+      awaiting_data: Paired, waiting for its first reading
+      signal: Signal %{value} dBm
+    send: Devices and sensors appear here after their first measurement.
   layout:
     help: Create sections and choose devices, complete sensors or individual measurements. Removing an item here
       keeps its registration and history.

@@ -61,3 +61,35 @@ export function answerText(record) {
     ? t("commands.reasons.failed")
     : text;
 }
+// One command at a time: the receiver answers commands in order and a second request
+// would only be refused as busy. Each step is reported in a notice.
+export function commandRunner({ session, notify, done }) {
+  let running = false;
+  return {
+    get running() {
+      return running;
+    },
+    async run(button, command) {
+      if (running) {
+        notify(t("commands.in_progress"));
+        return;
+      }
+      running = true;
+      button.disabled = true;
+      notify(t("commands.sending"));
+      try {
+        const record = await sendCommand(session(), command);
+        const answer = await awaitAnswer(record, {
+          onPending: () => notify(t("commands.waiting_node")),
+        });
+        notify(answerText(answer));
+      } catch (error) {
+        notify(error.message);
+      } finally {
+        running = false;
+        button.disabled = false;
+        await done();
+      }
+    },
+  };
+}

@@ -236,10 +236,11 @@ state and availability; Central also writes `manage/v1/+/+/commands` and reads
 
 ### Device commands
 
-A receiver whose state lists the `pairing` capability gets a Search for transmitters
-button on the dashboard: it opens the receiver's two-minute pairing window, lists the
-transmitters asking to join with their signal, and adds one on request. With `revoke`,
-a transmitter's details offer a confirmed Revoke. Central checks the command against the
+Commands live on the devices page; the dashboard only monitors. When a receiver's state
+lists the `pairing` capability, the Add device dialog offers Search for transmitters: it
+opens the receiver's two-minute pairing window, lists the transmitters asking to join
+with their signal, adds one on request and then offers it for naming once its first
+reading arrives. With `revoke`, a transmitter's edit dialog offers a confirmed Revoke. Central checks the command against the
 advertised capabilities, records it, publishes it with QoS 1 and never retained, and
 follows the receiver's answer on `manage/v1/+/+/results`. An answer that does not arrive
 within 30 seconds is reported as not delivered. The broker's authentication and ACL are

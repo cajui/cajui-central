@@ -588,3 +588,42 @@ test("command answers read as plain actions and reasons", () => {
   );
   setLocale("en-US");
 });
+
+test("pairing window time and transmitters still waiting for a first reading", async () => {
+  const { pairingRemaining, clockText, awaitingFirstReading, shortID } =
+    await import("../../internal/httpapi/ui/pairing.mjs");
+  const at = "2026-01-01T00:00:00Z";
+  const now = Date.parse(at) + 30000;
+  const receiver = { received_at: at, pairing: { remaining_s: 100 } };
+  assert.equal(pairingRemaining(receiver, now), 70);
+  assert.equal(pairingRemaining({ ...receiver, retained: true }, now), 100);
+  assert.equal(pairingRemaining({ received_at: at, pairing: {} }, now), null);
+  assert.equal(
+    pairingRemaining({ ...receiver, pairing: { remaining_s: 10 } }, now),
+    0,
+  );
+  assert.equal(clockText(70), "1:10");
+  assert.equal(clockText(5), "0:05");
+  assert.equal(shortID("000048ca433c776c"), "776C");
+  const snapshot = {
+    workspace: {
+      devices: [{ transport: "mqtt", source: "site", device: "a" }],
+    },
+    device_states: [
+      { role: "transmitter", source_id: "site", device_id: "a" },
+      { role: "transmitter", source_id: "site", device_id: "b" },
+      { role: "transmitter", source_id: "other", device_id: "a" },
+      {
+        role: "transmitter",
+        source_id: "site",
+        device_id: "c",
+        binding: "revoked",
+      },
+      { role: "receiver", source_id: "site", device_id: "r" },
+    ],
+  };
+  assert.deepEqual(
+    awaitingFirstReading(snapshot).map((s) => `${s.source_id}/${s.device_id}`),
+    ["site/b", "other/a"],
+  );
+});

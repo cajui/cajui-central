@@ -22,7 +22,7 @@ import {
   resolveItem,
 } from "./workspace-model.mjs";
 import { openLayoutEditor } from "./layout-editor.mjs";
-import { sendCommand, awaitAnswer, answerText } from "./command-api.mjs";
+import { fetchSnapshot } from "./snapshot-api.mjs";
 
 // A value the firmware reported that this version has no text for.
 function known(key, fallback) {
@@ -38,7 +38,6 @@ export function mountDashboard(root, { state = {}, notify }) {
     selected = "",
     hours = 24,
     pending = false,
-    commandRunning = false,
     dialogOpener = null;
   root.innerHTML = `<header class="page-heading"><div><h1>${t("common.dashboard")}</h1><p>${t("dashboard.description")}</p></div><div class="top-actions"><button class="button" id="organize">${t("dashboard.organize")}</button><button class="button" id="export">${icon("download")}${t("dashboard.export")}</button><button class="button primary" id="refresh">${icon("refresh")}${t("common.refresh")}</button></div></header>
     <div id="fetch-error" class="notice hidden" role="status"></div>
@@ -177,84 +176,7 @@ export function mountDashboard(root, { state = {}, notify }) {
       card.className = "panel receiver-card";
       card.dataset.status = summary.status;
       card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("signal")}</span><div><h3>${e(receiverLabel(r.device_id))}</h3><p class="muted">${e(t("receivers.transmitters", { count: transmitters }))}</p></div><span class="badge" data-state="${badge}">${e(t(`receivers.${summary.status}`))}</span></div>${summary.notices.length ? `<ul class="receiver-notices">${summary.notices.map((n) => `<li data-level="${n.level}">${n.level === "info" ? "" : icon("alert")}<span>${e(n.text)}</span></li>`).join("")}</ul>` : ""}<dl class="detail-list receiver-details">${rows.map(([k, v]) => `<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join("")}</dl>`;
-      const actions = receiverActions(r, summary);
-      if (actions) card.append(actions);
       target.querySelector(".receiver-items").append(card);
-    }
-  }
-  function offers(state, family) {
-    return (state?.capabilities ?? []).includes(family);
-  }
-  // Pairing controls, offered only by a connected receiver whose firmware lists them.
-  function receiverActions(r, summary) {
-    if (!offers(r, "pairing") || summary.status !== "online") return null;
-    const box = document.createElement("div");
-    box.className = "receiver-actions";
-    const button = (label, type, node, primary) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = primary ? "button primary" : "button";
-      b.textContent = label;
-      b.addEventListener("click", () =>
-        runCommand(b, { source: r.source_id, device: r.device_id, type, node }),
-      );
-      return b;
-    };
-    if (!r.pairing?.open) {
-      box.append(button(t("commands.search"), "pairing.open", "", true));
-      return box;
-    }
-    box.append(button(t("commands.stop"), "pairing.close", "", false));
-    const requests = r.pairing.requests ?? [];
-    const list = document.createElement("div");
-    list.className = "pairing-requests";
-    list.innerHTML = `<h4>${e(t("commands.requests"))}</h4>${requests.length ? "" : `<p class="muted">${e(t("commands.no_requests"))}</p>`}`;
-    for (const request of requests) {
-      const row = document.createElement("div");
-      row.className = "pairing-request";
-      const signal =
-        typeof request.rssi_dbm === "number"
-          ? ` · ${formatValue(request.rssi_dbm, 0)} dBm`
-          : "";
-      row.innerHTML = `<span><strong>${e(t("commands.request_name", { id: request.node_id.slice(-4).toUpperCase() }))}</strong><span class="muted">${e(signal)}</span>${request.conflict ? `<small>${e(t("commands.conflict"))}</small>` : ""}</span>`;
-      const add = button(
-        t("commands.add"),
-        "pairing.accept",
-        request.node_id,
-        true,
-      );
-      add.disabled = Boolean(request.conflict);
-      row.append(add);
-      list.append(row);
-    }
-    box.append(list);
-    return box;
-  }
-  async function runCommand(button, { source, device, type, node }) {
-    if (commandRunning) {
-      notify(t("commands.in_progress"));
-      return;
-    }
-    commandRunning = true;
-    button.disabled = true;
-    notify(t("commands.sending"));
-    try {
-      const record = await sendCommand(snapshot, {
-        source_id: source,
-        device_id: device,
-        type,
-        ...(node ? { node_id: node } : {}),
-      });
-      const answer = await awaitAnswer(record, {
-        onPending: () => notify(t("commands.waiting_node")),
-      });
-      notify(answerText(answer));
-    } catch (error) {
-      notify(error.message);
-    } finally {
-      commandRunning = false;
-      button.disabled = false;
-      await refresh();
     }
   }
   function matchingGroups() {
@@ -467,32 +389,6 @@ export function mountDashboard(root, { state = {}, notify }) {
     }
     if (g.diagnostics.length)
       root.querySelector("#device-detail").append(diagnostics);
-    if (
-      offers(g.receiver, "revoke") &&
-      g.state &&
-      g.state.binding !== "revoked"
-    ) {
-      const revoke = document.createElement("button");
-      revoke.type = "button";
-      revoke.className = "button danger";
-      revoke.textContent = t("commands.revoke");
-      revoke.addEventListener("click", () => {
-        if (commandRunning) {
-          notify(t("commands.in_progress"));
-          return;
-        }
-        if (!window.confirm(t("commands.revoke_confirm", { name: g.name })))
-          return;
-        root.querySelector("#device-dialog").close();
-        runCommand(revoke, {
-          source: g.source,
-          device: g.state.receiver_id,
-          type: "node.revoke",
-          node: g.device,
-        });
-      });
-      root.querySelector("#device-detail").append(revoke);
-    }
     dialogOpener = focusSpot(opener);
     root.querySelector("#device-dialog").showModal();
   }
@@ -531,23 +427,7 @@ export function mountDashboard(root, { state = {}, notify }) {
     const button = root.querySelector("#refresh");
     button.disabled = true;
     try {
-      const response = await fetch("/", {
-        cache: "no-store",
-        signal: AbortSignal.timeout(10000),
-      });
-      if (!response.ok) throw new Error("refresh failed");
-      const doc = new DOMParser().parseFromString(
-        await response.text(),
-        "text/html",
-      );
-      const next = JSON.parse(doc.querySelector("#initial-state").textContent);
-      if (
-        !Array.isArray(next.samples) ||
-        !Array.isArray(next.readings) ||
-        !Array.isArray(next.devices)
-      )
-        throw new Error("invalid snapshot");
-      snapshot = next;
+      snapshot = await fetchSnapshot("/");
       root.querySelector("#fetch-error").classList.add("hidden");
       // Re-rendering replaces the card buttons; keep keyboard focus on the same one.
       const spot = focusSpot(document.activeElement);
@@ -620,31 +500,19 @@ export function mountDashboard(root, { state = {}, notify }) {
   });
   render();
   // Refreshing never touches open dialogs or the history panel's focus target, so
-  // an open chart or dialog must not pause live data. The measurement select and
-  // the receiver controls are rebuilt without a stable key, so focus there waits.
-  const idle = () =>
-    !document.hidden &&
-    !commandRunning &&
-    document.activeElement !== root.querySelector("#metric-select") &&
-    !root.querySelector("#receivers").contains(document.activeElement);
+  // an open chart or dialog must not pause live data. Only the measurement select is
+  // rebuilt and would lose its options mid-choice.
   const timer = setInterval(() => {
-    if (idle()) refresh();
-  }, 30000);
-  // While a receiver's pairing window is open, requests appear within seconds.
-  const pairingTimer = setInterval(() => {
     if (
-      idle() &&
-      receivers().some(
-        (r) => r.pairing?.open && receiverSummary(r).status === "online",
-      )
+      !document.hidden &&
+      document.activeElement !== root.querySelector("#metric-select")
     )
       refresh();
-  }, 3000);
+  }, 30000);
   window.addEventListener(
     "pagehide",
     () => {
       clearInterval(timer);
-      clearInterval(pairingTimer);
     },
     { once: true },
   );
