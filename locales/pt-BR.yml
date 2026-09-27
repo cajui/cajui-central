@@ -323,7 +323,7 @@ pt-BR:
     retained_notice: Estado recebido do broker quando o Central se conectou; a idade é desconhecida.
     binding: Pareamento
     binding_active: Pareado
-    binding_pending: Aguardando confirmação do transmissor
+    binding_pending: Pareamento preparado, ainda não ativado
     binding_revoked: Revogado
     receiver: Receptor
     last_frame: Último quadro de rádio

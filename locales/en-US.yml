@@ -321,7 +321,7 @@ en-US:
     retained_notice: State received from the broker when Central connected; its age is unknown.
     binding: Pairing
     binding_active: Paired
-    binding_pending: Waiting for the transmitter to confirm
+    binding_pending: Pairing prepared, not yet active
     binding_revoked: Revoked
     receiver: Receiver
     last_frame: Last radio frame
