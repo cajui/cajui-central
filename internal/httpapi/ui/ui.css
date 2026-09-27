@@ -1770,8 +1770,66 @@ cj-reading {
   overflow-wrap: anywhere;
 }
 .registry-table td {
-  min-width: 140px;
+  min-width: 96px;
+}
+/* Names and identifiers may be long; short values and badges never break inside a word. */
+.registry-table td:first-child {
+  min-width: 160px;
   overflow-wrap: anywhere;
+}
+.registry-table cj-badge {
+  white-space: nowrap;
+}
+/* On a phone each row becomes a labelled block, so no column hides off-screen. */
+@media (max-width: 760px) {
+  .registry-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .registry-table,
+  .registry-table tbody,
+  .registry-table tr,
+  .registry-table td {
+    display: block;
+    width: 100%;
+  }
+  .registry-table tr {
+    padding: var(--space-3) 0;
+  }
+  .registry-table tr + tr {
+    border-top: 1px solid var(--line);
+  }
+  .registry-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+    padding: var(--space-1) var(--space-4);
+    border: 0;
+    text-align: right;
+  }
+  .registry-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    text-align: left;
+  }
+  .registry-table td:first-child {
+    display: block;
+    text-align: left;
+    padding-bottom: var(--space-2);
+  }
+  .registry-table td:first-child::before,
+  .registry-table td:last-child::before {
+    content: none;
+  }
+  .registry-table td:last-child {
+    justify-content: flex-start;
+    padding-top: var(--space-2);
+  }
 }
 .workspace-dialog {
   width: min(850px, calc(100vw - 32px));

@@ -1039,8 +1039,22 @@ test("revocation lives with the device name, not on the dashboard", async ({
     received_at: state.generated_at,
     interval: 300,
   });
+  await page.setViewportSize({ width: 390, height: 844 });
   await liveDevices(page, state);
-  await page.getByRole("button", { name: "Edit Coop", exact: true }).click();
+  const row = page.getByRole("row").filter({ hasText: "Coop" });
+  await expect(row).toContainText("Receiver 5E10");
+  await expect(row.locator('td[data-label="Battery"]')).toHaveText(
+    "Not reported",
+  );
+  const edit = page.getByRole("button", { name: "Edit Coop", exact: true });
+  const box = await edit.boundingBox();
+  expect(box.x + box.width).toBeLessThanOrEqual(390);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await edit.click();
   await expect(
     page.getByRole("button", { name: "Revoke transmitter", exact: true }),
   ).toBeVisible();
