@@ -41,10 +41,27 @@ export function awaitingFirstReading(snapshot) {
       !known.has(`${s.source_id}\u0000${s.device_id}`),
   );
 }
+// A node Central already knows asks again after losing its key or a reset; accepting
+// pairs it anew under the same identity, name and history.
+export function knownDevice(snapshot, source, node) {
+  return (snapshot.workspace?.devices ?? []).find(
+    (d) => d.transport === "mqtt" && d.source === source && d.device === node,
+  );
+}
+function pairingReceivers(snapshot) {
+  return (snapshot.device_states ?? []).filter(
+    (s) => s.role === "receiver" && offers(s, "pairing"),
+  );
+}
+// Whether a request the section shows will add a device that still needs a name.
 export function pairingRequests(snapshot) {
-  return (snapshot.device_states ?? []).some(
-    (s) =>
-      s.role === "receiver" && s.pairing?.open && s.pairing.requests?.length,
+  return pairingReceivers(snapshot).some(
+    (r) =>
+      receiverSummary(r).status === "online" &&
+      r.pairing?.open &&
+      (r.pairing.requests ?? []).some(
+        (q) => !knownDevice(snapshot, r.source_id, q.node_id),
+      ),
   );
 }
 function commandButton(label, command, run, primary) {
@@ -68,9 +85,7 @@ export function pairingSection(snapshot, run) {
   section.className = "add-step";
   section.setAttribute("aria-labelledby", "pairing-heading");
   section.innerHTML = `<h3 id="pairing-heading">${e(t("registry.pairing.heading"))}</h3>`;
-  const receivers = (snapshot.device_states ?? []).filter(
-    (s) => s.role === "receiver" && offers(s, "pairing"),
-  );
+  const receivers = pairingReceivers(snapshot);
   if (!receivers.length) {
     section.insertAdjacentHTML(
       "beforeend",
@@ -123,14 +138,7 @@ export function pairingSection(snapshot, run) {
       list.className = "pairing-requests";
       list.innerHTML = `<h4>${e(t("commands.requests"))}</h4>${requests.length ? "" : `<p class="muted">${e(t("registry.pairing.no_requests"))}</p>`}`;
       for (const request of requests) {
-        // A node Central already knows asks again after losing its key or a reset;
-        // accepting pairs it anew under the same identity, name and history.
-        const known = (snapshot.workspace?.devices ?? []).find(
-          (d) =>
-            d.transport === "mqtt" &&
-            d.source === r.source_id &&
-            d.device === request.node_id,
-        );
+        const known = knownDevice(snapshot, r.source_id, request.node_id);
         const row = document.createElement("div");
         row.className = "pairing-request";
         const signal =
