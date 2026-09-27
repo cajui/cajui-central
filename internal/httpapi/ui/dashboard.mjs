@@ -291,7 +291,7 @@ export function mountDashboard(root, { state = {}, notify }) {
         card.className = "panel dashboard-item";
         if (item.kind === "device") {
           card.classList.add("transmitter-card");
-          card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("device")}</span><div><h3>${e(g.name)}</h3><p class="muted">${e(t("counts.registered", { count: g.sensors.length }))}${g.location ? ` · ${e(g.location)}` : ""}</p></div></div><p class="device-last-report">${e(t("dashboard.last_report", { age: age(g.at, Date.parse(snapshot.generated_at)) }))}</p>${g.receiverOffline ? `<p class="device-alert">${icon("alert")}<span>${e(t("receivers.receiver_offline"))}</span></p>` : ""}<div class="transmitter-footer"><cj-badge state="${deviceStatus(g)}"></cj-badge><button class="text-button" data-details aria-label="${e(t("dashboard.details_for", { name: g.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></div>`;
+          card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("device")}</span><div><h3>${e(g.name)}</h3><p class="muted">${e(t("counts.registered", { count: g.sensors.length }))}${g.location ? ` · ${e(g.location)}` : ""}</p></div></div><p class="device-last-report">${e(t("dashboard.last_report", { age: age(g.at, Date.parse(snapshot.generated_at)) }))}</p>${g.receiverOffline ? `<p class="device-alert">${icon("alert")}<span>${e(t("receivers.receiver_offline"))}</span></p>` : ""}<div class="transmitter-footer"><cj-badge state="${deviceStatus(g)}"></cj-badge><button class="text-button" data-details="${e(`${g.source}/${g.device}`)}" aria-label="${e(t("dashboard.details_for", { name: g.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></div>`;
           card
             .querySelector("[data-details]")
             .addEventListener("click", () => showDevice(g));
@@ -472,6 +472,8 @@ export function mountDashboard(root, { state = {}, notify }) {
       });
       root.querySelector("#device-detail").append(revoke);
     }
+    root.querySelector("#device-dialog").dataset.for =
+      `${g.source}/${g.device}`;
     root.querySelector("#device-dialog").showModal();
   }
   function render() {
@@ -527,7 +529,15 @@ export function mountDashboard(root, { state = {}, notify }) {
         throw new Error("invalid snapshot");
       snapshot = next;
       root.querySelector("#fetch-error").classList.add("hidden");
+      // Re-rendering replaces the card buttons; keep keyboard focus on the same one.
+      const { channelKey, details } = document.activeElement?.dataset ?? {};
       render();
+      const again = channelKey
+        ? `[data-channel-key="${CSS.escape(channelKey)}"]`
+        : details
+          ? `[data-details="${CSS.escape(details)}"]`
+          : "";
+      if (again) root.querySelector(again)?.focus({ preventScroll: true });
     } catch {
       root.querySelector("#fetch-error").textContent = t(
         "dashboard.refresh_error",
@@ -564,6 +574,17 @@ export function mountDashboard(root, { state = {}, notify }) {
     .querySelector("#metric-select")
     .addEventListener("change", (event) => selectHistory(event.target.value));
   root.querySelector("#refresh").addEventListener("click", refresh);
+  // A refresh may have replaced the button that opened the dialog; focus then stays
+  // on the closed dialog's own button or falls back to the body.
+  root.querySelector("#device-dialog").addEventListener("close", (event) => {
+    const focus = document.activeElement;
+    if (!focus || focus === document.body || event.target.contains(focus))
+      root
+        .querySelector(
+          `[data-details="${CSS.escape(event.target.dataset.for)}"]`,
+        )
+        ?.focus();
+  });
   root
     .querySelector("#close-dialog")
     .addEventListener("click", () =>
@@ -587,22 +608,20 @@ export function mountDashboard(root, { state = {}, notify }) {
     notify(t("dashboard.exported"));
   });
   render();
+  // Refreshing never touches open dialogs or the history panel's focus target, so
+  // an open chart or dialog must not pause live data. Only the measurement select
+  // is rebuilt and would lose its options mid-choice.
+  const idle = () =>
+    !document.hidden &&
+    !commandRunning &&
+    document.activeElement !== root.querySelector("#metric-select");
   const timer = setInterval(() => {
-    if (
-      !document.hidden &&
-      !commandRunning &&
-      !root.contains(document.activeElement) &&
-      !root.querySelector("dialog[open]")
-    )
-      refresh();
+    if (idle()) refresh();
   }, 30000);
   // While a receiver's pairing window is open, requests appear within seconds.
   const pairingTimer = setInterval(() => {
     if (
-      !document.hidden &&
-      !commandRunning &&
-      !root.contains(document.activeElement) &&
-      !root.querySelector("dialog[open]") &&
+      idle() &&
       receivers().some(
         (r) => r.pairing?.open && receiverSummary(r).status === "online",
       )

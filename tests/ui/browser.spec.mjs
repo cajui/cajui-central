@@ -360,19 +360,62 @@ async function liveWorkspace(page, language = "en-US") {
   };
   const response = await page.request.get(`/?lang=${language}`);
   const html = await response.text();
-  const json = JSON.stringify(snapshot).replaceAll("<", "\\u003c");
-  await page.route("**/", (route) =>
-    route.fulfill({
-      contentType: "text/html",
-      body: html.replace(
-        /(<script type="application\/json" id="initial-state">)[\s\S]*?(<\/script>)/,
-        `$1${json}$2`,
-      ),
-    }),
-  );
+  const serve = (state) => {
+    const json = JSON.stringify(state).replaceAll("<", "\\u003c");
+    return page.route("**/", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: html.replace(
+          /(<script type="application\/json" id="initial-state">)[\s\S]*?(<\/script>)/,
+          `$1${json}$2`,
+        ),
+      }),
+    );
+  };
+  await serve(snapshot);
   await page.goto("/");
   await page.locator("html.ready").waitFor();
+  return { snapshot, serve };
 }
+test("live data keeps refreshing while a chart or dialog is open", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const { snapshot, serve } = await liveWorkspace(page);
+  const reading = page.getByRole("button", { name: /Inspect Humidity:/ });
+  await reading.click();
+  await expect(page.locator("#history-heading")).toBeFocused();
+  const next = structuredClone(snapshot);
+  const humidity = (state, value) => {
+    state.samples[0].readings[1].value = value;
+    state.workspace.sensors[0].measurements[1].value = value;
+  };
+  humidity(next, 71);
+  await serve(next);
+  await page.clock.fastForward(31000);
+  await expect(reading).toHaveAccessibleName(/Inspect Humidity: 71/);
+  await expect(page.locator("#history-panel")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Details for Device 1", exact: true })
+    .focus();
+  humidity(next, 72);
+  await serve(next);
+  await page.clock.fastForward(31000);
+  await expect(reading).toHaveAccessibleName(/Inspect Humidity: 72/);
+  await expect(
+    page.getByRole("button", { name: "Details for Device 1", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog")).toBeVisible();
+  humidity(next, 73);
+  await serve(next);
+  await page.clock.fastForward(31000);
+  await expect(reading).toHaveAccessibleName(/Inspect Humidity: 73/);
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Details for Device 1", exact: true }),
+  ).toBeFocused();
+});
 for (const width of [390, 820, 1440]) {
   test(`product groups one device and one sensor at ${width}`, async ({
     page,
