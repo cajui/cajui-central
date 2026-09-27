@@ -86,7 +86,7 @@ export function receiverCard(r, snapshot) {
   const card = document.createElement("article");
   card.className = "panel receiver-card";
   card.dataset.status = summary.status;
-  card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("signal")}</span><div><h3>${e(receiverLabel(r.device_id))}</h3><p class="muted">${e(t("receivers.transmitters", { count: transmitters }))}</p></div><span class="badge" data-state="${badge}">${e(t(`receivers.${summary.status}`))}</span></div>${summary.notices.length ? `<ul class="receiver-notices">${summary.notices.map((n) => `<li data-level="${n.level}">${n.level === "info" ? "" : icon("alert")}<span>${e(n.text)}</span></li>`).join("")}</ul>` : ""}<dl class="detail-list receiver-details">${rows.map(([k, v]) => `<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join("")}</dl>`;
+  card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("signal")}</span><div><h2>${e(receiverLabel(r.device_id))}</h2><p class="muted">${e(t("receivers.transmitters", { count: transmitters }))}</p></div><span class="badge" data-state="${badge}">${e(t(`receivers.${summary.status}`))}</span></div>${summary.notices.length ? `<ul class="receiver-notices">${summary.notices.map((n) => `<li data-level="${n.level}">${n.level === "info" ? "" : icon("alert")}<span>${e(n.text)}</span></li>`).join("")}</ul>` : ""}<dl class="detail-list receiver-details">${rows.map(([k, v]) => `<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join("")}</dl>`;
   return card;
 }
 // One line per receiver on the dashboard; problems carry their first notice.
