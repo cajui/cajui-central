@@ -17,6 +17,7 @@ import {
   workspaceGroups,
   registeredGroups,
   automaticSections,
+  withoutRevoked,
   resolveItem,
 } from "./workspace-model.mjs";
 import { openLayoutEditor } from "./layout-editor.mjs";
@@ -52,6 +53,21 @@ export function mountDashboard(root, { state = {}, notify }) {
     const now = Date.parse(snapshot.generated_at);
     groups = workspaceGroups(snapshot, now);
     if (snapshot.workspace) groups = registeredGroups(groups);
+    // A transmitter whose receiver is offline cannot report: that needs attention too.
+    const deviceStates = snapshot.device_states ?? [];
+    for (const g of groups) {
+      if (g.transport !== "mqtt") continue;
+      const state = deviceStateFor(deviceStates, g.source, g.device);
+      const receiver = state?.receiver_id
+        ? deviceStateFor(deviceStates, g.source, state.receiver_id)
+        : null;
+      g.state = state;
+      g.receiver = receiver;
+      g.receiverOffline = receiver?.availability === "offline";
+      if (g.receiverOffline) g.attention = true;
+    }
+    // A revoked transmitter no longer reports; it stays on the devices page only.
+    groups = groups.filter((g) => g.state?.binding !== "revoked");
     channels = groups.flatMap((g) => [
       ...g.sensors.flatMap((s) => s.channels),
       ...g.diagnostics,
@@ -66,20 +82,8 @@ export function mountDashboard(root, { state = {}, notify }) {
             : c.metric.toUpperCase();
     }
     if (!channels.some((c) => c.key === selected)) selected = "";
-    // A transmitter whose receiver is offline cannot report: that needs attention too.
-    const deviceStates = snapshot.device_states ?? [];
-    for (const g of groups) {
-      if (g.transport !== "mqtt") continue;
-      const state = deviceStateFor(deviceStates, g.source, g.device);
-      const receiver = state?.receiver_id
-        ? deviceStateFor(deviceStates, g.source, state.receiver_id)
-        : null;
-      g.state = state;
-      g.receiver = receiver;
-      g.receiverOffline = receiver?.availability === "offline";
-      if (g.receiverOffline) g.attention = true;
-    }
   }
+
   // A layout may show the same reading or device in several sections, so a card
   // button is identified by its key and its position among equal keys.
   function focusSpot(element) {
@@ -144,7 +148,7 @@ export function mountDashboard(root, { state = {}, notify }) {
   function renderSections(target) {
     const sections =
       snapshot.workspace.layout.sections ??
-      automaticSections(snapshot.workspace);
+      automaticSections(withoutRevoked(snapshot));
     const matching = matchingGroups();
     for (const section of sections) {
       const block = document.createElement("section");
@@ -176,11 +180,11 @@ export function mountDashboard(root, { state = {}, notify }) {
         items.append(card);
       }
       if (!items.children.length)
-        items.innerHTML = `<p class="muted">${t("dashboard.no_items")}</p>`;
+        items.innerHTML = `<p class="muted">${t(query.trim() || filter !== "all" ? "dashboard.no_items" : "dashboard.section_empty")}</p>`;
       target.append(block);
     }
     if (!sections.length) {
-      const available = snapshot.workspace.devices.filter(
+      const available = withoutRevoked(snapshot).devices.filter(
         (d) => !d.name,
       ).length;
       target.innerHTML = `<div class="empty">${icon("overview")}<h2>${t("dashboard.make_yours")}</h2><p>${available ? t("counts.detected", { count: available }) + " " : ""}${t("dashboard.get_started")}</p><div class="top-actions"><a class="button primary" href="/devices">${t("dashboard.manage_devices")}</a><a class="button" href="/sensors">${t("dashboard.manage_sensors")}</a></div></div>`;
@@ -373,9 +377,12 @@ export function mountDashboard(root, { state = {}, notify }) {
   }
 
   root.querySelector("#organize").hidden = !snapshot.workspace;
-  root
-    .querySelector("#organize")
-    .addEventListener("click", () => openLayoutEditor(root, snapshot));
+  root.querySelector("#organize").addEventListener("click", () =>
+    openLayoutEditor(root, {
+      ...snapshot,
+      workspace: withoutRevoked(snapshot),
+    }),
+  );
   root.querySelectorAll("[data-filter]").forEach((button) =>
     button.addEventListener("click", () => {
       filter = button.dataset.filter;

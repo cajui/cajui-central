@@ -82,6 +82,7 @@ pt-BR:
     last_report: 'Último envio: %{age}'
     inspect_history: Ver histórico de %{measurement} de %{device}
     no_items: Nenhum item corresponde ao filtro nesta seção.
+    section_empty: Nada para mostrar nesta seção.
     make_yours: Personalize seu painel
     get_started: Dê um nome aos seus transmissores e sensores e escolha o que mostrar aqui.
     manage_devices: Gerenciar transmissores
@@ -161,6 +162,11 @@ pt-BR:
       searching_left: Buscando · faltam %{time}
       no_requests: Nenhum pedido ainda.
       awaiting_data: Pareado, aguardando a primeira leitura
+      revoked_heading: Revogados
+      revoked_note: O receptor não aceita mais estes transmissores. O nome e o histórico continuam.
+      revoked_sensors_note: O transmissor destes sensores foi revogado. O nome e o histórico continuam.
+      repair: Parear de novo
+      repair_name: Parear %{name} de novo
       revoked: 'Revogado: o receptor não aceita mais este transmissor. Para ele voltar, use Adicionar transmissor e segure o botão PRG dele por três segundos.'
       known: Já pareado. Adicionar de novo refaz o pareamento; o nome e o histórico continuam.
       after_add: Depois de adicionado, um transmissor novo aparece aqui para receber um nome.

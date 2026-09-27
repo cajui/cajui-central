@@ -1276,9 +1276,40 @@ test("a revoked transmitter says so instead of offering Revoke", async ({
   await expect(row.locator('td[data-label="Receiver"]')).toHaveText(
     "Receiver 5E10 · Revoked",
   );
+  const section = page.getByRole("region", { name: "Revoked" });
+  await expect(
+    section.getByRole("row").filter({ hasText: "Coop" }),
+  ).toHaveCount(1);
+  await expect(row.locator('td[data-label="Status"]')).toHaveText("Revoked");
   await page.getByRole("button", { name: "Edit Coop", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText("Revoked: the receiver");
   await expect(
     page.getByRole("button", { name: "Revoke transmitter" }),
   ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("button", { name: "Pair Coop again", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText("Pair by radio");
+});
+test("a revoked transmitter leaves the dashboard", async ({ page }) => {
+  const { snapshot, serve } = await liveWorkspace(page);
+  snapshot.device_states = [
+    {
+      source_id: "receiver",
+      device_id: "device-1",
+      role: "transmitter",
+      receiver_id: "000048ca433c5e10",
+      binding: "revoked",
+      received_at: snapshot.generated_at,
+    },
+  ];
+  await serve(snapshot);
+  await page.goto("/");
+  await expect(page.locator(".dashboard-item")).toHaveCount(0);
+  await expect(page.locator("#summary")).toContainText("0 devices");
+  await expect(
+    page.getByText("No matching items in this section."),
+  ).toHaveCount(0);
+  await expect(page.locator("#devices .empty")).toBeVisible();
 });

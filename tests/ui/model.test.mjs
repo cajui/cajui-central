@@ -627,3 +627,49 @@ test("pairing window time and transmitters still waiting for a first reading", a
     ["site/b", "other/a"],
   );
 });
+
+test("revoked transmitters and their sensors leave the dashboard catalog", async () => {
+  const { withoutRevoked } = await import(
+    "../../internal/httpapi/ui/workspace-model.mjs"
+  );
+  const state = {
+    workspace: {
+      devices: [
+        { id: 1, transport: "mqtt", source: "s", device: "a" },
+        { id: 2, transport: "mqtt", source: "s", device: "b" },
+        { id: 3, transport: "http", source: "HTTP", device: "a" },
+      ],
+      sensors: [
+        { id: 10, device_id: 1 },
+        { id: 20, device_id: 2 },
+        { id: 30, device_id: 3 },
+      ],
+      layout: { revision: 4, sections: null },
+    },
+    device_states: [
+      {
+        source_id: "s",
+        device_id: "a",
+        role: "transmitter",
+        binding: "revoked",
+      },
+      {
+        source_id: "s",
+        device_id: "b",
+        role: "transmitter",
+        binding: "active",
+      },
+    ],
+  };
+  const catalog = withoutRevoked(state);
+  assert.deepEqual(
+    catalog.devices.map((d) => d.id),
+    [2, 3],
+  );
+  assert.deepEqual(
+    catalog.sensors.map((s) => s.id),
+    [20, 30],
+  );
+  assert.equal(catalog.layout.revision, 4);
+  assert.equal(state.workspace.devices.length, 3);
+});
