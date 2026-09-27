@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -276,11 +277,12 @@ func TestWorkspaceMigrationFailureRollsBack(t *testing.T) {
 	if _, err := s.Insert(context.Background(), sample(), time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`DROP TABLE workspace_measurements; DROP TABLE workspace_sensors; DROP TABLE workspace_devices; DROP TABLE workspace_layout; UPDATE readings SET payload='broken'; PRAGMA user_version=2;`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE workspace_measurements; DROP TABLE workspace_sensors; DROP TABLE workspace_devices; DROP TABLE workspace_layout; DROP TABLE device_states; DROP TABLE device_availability; DROP TABLE device_commands; UPDATE readings SET payload='broken'; PRAGMA user_version=2;`); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.migrate(); err == nil {
-		t.Fatal("corrupt telemetry migrated")
+	// The failure must come from the backfill itself, after every schema step ran.
+	if err := s.migrate(); err == nil || !strings.Contains(err.Error(), "invalid character") {
+		t.Fatal("corrupt telemetry migrated", err)
 	}
 	var version, count int
 	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 2 {
