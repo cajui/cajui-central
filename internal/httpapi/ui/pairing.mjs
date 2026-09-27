@@ -41,6 +41,12 @@ export function awaitingFirstReading(snapshot) {
       !known.has(`${s.source_id}\u0000${s.device_id}`),
   );
 }
+export function pairingRequests(snapshot) {
+  return (snapshot.device_states ?? []).some(
+    (s) =>
+      s.role === "receiver" && s.pairing?.open && s.pairing.requests?.length,
+  );
+}
 function commandButton(label, command, run, primary) {
   const button = document.createElement("button");
   button.type = "button";
@@ -117,6 +123,14 @@ export function pairingSection(snapshot, run) {
       list.className = "pairing-requests";
       list.innerHTML = `<h4>${e(t("commands.requests"))}</h4>${requests.length ? "" : `<p class="muted">${e(t("registry.pairing.no_requests"))}</p>`}`;
       for (const request of requests) {
+        // A node Central already knows asks again after losing its key or a reset;
+        // accepting pairs it anew under the same identity, name and history.
+        const known = (snapshot.workspace?.devices ?? []).find(
+          (d) =>
+            d.transport === "mqtt" &&
+            d.source === r.source_id &&
+            d.device === request.node_id,
+        );
         const row = document.createElement("div");
         row.className = "pairing-request";
         const signal =
@@ -125,7 +139,10 @@ export function pairingSection(snapshot, run) {
                 value: formatValue(request.rssi_dbm, 0),
               })
             : "";
-        row.innerHTML = `<span><strong>${e(t("commands.request_name", { id: shortID(request.node_id) }))}</strong><span class="muted">${e(signal)}</span>${request.conflict ? `<small>${e(t("commands.conflict"))}</small>` : ""}</span>`;
+        const title =
+          known?.name ||
+          t("commands.request_name", { id: shortID(request.node_id) });
+        row.innerHTML = `<span><strong>${e(title)}</strong><span class="muted">${e(signal)}</span>${known ? `<span class="muted">${e(t("registry.pairing.known"))}</span>` : ""}${request.conflict ? `<small>${e(t("commands.conflict"))}</small>` : ""}</span>`;
         const add = commandButton(
           t("commands.add"),
           { ...target, type: "pairing.accept", node_id: request.node_id },

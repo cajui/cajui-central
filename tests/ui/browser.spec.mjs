@@ -1204,3 +1204,34 @@ test("the theme follows the system until one is chosen", async ({ page }) => {
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });
+
+test("a known transmitter asking again shows its name, not a new device", async ({
+  page,
+}) => {
+  const state = pairingSnapshot();
+  state.device_states[0].pairing = {
+    open: true,
+    remaining_s: 90,
+    requests: [{ node_id: "000048ca433c776c", rssi_dbm: -82, conflict: false }],
+  };
+  state.workspace.devices.push({
+    id: 7,
+    transport: "mqtt",
+    source: "site",
+    device: "000048ca433c776c",
+    name: "Coop",
+    location: "",
+    revision: 1,
+    received_at: state.generated_at,
+    interval: 300,
+  });
+  await liveDevices(page, state);
+  await page.getByRole("button", { name: "Add device", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  const request = dialog.locator(".pairing-request");
+  await expect(request).toContainText("Coop");
+  await expect(request).toContainText("Already paired");
+  await expect(request).not.toContainText("Transmitter 776C");
+  await expect(dialog).toContainText("After you add it");
+  await expect(dialog).not.toContainText("No new devices detected");
+});

@@ -161,6 +161,8 @@ pt-BR:
       searching_left: Buscando · faltam %{time}
       no_requests: Nenhum pedido ainda.
       awaiting_data: Pareado, aguardando a primeira leitura
+      known: Já pareado. Adicionar de novo refaz o pareamento; o nome e o histórico continuam.
+      after_add: Depois de adicionado, um transmissor novo aparece aqui para receber um nome.
       signal: Sinal %{value} dBm
     send: Transmissores e sensores aparecem aqui após a primeira medição.
   layout:

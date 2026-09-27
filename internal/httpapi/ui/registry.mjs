@@ -23,6 +23,7 @@ import {
   offers,
   shortID,
   awaitingFirstReading,
+  pairingRequests,
   pairingSection,
 } from "./pairing.mjs";
 
@@ -304,7 +305,9 @@ export function mountRegistry(root, { state, kind, notify }) {
     naming.innerHTML =
       available.length || waiting.length
         ? `${heading}<p>${message("select")}</p><ul class="add-list" aria-label="${e(message("available"))}">${availableItems()}${waiting.map((s) => `<li><span><strong>${e(t("commands.request_name", { id: shortID(s.device_id) }))}</strong><span class="muted">${e(t("registry.pairing.awaiting_data"))}</span></span></li>`).join("")}</ul>`
-        : `${heading}<div class="empty"><h3>${message("no_new")}</h3><p>${t("registry.send")}</p></div>`;
+        : !sensors && pairingRequests(snapshot)
+          ? `${heading}<p class="muted">${e(t("registry.pairing.after_add"))}</p>`
+          : `${heading}<div class="empty"><h3>${message("no_new")}</h3><p>${t("registry.send")}</p></div>`;
     body.append(naming);
     dialog.append(body);
     for (const b of body.querySelectorAll("[data-select]"))
