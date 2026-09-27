@@ -83,7 +83,7 @@ en-US:
     inspect_history: Inspect %{measurement} history for %{device}
     no_items: No matching items in this section.
     make_yours: Make this dashboard yours
-    get_started: Register your devices and sensors, then choose what to show here.
+    get_started: Name your devices and sensors, then choose what to show here.
     manage_devices: Manage devices
     manage_sensors: Manage sensors
     inspect: 'Inspect %{measurement}: %{value} %{unit}, %{status}, sensor %{sensor}, device %{device}'
@@ -94,10 +94,9 @@ en-US:
     device_id: Device ID
     interval: Expected interval
     not_reported: Not reported
-    registered_sensors: Registered sensors
+    registered_sensors: Named sensors
     arrival_status: Arrival status
-    identity_note: Device and sensor identifiers come from received data. A recent report does not guarantee that
-      a device is currently online. Names are local labels; registration does not grant network access.
+    identity_note: Names are local labels. A recent report does not guarantee that the device is online now.
     no_issues: No reported issues
     updated: Updated %{time} · Refreshes every 30 s
     refresh_error: Could not refresh. Showing the last loaded snapshot; its readings may be out of date.
@@ -112,9 +111,9 @@ en-US:
       save: Save device
       search: Search devices
       discovery: Choose Add device to name them.
-      empty: No registered devices yet
+      empty: No named devices yet
       choose: Choose Add device to select one from the available devices.
-      registered: Registered devices
+      registered: Named devices
       select: Select a detected device to give it a name.
       available: Available devices
       no_new: No new devices detected
@@ -128,10 +127,10 @@ en-US:
       edit: Edit sensor
       save: Save sensor
       search: Search sensors
-      discovery: Available sensors come from received measurements; register their device first.
-      empty: No registered sensors yet
+      discovery: Available sensors come from received measurements; name their device first.
+      empty: No named sensors yet
       choose: Choose Add sensor to select one from the available sensors.
-      registered: Registered sensors
+      registered: Named sensors
       select: Select a detected sensor to give it a name.
       available: Available sensors
       no_new: No new sensors detected
@@ -142,12 +141,12 @@ en-US:
     no_matches: No matches
     try_search: Try a different name or location.
     name_location: Name / location
-    counts: '%{registered} registered / %{detected} detected'
+    counts: '%{registered} named / %{detected} detected'
     edit_name: Edit %{name}
     select_name: Select %{name}
     sensor_identity: 'Device: %{device} · Sensor: %{sensor}'
     identity_note: Names can change. Identity and recorded history stay the same.
-    register_parent: Register device first
+    register_parent: Name the device first
     name_action: Name it
     pairing:
       heading: Pair by radio
@@ -165,11 +164,11 @@ en-US:
     send: Devices and sensors appear here after their first measurement.
   layout:
     help: Create sections and choose devices, complete sensors or individual measurements. Removing an item here
-      keeps its registration and history.
+      keeps its name and history.
     add_section: Add section
     automatic: Use automatic layout
     save: Save dashboard
-    automatic_note: 'Automatic layout: registered sensors and devices will appear in separate sections.'
+    automatic_note: 'Automatic layout: named sensors and devices will appear in separate sections.'
     empty: No sections yet. Add one to start, or save an empty dashboard.
     section: Section %{number}
     title: Section title
@@ -189,7 +188,7 @@ en-US:
     device_choice: Device · %{name}
     sensor_choice: Sensor · %{name} · %{device}
   errors:
-    conflict: These settings changed or the parent is not registered. Reload this page before saving again.
+    conflict: These settings changed or the parent has no name yet. Reload this page before saving again.
     session: Your editing session expired. Reload this local page and try again.
     invalid: Check the names and selected items, then try again.
     save: Could not save. Your changes remain here; check the connection and retry.
@@ -260,9 +259,9 @@ en-US:
       other: '%{count} observations'
       zero: '%{count} observations'
     registered:
-      one: '%{count} registered sensor'
-      other: '%{count} registered sensors'
-      zero: '%{count} registered sensors'
+      one: '%{count} named sensor'
+      other: '%{count} named sensors'
+      zero: '%{count} named sensors'
     detected:
       one: '%{count} detected device is ready to name.'
       other: '%{count} detected devices are ready to name.'
@@ -322,7 +321,7 @@ en-US:
     retained_notice: State received from the broker when Central connected; its age is unknown.
     binding: Pairing
     binding_active: Paired
-    binding_pending: Enrolled, not yet active
+    binding_pending: Pairing prepared, not yet active
     binding_revoked: Revoked
     receiver: Receiver
     last_frame: Last radio frame
