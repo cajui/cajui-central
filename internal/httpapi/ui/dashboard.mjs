@@ -38,7 +38,8 @@ export function mountDashboard(root, { state = {}, notify }) {
     selected = "",
     hours = 24,
     pending = false,
-    commandRunning = false;
+    commandRunning = false,
+    dialogOpener = null;
   root.innerHTML = `<header class="page-heading"><div><h1>${t("common.dashboard")}</h1><p>${t("dashboard.description")}</p></div><div class="top-actions"><button class="button" id="organize">${t("dashboard.organize")}</button><button class="button" id="export">${icon("download")}${t("dashboard.export")}</button><button class="button primary" id="refresh">${icon("refresh")}${t("common.refresh")}</button></div></header>
     <div id="fetch-error" class="notice hidden" role="status"></div>
     <section id="summary" class="device-summary" aria-label="${t("dashboard.summary")}"></section>
@@ -80,6 +81,24 @@ export function mountDashboard(root, { state = {}, notify }) {
       g.receiverOffline = receiver?.availability === "offline";
       if (g.receiverOffline) g.attention = true;
     }
+  }
+  // A layout may show the same reading or device in several sections, so a card
+  // button is identified by its key and its position among equal keys.
+  function focusSpot(element) {
+    const { channelKey, details } = element?.dataset ?? {};
+    const selector = channelKey
+      ? `[data-channel-key="${CSS.escape(channelKey)}"]`
+      : details
+        ? `[data-details="${CSS.escape(details)}"]`
+        : "";
+    if (!selector) return null;
+    return {
+      selector,
+      index: [...root.querySelectorAll(selector)].indexOf(element),
+    };
+  }
+  function restoreFocus(spot, options) {
+    if (spot) root.querySelectorAll(spot.selector)[spot.index]?.focus(options);
   }
   function receivers() {
     return (snapshot.device_states ?? []).filter((s) => s.role === "receiver");
@@ -294,7 +313,9 @@ export function mountDashboard(root, { state = {}, notify }) {
           card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("device")}</span><div><h3>${e(g.name)}</h3><p class="muted">${e(t("counts.registered", { count: g.sensors.length }))}${g.location ? ` · ${e(g.location)}` : ""}</p></div></div><p class="device-last-report">${e(t("dashboard.last_report", { age: age(g.at, Date.parse(snapshot.generated_at)) }))}</p>${g.receiverOffline ? `<p class="device-alert">${icon("alert")}<span>${e(t("receivers.receiver_offline"))}</span></p>` : ""}<div class="transmitter-footer"><cj-badge state="${deviceStatus(g)}"></cj-badge><button class="text-button" data-details="${e(`${g.source}/${g.device}`)}" aria-label="${e(t("dashboard.details_for", { name: g.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></div>`;
           card
             .querySelector("[data-details]")
-            .addEventListener("click", () => showDevice(g));
+            .addEventListener("click", (event) =>
+              showDevice(g, event.currentTarget),
+            );
         } else {
           card.classList.add("sensor-group");
           if (readings.length > 1) card.classList.add("sensor-group-wide");
@@ -381,7 +402,7 @@ export function mountDashboard(root, { state = {}, notify }) {
       count: points.length,
     });
   }
-  function showDevice(g) {
+  function showDevice(g, opener) {
     const values = [
       [t("dashboard.device_id"), g.device],
       [t("common.source"), g.source],
@@ -472,8 +493,7 @@ export function mountDashboard(root, { state = {}, notify }) {
       });
       root.querySelector("#device-detail").append(revoke);
     }
-    root.querySelector("#device-dialog").dataset.for =
-      `${g.source}/${g.device}`;
+    dialogOpener = focusSpot(opener);
     root.querySelector("#device-dialog").showModal();
   }
   function render() {
@@ -530,14 +550,9 @@ export function mountDashboard(root, { state = {}, notify }) {
       snapshot = next;
       root.querySelector("#fetch-error").classList.add("hidden");
       // Re-rendering replaces the card buttons; keep keyboard focus on the same one.
-      const { channelKey, details } = document.activeElement?.dataset ?? {};
+      const spot = focusSpot(document.activeElement);
       render();
-      const again = channelKey
-        ? `[data-channel-key="${CSS.escape(channelKey)}"]`
-        : details
-          ? `[data-details="${CSS.escape(details)}"]`
-          : "";
-      if (again) root.querySelector(again)?.focus({ preventScroll: true });
+      restoreFocus(spot, { preventScroll: true });
     } catch {
       root.querySelector("#fetch-error").textContent = t(
         "dashboard.refresh_error",
@@ -579,11 +594,7 @@ export function mountDashboard(root, { state = {}, notify }) {
   root.querySelector("#device-dialog").addEventListener("close", (event) => {
     const focus = document.activeElement;
     if (!focus || focus === document.body || event.target.contains(focus))
-      root
-        .querySelector(
-          `[data-details="${CSS.escape(event.target.dataset.for)}"]`,
-        )
-        ?.focus();
+      restoreFocus(dialogOpener);
   });
   root
     .querySelector("#close-dialog")
@@ -609,12 +620,13 @@ export function mountDashboard(root, { state = {}, notify }) {
   });
   render();
   // Refreshing never touches open dialogs or the history panel's focus target, so
-  // an open chart or dialog must not pause live data. Only the measurement select
-  // is rebuilt and would lose its options mid-choice.
+  // an open chart or dialog must not pause live data. The measurement select and
+  // the receiver controls are rebuilt without a stable key, so focus there waits.
   const idle = () =>
     !document.hidden &&
     !commandRunning &&
-    document.activeElement !== root.querySelector("#metric-select");
+    document.activeElement !== root.querySelector("#metric-select") &&
+    !root.querySelector("#receivers").contains(document.activeElement);
   const timer = setInterval(() => {
     if (idle()) refresh();
   }, 30000);
