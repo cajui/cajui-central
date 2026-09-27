@@ -141,6 +141,7 @@ pt-BR:
     no_matches: Nenhum resultado
     try_search: Tente outro nome ou localização.
     name_location: Nome / localização
+    signal: Sinal
     counts: '%{registered} com nome / %{detected} detectados'
     edit_name: Editar %{name}
     select_name: Selecionar %{name}

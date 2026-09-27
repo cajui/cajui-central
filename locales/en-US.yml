@@ -141,6 +141,7 @@ en-US:
     no_matches: No matches
     try_search: Try a different name or location.
     name_location: Name / location
+    signal: Signal
     counts: '%{registered} named / %{detected} detected'
     edit_name: Edit %{name}
     select_name: Select %{name}
