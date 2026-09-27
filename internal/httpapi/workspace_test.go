@@ -188,3 +188,58 @@ func TestLocalHostAndTLSOrigin(t *testing.T) {
 		t.Fatal(w.Code, w.Body)
 	}
 }
+
+func TestArchiveDeviceEndpoint(t *testing.T) {
+	h := testHandler(t)
+	if w := request(h, "POST", "/api/v1/readings", payload, "Bearer "+token, "application/json"); w.Code != 201 {
+		t.Fatal(w.Code)
+	}
+	state := workspaceSnapshot(t, h, "/devices")
+	d := state.Workspace.Devices[0].ID
+	archive := func(path, body, capability string, alter func(*http.Request)) int {
+		return workspaceEdit(h, path, body, capability, func(r *http.Request) {
+			r.Method = "POST"
+			if alter != nil {
+				alter(r)
+			}
+		}).Code
+	}
+	path := fmt.Sprintf("/ui-api/devices/%d/archive", d)
+	if code := archive(path, `{"revision":0}`, token, nil); code != 403 {
+		t.Fatal("foreign capability", code)
+	}
+	if code := archive(path, `{"revision":0}`, state.UIToken, func(r *http.Request) { r.Header.Set("Content-Type", "text/plain") }); code != 415 {
+		t.Fatal("content type", code)
+	}
+	for _, body := range []string{`{}`, `{"revision":null}`, `{"revision":0,"x":1}`, `{"revision":0}{}`, `[`} {
+		if code := archive(path, body, state.UIToken, nil); code != 400 {
+			t.Fatal(body, code)
+		}
+	}
+	if code := archive("/ui-api/devices/0/archive", `{"revision":0}`, state.UIToken, nil); code != 400 {
+		t.Fatal("zero id", code)
+	}
+	if code := archive(path, `{"revision":5}`, state.UIToken, nil); code != 409 {
+		t.Fatal("stale revision", code)
+	}
+	if code := archive(path, `{"revision":0}`, state.UIToken, nil); code != 204 {
+		t.Fatal("archive", code)
+	}
+	if code := archive(path, `{"revision":1}`, state.UIToken, nil); code != 404 {
+		t.Fatal("archived again", code)
+	}
+	if after := workspaceSnapshot(t, h, "/devices"); len(after.Workspace.Devices) != 0 {
+		t.Fatal("archived device listed", after.Workspace.Devices)
+	}
+	broken := &server{repo: brokenRepo{}, uiToken: "capability", logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	r := httptest.NewRequest("POST", "http://localhost/ui-api/devices/1/archive", strings.NewReader(`{"revision":0}`))
+	r.SetPathValue("id", "1")
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Origin", "http://localhost")
+	r.Header.Set("X-Cajui-Workspace", "capability")
+	w := httptest.NewRecorder()
+	broken.archiveDevice(w, r)
+	if w.Code != 500 || strings.Contains(w.Body.String(), "private") {
+		t.Fatal(w.Code, w.Body.String())
+	}
+}

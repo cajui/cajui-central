@@ -1,9 +1,9 @@
 import { t } from "./i18n.mjs";
-export async function saveWorkspace(state, path, value) {
+export async function saveWorkspace(state, path, value, method = "PUT") {
   let response;
   try {
     response = await fetch(`/ui-api/${path}`, {
-      method: "PUT",
+      method,
       headers: {
         "Content-Type": "application/json",
         "X-Cajui-Workspace": state.ui_token,

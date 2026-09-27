@@ -1271,7 +1271,7 @@ test("a revoked transmitter says so instead of offering Revoke", async ({
     received_at: state.generated_at,
     interval: 300,
   });
-  await liveDevices(page, state);
+  const serve = await liveDevices(page, state);
   const row = page.getByRole("row").filter({ hasText: "Coop" });
   await expect(row.locator('td[data-label="Receiver"]')).toHaveText(
     "Receiver 5E10 · Revoked",
@@ -1291,6 +1291,24 @@ test("a revoked transmitter says so instead of offering Revoke", async ({
     .getByRole("button", { name: "Pair Coop again", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toContainText("Pair by radio");
+  await page.keyboard.press("Escape");
+  let archived = null;
+  await page.route("**/ui-api/devices/7/archive", (route) => {
+    archived = JSON.parse(route.request().postData());
+    return route.fulfill({ status: 204 });
+  });
+  page.once("dialog", (d) => d.accept());
+  const gone = structuredClone(state);
+  gone.workspace.devices = [];
+  await serve(gone);
+  await page
+    .getByRole("button", { name: "Remove Coop from the list", exact: true })
+    .click();
+  await expect(page.locator("#toast")).toHaveText(
+    "Coop removed from the list.",
+  );
+  expect(archived).toEqual({ revision: 1 });
+  await expect(page.getByRole("region", { name: "Revoked" })).toHaveCount(0);
 });
 test("a revoked transmitter leaves the dashboard", async ({ page }) => {
   const { snapshot, serve } = await liveWorkspace(page);

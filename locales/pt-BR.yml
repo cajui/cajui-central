@@ -144,6 +144,10 @@ pt-BR:
     name_location: Nome / localização
     signal: Sinal
     counts: '%{registered} com nome / %{detected} detectados'
+    archive: Remover da lista
+    archive_name: Remover %{name} da lista
+    archive_confirm: 'Remover %{name} da lista? As leituras continuam guardadas, e ele volta com o mesmo nome se enviar dados de novo.'
+    archived: '%{name} removido da lista.'
     edit_name: Editar %{name}
     select_name: Selecionar %{name}
     sensor_identity: 'Transmissor: %{device} · Sensor: %{sensor}'

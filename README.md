@@ -372,6 +372,9 @@ registration settings and layout preferences. Migration backfills existing histo
 transactionally, without guessing names or changing original readings. Observations
 and new telemetry commit together; duplicate retries never refresh inventory times.
 Known sensors remain listed when absent from the most recent 100 samples/readings.
+Schema version 6 adds `workspace_devices.archived`: an archived device and its sensors
+leave the catalog, their telemetry stays, and the next observation brings them back.
+An older binary refuses a database migrated to a newer schema.
 Back up before upgrading; an older binary cannot open a version 3 database. To roll
 back, restore a pre-upgrade backup together with the older binary.
 
@@ -457,7 +460,9 @@ JavaScript or browser storage. Refresh reads the same public loopback-only docum
 without exposing the ingestion credential. Existing authenticated APIs are unchanged.
 
 Local edits use `PUT /ui-api/devices/{id}`, `/ui-api/sensors/{id}` and
-`/ui-api/dashboard/layout`. These are browser-workspace endpoints, not ingestion APIs.
+`/ui-api/dashboard/layout`; `POST /ui-api/devices/{id}/archive` with `{"revision":n}`
+removes a device and its sensors from the pages (offered for revoked transmitters) while
+its telemetry stays stored, and its next observation brings it back with its name. These are browser-workspace endpoints, not ingestion APIs.
 They require an allowed loopback Host, an exactly matching Origin, a process-scoped
 `X-Cajui-Workspace` capability from the local page, JSON content type and bounded
 payloads. Cross-site fetch metadata is rejected. Names and optional locations are

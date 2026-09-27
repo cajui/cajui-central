@@ -42,7 +42,7 @@ func (s *Store) migrate() error {
 	if err = tx.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return err
 	}
-	if version > 5 {
+	if version > 6 {
 		return fmt.Errorf("unsupported schema version %d", version)
 	}
 	if version == 0 {
@@ -71,9 +71,6 @@ func (s *Store) migrate() error {
 		if _, err = tx.Exec(workspaceSchema); err != nil {
 			return err
 		}
-		if err = backfillWorkspace(tx); err != nil {
-			return err
-		}
 	}
 	if version < 4 {
 		if _, err = tx.Exec(deviceStateSchema); err != nil {
@@ -82,6 +79,18 @@ func (s *Store) migrate() error {
 	}
 	if version < 5 {
 		if _, err = tx.Exec(commandSchema); err != nil {
+			return err
+		}
+	}
+	if version < 6 {
+		if _, err = tx.Exec(archiveSchema); err != nil {
+			return err
+		}
+	}
+	// Backfill writes through observe, which uses the newest workspace columns, so it
+	// runs once the whole schema is in place.
+	if version < 3 {
+		if err = backfillWorkspace(tx); err != nil {
 			return err
 		}
 	}

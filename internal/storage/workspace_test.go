@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -276,11 +277,12 @@ func TestWorkspaceMigrationFailureRollsBack(t *testing.T) {
 	if _, err := s.Insert(context.Background(), sample(), time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`DROP TABLE workspace_measurements; DROP TABLE workspace_sensors; DROP TABLE workspace_devices; DROP TABLE workspace_layout; UPDATE readings SET payload='broken'; PRAGMA user_version=2;`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE workspace_measurements; DROP TABLE workspace_sensors; DROP TABLE workspace_devices; DROP TABLE workspace_layout; DROP TABLE device_states; DROP TABLE device_availability; DROP TABLE device_commands; UPDATE readings SET payload='broken'; PRAGMA user_version=2;`); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.migrate(); err == nil {
-		t.Fatal("corrupt telemetry migrated")
+	// The failure must come from the backfill itself, after every schema step ran.
+	if err := s.migrate(); err == nil || !strings.Contains(err.Error(), "invalid character") {
+		t.Fatal("corrupt telemetry migrated", err)
 	}
 	var version, count int
 	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 2 {
@@ -288,5 +290,68 @@ func TestWorkspaceMigrationFailureRollsBack(t *testing.T) {
 	}
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE name='workspace_devices'`).Scan(&count); err != nil || count != 0 {
 		t.Fatal("partial migration", count, err)
+	}
+}
+
+func TestArchiveDeviceHidesItUntilItReportsAgain(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	at := time.Now().UTC()
+	r := sample()
+	if _, err := s.Insert(ctx, r, at); err != nil {
+		t.Fatal(err)
+	}
+	d := catalog(t, s).Devices[0]
+	if err := s.SaveDevice(ctx, d.ID, workspace.Settings{Name: "North"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ArchiveDevice(ctx, d.ID, 0); !errors.Is(err, workspace.ErrConflict) {
+		t.Fatal(err)
+	}
+	if err := s.ArchiveDevice(ctx, 0, 1); !errors.Is(err, workspace.ErrInvalid) {
+		t.Fatal(err)
+	}
+	if err := s.ArchiveDevice(ctx, d.ID+100, 1); !errors.Is(err, workspace.ErrNotFound) {
+		t.Fatal(err)
+	}
+	if err := s.ArchiveDevice(ctx, d.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	if c := catalog(t, s); len(c.Devices) != 0 || len(c.Sensors) != 0 {
+		t.Fatal("archived device still listed", c)
+	}
+	if err := s.ArchiveDevice(ctx, d.ID, 2); !errors.Is(err, workspace.ErrNotFound) {
+		t.Fatal(err)
+	}
+	if recent, err := s.Recent(ctx, 10); err != nil || len(recent) != 1 {
+		t.Fatal("telemetry lost", recent, err)
+	}
+	r.Sequence++
+	if _, err := s.Insert(ctx, r, at.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	c := catalog(t, s)
+	if len(c.Devices) != 1 || c.Devices[0].Name != "North" || len(c.Sensors) != 1 || len(c.Sensors[0].Measurements) != 1 {
+		t.Fatal("device did not return with its name", c)
+	}
+}
+func TestArchiveMigrationKeepsDevices(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	if _, err := s.Insert(ctx, sample(), time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`ALTER TABLE workspace_devices DROP COLUMN archived; PRAGMA user_version=5;`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	var version int
+	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 6 {
+		t.Fatal(version, err)
+	}
+	if c := catalog(t, s); len(c.Devices) != 1 {
+		t.Fatal("device lost in migration", c)
 	}
 }
