@@ -71,6 +71,8 @@ type WiFi struct {
 type Queue struct {
 	Depth    *int64 `json:"depth,omitempty"`
 	Capacity *int64 `json:"capacity,omitempty"`
+	// Oldest samples the receiver gave up for new ones because its queue was full.
+	Dropped *int64 `json:"dropped,omitempty"`
 }
 type Forwarding struct {
 	Published *int64 `json:"published,omitempty"`
@@ -202,6 +204,7 @@ func (s State) validate() error {
 	if s.Queue != nil {
 		number(s.Queue.Depth, 0, 1<<20)
 		number(s.Queue.Capacity, 0, 1<<20)
+		number(s.Queue.Dropped, 0, math.MaxUint32)
 	}
 	if s.Forwarding != nil {
 		number(s.Forwarding.Published, 0, math.MaxUint32)

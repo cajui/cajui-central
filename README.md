@@ -218,7 +218,7 @@ registered sensors together on a dashboard.
 Central also subscribes to the retained `manage/v1/+/+/state` and
 `manage/v1/+/+/availability` topics of the
 [cajui-firmware management channel](https://github.com/cajui/cajui-firmware/blob/main/docs/management-v1.md):
-receiver firmware, uptime, Wi-Fi signal, queue, forwarding counts, last restart and pairing
+receiver firmware, uptime, Wi-Fi signal, queue (including samples dropped when full), forwarding counts, last restart and pairing
 window, and each transmitter's pairing and last radio frame. It keeps only the latest state
 and availability per device, validates known fields, ignores unknown ones and keeps absent
 values unknown. The broker repeats retained messages on every subscription: an identical
