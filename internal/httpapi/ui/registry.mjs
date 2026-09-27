@@ -194,7 +194,7 @@ export function mountRegistry(root, { state, kind, notify }) {
           ],
           [
             t("common.actions"),
-            `<span class="row-actions"><button class="button" data-edit="${entry.id}" aria-label="${e(t("registry.edit_name", { name: entry.name }))}">${t("common.edit")}</button>${revoked(entry) && !sensors ? `<button class="button" data-repair="${entry.id}" aria-label="${e(t("registry.pairing.repair_name", { name: entry.name }))}">${t("registry.pairing.repair")}</button>` : ""}</span>`,
+            `<span class="row-actions"><button class="button" data-edit="${entry.id}" aria-label="${e(t("registry.edit_name", { name: entry.name }))}">${t("common.edit")}</button>${revoked(entry) && !sensors ? `<button class="button" data-repair="${entry.id}" aria-label="${e(t("registry.pairing.repair_name", { name: entry.name }))}">${t("registry.pairing.repair")}</button><button class="button danger-text" data-archive="${entry.id}" aria-label="${e(t("registry.archive_name", { name: entry.name }))}">${t("registry.archive")}</button>` : ""}</span>`,
           ],
         ];
         return cells;
@@ -212,6 +212,13 @@ export function mountRegistry(root, { state, kind, notify }) {
     const gone = registered.filter(revoked);
     // Revoked devices keep their name and history but sit apart, below the working ones.
     list.innerHTML = `${active.length ? table(active, message("registered")) : ""}${gone.length ? `<section class="registry-revoked" aria-labelledby="revoked-heading"><h2 id="revoked-heading">${e(t("registry.pairing.revoked_heading"))}</h2><p class="muted">${e(t(sensors ? "registry.pairing.revoked_sensors_note" : "registry.pairing.revoked_note"))}</p>${table(gone, t("registry.pairing.revoked_heading"))}</section>` : ""}`;
+    for (const b of list.querySelectorAll("[data-archive]"))
+      b.addEventListener("click", () =>
+        archive(
+          entries.find((d) => d.id === Number(b.dataset.archive)),
+          b,
+        ),
+      );
     for (const b of list.querySelectorAll("[data-repair]"))
       b.addEventListener("click", () =>
         openAdd(`[data-repair="${CSS.escape(b.dataset.repair)}"]`),
@@ -263,6 +270,25 @@ export function mountRegistry(root, { state, kind, notify }) {
       );
     if (!dialog.open) dialog.showModal();
     form.elements.name.focus();
+  }
+  // Archiving hides a revoked device until it reports again; history stays.
+  async function archive(entry, button) {
+    if (!window.confirm(t("registry.archive_confirm", { name: entry.name })))
+      return;
+    button.disabled = true;
+    try {
+      await saveWorkspace(
+        snapshot,
+        `devices/${entry.id}/archive`,
+        { revision: entry.revision },
+        "POST",
+      );
+      notify(t("registry.archived", { name: entry.name }));
+      await refresh();
+    } catch (error) {
+      notify(error.message);
+      button.disabled = false;
+    }
   }
   // Revocation is management, not monitoring: it lives with the device's name.
   function bindingOf(entry) {

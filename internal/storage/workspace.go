@@ -29,12 +29,18 @@ CREATE TABLE workspace_layout (id INTEGER PRIMARY KEY CHECK(id=1), revision INTE
 INSERT INTO workspace_layout VALUES(1,0,'null');
 PRAGMA user_version=3;`
 
+// An archived device leaves the catalog with its sensors; its telemetry stays, and a new
+// observation brings it back with its name.
+const archiveSchema = `
+ALTER TABLE workspace_devices ADD COLUMN archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1));
+PRAGMA user_version=6;`
+
 // Observation and telemetry share a transaction, so retries cannot refresh inventory.
 func observe(ctx context.Context, tx *sql.Tx, transport, source, device string, readings []telemetry.Measurement, at time.Time, interval int) error {
 	stamp := at.UTC().Format(time.RFC3339Nano)
 	var deviceID int64
 	err := tx.QueryRowContext(ctx, `INSERT INTO workspace_devices(transport,source,device,received_at,interval) VALUES(?,?,?,?,?)
- ON CONFLICT(transport,source,device) DO UPDATE SET received_at=excluded.received_at,interval=excluded.interval RETURNING id`, transport, source, device, stamp, interval).Scan(&deviceID)
+ ON CONFLICT(transport,source,device) DO UPDATE SET received_at=excluded.received_at,interval=excluded.interval,archived=0 RETURNING id`, transport, source, device, stamp, interval).Scan(&deviceID)
 	if err != nil {
 		return err
 	}
@@ -114,7 +120,7 @@ func (s *Store) Catalog(ctx context.Context) (workspace.Catalog, error) {
 		return c, err
 	}
 	defer tx.Rollback()
-	rows, err := tx.QueryContext(ctx, `SELECT id,transport,source,device,name,location,revision,received_at,interval FROM workspace_devices ORDER BY id`)
+	rows, err := tx.QueryContext(ctx, `SELECT id,transport,source,device,name,location,revision,received_at,interval FROM workspace_devices WHERE archived=0 ORDER BY id`)
 	if err != nil {
 		return c, err
 	}
@@ -131,7 +137,7 @@ func (s *Store) Catalog(ctx context.Context) (workspace.Catalog, error) {
 	if err != nil {
 		return c, err
 	}
-	rows, err = tx.QueryContext(ctx, `SELECT id,device_id,sensor,name,location,revision FROM workspace_sensors ORDER BY id`)
+	rows, err = tx.QueryContext(ctx, `SELECT s.id,s.device_id,s.sensor,s.name,s.location,s.revision FROM workspace_sensors s JOIN workspace_devices d ON d.id=s.device_id WHERE d.archived=0 ORDER BY s.id`)
 	if err != nil {
 		return c, err
 	}
@@ -151,7 +157,7 @@ func (s *Store) Catalog(ctx context.Context) (workspace.Catalog, error) {
 	if err != nil {
 		return c, err
 	}
-	rows, err = tx.QueryContext(ctx, `SELECT sensor_id,metric,unit,value,status,received_at,interval FROM workspace_measurements ORDER BY sensor_id,metric,unit`)
+	rows, err = tx.QueryContext(ctx, `SELECT m.sensor_id,m.metric,m.unit,m.value,m.status,m.received_at,m.interval FROM workspace_measurements m JOIN workspace_sensors s ON s.id=m.sensor_id JOIN workspace_devices d ON d.id=s.device_id WHERE d.archived=0 ORDER BY m.sensor_id,m.metric,m.unit`)
 	if err != nil {
 		return c, err
 	}
@@ -182,6 +188,34 @@ func (s *Store) Catalog(ctx context.Context) (workspace.Catalog, error) {
 }
 func (s *Store) SaveDevice(ctx context.Context, id int64, settings workspace.Settings) error {
 	return s.saveSettings(ctx, "workspace_devices", id, settings)
+}
+
+// ArchiveDevice removes a device from the catalog until it reports again. Its readings,
+// samples and names are kept.
+func (s *Store) ArchiveDevice(ctx context.Context, id, revision int64) error {
+	if id <= 0 {
+		return workspace.ErrInvalid
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var current int64
+	err = tx.QueryRowContext(ctx, `SELECT revision FROM workspace_devices WHERE id=? AND archived=0`, id).Scan(&current)
+	if errors.Is(err, sql.ErrNoRows) {
+		return workspace.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if current != revision {
+		return workspace.ErrConflict
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE workspace_devices SET archived=1,revision=revision+1 WHERE id=?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 func (s *Store) SaveSensor(ctx context.Context, id int64, settings workspace.Settings) error {
 	return s.saveSettings(ctx, "workspace_sensors", id, settings)

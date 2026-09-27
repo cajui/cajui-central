@@ -1789,6 +1789,9 @@ cj-reading {
 .registry-revoked .registry-table {
   color: var(--muted);
 }
+.button.danger-text {
+  color: var(--danger);
+}
 .row-actions {
   display: flex;
   flex-wrap: wrap;

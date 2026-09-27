@@ -457,7 +457,9 @@ JavaScript or browser storage. Refresh reads the same public loopback-only docum
 without exposing the ingestion credential. Existing authenticated APIs are unchanged.
 
 Local edits use `PUT /ui-api/devices/{id}`, `/ui-api/sensors/{id}` and
-`/ui-api/dashboard/layout`. These are browser-workspace endpoints, not ingestion APIs.
+`/ui-api/dashboard/layout`; `POST /ui-api/devices/{id}/archive` with `{"revision":n}`
+removes a device and its sensors from the pages (offered for revoked transmitters) while
+its telemetry stays stored, and its next observation brings it back with its name. These are browser-workspace endpoints, not ingestion APIs.
 They require an allowed loopback Host, an exactly matching Origin, a process-scoped
 `X-Cajui-Workspace` capability from the local page, JSON content type and bounded
 payloads. Cross-site fetch metadata is rejected. Names and optional locations are

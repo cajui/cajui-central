@@ -121,3 +121,44 @@ func (s *server) editWorkspace(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
+
+// archiveDevice takes one device off the local pages; the same local-write checks as
+// edits apply, and the revision guards against a stale page.
+func (s *server) archiveDevice(w http.ResponseWriter, r *http.Request) {
+	if !s.trustedLocalWrite(r) {
+		http.Error(w, "reload the local page before editing", http.StatusForbidden)
+		return
+	}
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "use application/json", http.StatusUnsupportedMediaType)
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		http.Error(w, "invalid item", 400)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1024)
+	var input struct {
+		Revision *int64 `json:"revision"`
+	}
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if dec.Decode(&input) != nil || input.Revision == nil || dec.Decode(new(any)) != io.EOF {
+		http.Error(w, "invalid workspace settings", 400)
+		return
+	}
+	err = s.repo.ArchiveDevice(r.Context(), id, *input.Revision)
+	switch {
+	case errors.Is(err, workspace.ErrInvalid):
+		http.Error(w, "invalid workspace settings", 400)
+	case errors.Is(err, workspace.ErrNotFound):
+		http.Error(w, "observed item not found", 404)
+	case errors.Is(err, workspace.ErrConflict):
+		http.Error(w, "settings changed in another window; reload before saving", 409)
+	case err != nil:
+		s.fail(w, err)
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
+}

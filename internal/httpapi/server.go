@@ -25,6 +25,7 @@ import (
 type Repository interface {
 	Catalog(context.Context) (workspace.Catalog, error)
 	SaveDevice(context.Context, int64, workspace.Settings) error
+	ArchiveDevice(context.Context, int64, int64) error
 	SaveSensor(context.Context, int64, workspace.Settings) error
 	SaveLayout(context.Context, workspace.Layout) error
 	Insert(context.Context, telemetry.Reading, time.Time) (bool, error)
@@ -67,6 +68,7 @@ func New(repo Repository, token string, logger *slog.Logger, options ...Option) 
 	mux.HandleFunc("GET /sensors", s.localPage(s.index))
 	mux.HandleFunc("GET /receivers", s.localPage(s.index))
 	mux.HandleFunc("PUT /ui-api/{kind}/{id}", s.editWorkspace)
+	mux.HandleFunc("POST /ui-api/devices/{id}/archive", s.archiveDevice)
 	mux.HandleFunc("GET /ui/{path...}", serveUIAsset)
 	mux.HandleFunc("POST /ui-api/commands", s.localPage(s.sendCommand))
 	mux.HandleFunc("GET /ui-api/commands/{id}", s.localPage(s.commandStatus))

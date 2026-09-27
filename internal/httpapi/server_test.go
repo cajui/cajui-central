@@ -225,6 +225,9 @@ func (brokenRepo) Catalog(context.Context) (workspace.Catalog, error) {
 func (brokenRepo) SaveDevice(context.Context, int64, workspace.Settings) error {
 	return errors.New("private database failure")
 }
+func (brokenRepo) ArchiveDevice(context.Context, int64, int64) error {
+	return errors.New("private database failure")
+}
 func (brokenRepo) SaveSensor(context.Context, int64, workspace.Settings) error {
 	return errors.New("private database failure")
 }

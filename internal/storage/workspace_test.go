@@ -290,3 +290,66 @@ func TestWorkspaceMigrationFailureRollsBack(t *testing.T) {
 		t.Fatal("partial migration", count, err)
 	}
 }
+
+func TestArchiveDeviceHidesItUntilItReportsAgain(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	at := time.Now().UTC()
+	r := sample()
+	if _, err := s.Insert(ctx, r, at); err != nil {
+		t.Fatal(err)
+	}
+	d := catalog(t, s).Devices[0]
+	if err := s.SaveDevice(ctx, d.ID, workspace.Settings{Name: "North"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ArchiveDevice(ctx, d.ID, 0); !errors.Is(err, workspace.ErrConflict) {
+		t.Fatal(err)
+	}
+	if err := s.ArchiveDevice(ctx, 0, 1); !errors.Is(err, workspace.ErrInvalid) {
+		t.Fatal(err)
+	}
+	if err := s.ArchiveDevice(ctx, d.ID+100, 1); !errors.Is(err, workspace.ErrNotFound) {
+		t.Fatal(err)
+	}
+	if err := s.ArchiveDevice(ctx, d.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	if c := catalog(t, s); len(c.Devices) != 0 || len(c.Sensors) != 0 {
+		t.Fatal("archived device still listed", c)
+	}
+	if err := s.ArchiveDevice(ctx, d.ID, 2); !errors.Is(err, workspace.ErrNotFound) {
+		t.Fatal(err)
+	}
+	if recent, err := s.Recent(ctx, 10); err != nil || len(recent) != 1 {
+		t.Fatal("telemetry lost", recent, err)
+	}
+	r.Sequence++
+	if _, err := s.Insert(ctx, r, at.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	c := catalog(t, s)
+	if len(c.Devices) != 1 || c.Devices[0].Name != "North" || len(c.Sensors) != 1 || len(c.Sensors[0].Measurements) != 1 {
+		t.Fatal("device did not return with its name", c)
+	}
+}
+func TestArchiveMigrationKeepsDevices(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	if _, err := s.Insert(ctx, sample(), time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`ALTER TABLE workspace_devices DROP COLUMN archived; PRAGMA user_version=5;`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	var version int
+	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 6 {
+		t.Fatal(version, err)
+	}
+	if c := catalog(t, s); len(c.Devices) != 1 {
+		t.Fatal("device lost in migration", c)
+	}
+}
