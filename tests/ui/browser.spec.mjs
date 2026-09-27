@@ -946,24 +946,34 @@ test("one dialog pairs a transmitter by radio and names it as it appears", async
   await page.clock.install();
   const state = pairingSnapshot();
   const serve = await liveDevices(page, state);
-  await page.route("**/ui-api/commands", (route) =>
+  await page.route("**/ui-api/commands", (route) => {
+    const type = JSON.parse(route.request().postData()).type;
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        command_id: type === "pairing.accept" ? "c2" : "c1",
+        status: type === "pairing.accept" ? "pending" : "applied",
+        type,
+      }),
+    });
+  });
+  await page.route("**/ui-api/commands/c2", (route) =>
     route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        command_id: "c1",
+        command_id: "c2",
         status: "applied",
-        type: JSON.parse(route.request().postData()).type,
+        type: "pairing.accept",
       }),
     }),
   );
   await page.getByRole("button", { name: "Add device", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Pair by radio");
+  await expect(
+    dialog.getByRole("heading", { name: "Pair a transmitter" }),
+  ).toBeVisible();
   await expect(dialog).toContainText("hold the PRG button");
-  await expect(dialog).toContainText("No new devices detected");
-  await expect(dialog).toContainText(
-    "Devices and sensors appear here after their first measurement.",
-  );
+  await expect(dialog).not.toContainText("No new devices detected");
   const receiver = state.device_states[0];
   receiver.pairing = {
     open: true,
@@ -974,11 +984,21 @@ test("one dialog pairs a transmitter by radio and names it as it appears", async
   await dialog
     .getByRole("button", { name: "Search for transmitters", exact: true })
     .click();
+  // The notice sits in the top layer, above the modal's backdrop.
+  await expect(page.locator("#toast")).toBeVisible();
   await expect(page.locator("#toast")).toHaveText(
     "Search started for two minutes.",
   );
-  await expect(dialog).toContainText("Searching · 2:00 left");
-  await expect(dialog).toContainText("Transmitter 776C");
+  await expect(
+    dialog.getByRole("heading", { name: "Searching for transmitters" }),
+  ).toBeVisible();
+  await expect(dialog).toContainText("2:00 left");
+  const request = dialog.locator(".pairing-item");
+  await expect(request).toContainText("New transmitter");
+  await expect(request).toContainText("ID 776C · Signal -60 dBm");
+  await request.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(request).toContainText("waiting for the transmitter to confirm");
+  await expect(request.getByRole("button")).toHaveCount(0);
   receiver.pairing = { open: false, requests: [] };
   state.device_states.push({
     source_id: "site",
@@ -989,9 +1009,13 @@ test("one dialog pairs a transmitter by radio and names it as it appears", async
     received_at: state.generated_at,
   });
   await serve(state);
-  await dialog.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(page.locator("#toast")).toHaveText("Transmitter paired.");
-  await expect(dialog).toContainText("Paired, waiting for its first reading");
+  await page.clock.fastForward(1100);
+  await expect(dialog.locator(".pairing-item")).toContainText(
+    "Paired. Waiting for its first reading…",
+  );
+  await expect(
+    dialog.getByRole("button", { name: "Done", exact: true }),
+  ).toBeVisible();
   state.workspace.devices.push({
     id: 7,
     transport: "mqtt",
@@ -1005,16 +1029,14 @@ test("one dialog pairs a transmitter by radio and names it as it appears", async
   });
   await serve(state);
   await page.clock.fastForward(3100);
-  await expect(dialog).not.toContainText("waiting for its first reading");
-  await dialog
-    .getByRole("button", { name: "Select 000048ca433c776c", exact: true })
-    .click();
+  await expect(dialog.locator(".pairing-item")).toContainText(
+    "Paired and sending readings. Give it a name.",
+  );
+  await expect(dialog).not.toContainText("Give it a name</h3>");
+  await dialog.getByRole("button", { name: "Name it", exact: true }).click();
   await expect(dialog.getByLabel("Name")).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();
-  await expect(page.locator("#discovery-note")).toContainText(
-    "1 device available to add.",
-  );
 });
 test("revocation lives with the device name, not on the dashboard", async ({
   page,
@@ -1228,24 +1250,17 @@ test("a known transmitter asking again shows its name, not a new device", async 
   await liveDevices(page, state);
   await page.getByRole("button", { name: "Add device", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  const request = dialog.locator(".pairing-request");
+  const request = dialog.locator(".pairing-item");
   await expect(request).toContainText("Coop");
   await expect(request).toContainText("Already paired");
-  await expect(request).not.toContainText("Transmitter 776C");
-  await expect(dialog).not.toContainText("After you add it");
-  state.device_states[0].pairing.requests.push({
-    node_id: "000048ca433c9f01",
-    rssi_dbm: -70,
-    conflict: false,
-  });
-  await liveDevices(page, state);
-  await page.getByRole("button", { name: "Add device", exact: true }).click();
-  await expect(dialog).toContainText("After you add it");
-  await expect(dialog).not.toContainText("No new devices detected");
+  await expect(request).not.toContainText("New transmitter");
   state.device_states[0].availability = "offline";
   await liveDevices(page, state);
   await page.getByRole("button", { name: "Add device", exact: true }).click();
-  await expect(dialog).not.toContainText("After you add it");
+  await expect(
+    dialog.getByRole("heading", { name: "Receiver offline" }),
+  ).toBeVisible();
+  await expect(dialog.locator(".pairing-item")).toHaveCount(0);
 });
 
 test("a revoked transmitter says so instead of offering Revoke", async ({
@@ -1290,7 +1305,7 @@ test("a revoked transmitter says so instead of offering Revoke", async ({
   await page
     .getByRole("button", { name: "Pair Coop again", exact: true })
     .click();
-  await expect(page.getByRole("dialog")).toContainText("Pair by radio");
+  await expect(page.getByRole("dialog")).toContainText("Pair a transmitter");
   await page.keyboard.press("Escape");
   let archived = null;
   await page.route("**/ui-api/devices/7/archive", (route) => {

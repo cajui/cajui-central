@@ -155,16 +155,12 @@ en-US:
     register_parent: Name the device first
     name_action: Name it
     pairing:
-      heading: Pair by radio
       naming_heading: Give it a name
       no_receiver: No receiver is connected to Central. Turn a receiver on to pair devices by radio.
       offline: Offline. Turn the receiver on to pair.
       step_search: Choose Search for transmitters.
       step_button: On the transmitter, hold the PRG button for three seconds.
-      step_accept: Choose Add on the request that appears here, then give it a name.
-      searching: Searching
-      searching_left: Searching · %{time} left
-      no_requests: No requests yet.
+      step_accept: Choose Add when it appears below.
       awaiting_data: Paired, waiting for its first reading
       revoked_heading: Revoked
       revoked_note: The receiver no longer accepts these devices. Their names and history stay.
@@ -173,8 +169,22 @@ en-US:
       repair_name: Pair %{name} again
       revoked: 'Revoked: the receiver no longer accepts this transmitter. To bring it back, use Add device and hold its PRG button for three seconds.'
       known: Already paired. Adding it again pairs it anew; its name and history stay.
-      after_add: After you add it, a new device appears here to be named.
       signal: Signal %{value} dBm
+      no_receiver_title: No receiver connected
+      via: Through %{receiver}
+      offline_title: Receiver offline
+      idle_title: Pair a transmitter
+      again_title: Pair another transmitter
+      searching_title: Searching for transmitters
+      time_left: '%{time} left'
+      hold_button: On the transmitter, hold the PRG button for three seconds. It appears below.
+      id: ID %{id}
+      new_device: New transmitter
+      retry: Try again
+      done_waiting: Paired. Waiting for its first reading…
+      done_reporting: Paired and sending readings.
+      done_name: Paired and sending readings. Give it a name.
+      finish: Done
     send: Devices and sensors appear here after their first measurement.
   layout:
     help: Create sections and choose devices, complete sensors or individual measurements. Removing an item here

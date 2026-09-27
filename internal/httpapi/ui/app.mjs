@@ -108,13 +108,15 @@ function notify(text) {
     toast.id = "toast";
     toast.className = "toast";
     toast.setAttribute("role", "status");
+    // A popover sits in the top layer, so a notice stays readable above an open
+    // modal dialog instead of behind its backdrop.
+    toast.popover = "manual";
     document.body.append(toast);
   }
   toast.textContent = text;
-  toast.hidden = false;
-  toastTimer = setTimeout(() => {
-    toast.hidden = true;
-  }, 3000);
+  if (toast.matches(":popover-open")) toast.hidePopover();
+  toast.showPopover();
+  toastTimer = setTimeout(() => toast.hidePopover(), 3000);
 }
 const root = document.querySelector("#app");
 if (route === "/devices" || route === "/sensors")

@@ -23,7 +23,7 @@ import {
   offers,
   shortID,
   awaitingFirstReading,
-  pairingRequests,
+  knownDevice,
   pairingSection,
 } from "./pairing.mjs";
 
@@ -353,6 +353,25 @@ export function mountRegistry(root, { state, kind, notify }) {
       })
       .join("");
   }
+  // Steps of the pairing commands sent from the open add dialog, by node.
+  let progress = new Map();
+  function act(button, command) {
+    const node = command.node_id;
+    const known = node
+      ? knownDevice(snapshot, command.source_id, node)?.name
+      : "";
+    return commands.run(button, command, (phase, text) => {
+      if (node)
+        progress.set(node, {
+          phase,
+          text,
+          source: command.source_id,
+          name: known,
+          at: Date.parse(snapshot.generated_at),
+        });
+      renderAdd();
+    });
+  }
   // The add dialog follows the live snapshot until a form replaces its list.
   function renderAdd() {
     const dialog = addDialog;
@@ -363,20 +382,41 @@ export function mountRegistry(root, { state, kind, notify }) {
     dialog.querySelector(".dialog-body")?.remove();
     const body = document.createElement("div");
     body.className = "dialog-body";
-    if (!sensors) body.append(pairingSection(snapshot, commands.run));
-    const naming = document.createElement("section");
-    naming.className = "add-step";
-    const waiting = sensors ? [] : awaitingFirstReading(snapshot);
-    const heading = sensors
-      ? ""
-      : `<h3>${e(t("registry.pairing.naming_heading"))}</h3>`;
-    naming.innerHTML =
-      available.length || waiting.length
-        ? `${heading}<p>${message("select")}</p><ul class="add-list" aria-label="${e(message("available"))}">${availableItems()}${waiting.map((s) => `<li><span><strong>${e(t("commands.request_name", { id: shortID(s.device_id) }))}</strong><span class="muted">${e(t("registry.pairing.awaiting_data"))}</span></span></li>`).join("")}</ul>`
-        : !sensors && pairingRequests(snapshot)
-          ? `${heading}<p class="muted">${e(t("registry.pairing.after_add"))}</p>`
-          : `${heading}<div class="empty"><h3>${message("no_new")}</h3><p>${t("registry.send")}</p></div>`;
-    body.append(naming);
+    if (!sensors) body.append(pairingSection(snapshot, act, progress));
+    // Devices this dialog just paired are named from their own row above.
+    const mine = new Set(progress.keys());
+    const unnamed = available.filter(
+      (entry) => sensors || !mine.has(entry.device),
+    );
+    const waiting = sensors
+      ? []
+      : awaitingFirstReading(snapshot).filter((s) => !mine.has(s.device_id));
+    if (unnamed.length || waiting.length) {
+      const naming = document.createElement("section");
+      naming.className = "add-step";
+      const saved = available;
+      available = unnamed;
+      naming.innerHTML = `${sensors ? "" : `<h3>${e(t("registry.pairing.naming_heading"))}</h3>`}<p>${message("select")}</p><ul class="add-list" aria-label="${e(message("available"))}">${availableItems()}${waiting.map((s) => `<li><span><strong>${e(t("commands.request_name", { id: shortID(s.device_id) }))}</strong><span class="muted">${e(t("registry.pairing.awaiting_data"))}</span></span></li>`).join("")}</ul>`;
+      available = saved;
+      body.append(naming);
+    } else if (sensors) {
+      body.insertAdjacentHTML(
+        "beforeend",
+        `<div class="empty"><h3>${message("no_new")}</h3><p>${t("registry.send")}</p></div>`,
+      );
+    }
+    if ([...progress.values()].some((step) => step.phase === "applied")) {
+      const done = document.createElement("div");
+      done.className = "dialog-actions";
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "button primary";
+      close.dataset.focus = "done";
+      close.textContent = t("registry.pairing.finish");
+      close.addEventListener("click", () => dialog.close());
+      done.append(close);
+      body.append(done);
+    }
     dialog.append(body);
     for (const b of body.querySelectorAll("[data-select]"))
       b.addEventListener("click", () =>
@@ -390,6 +430,7 @@ export function mountRegistry(root, { state, kind, notify }) {
   }
   // opener names the list button that opened the dialog, which a refresh may replace.
   function openAdd(opener) {
+    progress = new Map();
     addDialog = createDialog(root, message("add"));
     const dialog = addDialog;
     dialog.addEventListener("close", () => {
