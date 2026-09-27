@@ -63,38 +63,48 @@ export function mountRegistry(root, { state, kind, notify }) {
       : null;
     return { device, group, sensor };
   }
-  // Battery, radio link and receiver of a device, from its diagnostics and state.
+  // Battery, radio link and receiver of a device, from its diagnostics and state. A
+  // value keeps its own state: an old one says so and a failed read is not "missing".
   function health(entry, group) {
-    const latest = (metric) =>
+    const none = t("dashboard.not_reported");
+    const channel = (metric) =>
       group?.diagnostics.find(
-        (c) =>
-          c.metric === metric && ["ok", "recorded", "stale"].includes(c.state),
+        (c) => c.metric === metric && c.state !== "empty",
       );
-    const battery = latest("voltage");
-    const rssi = latest("rssi");
-    const snr = latest("snr");
+    const shown = (c, text) =>
+      !c
+        ? none
+        : ["ok", "recorded"].includes(c.state)
+          ? text(c)
+          : c.state === "stale"
+            ? `${text(c)} · ${states.stale}`
+            : (states[c.state] ?? c.state);
+    const battery = channel("voltage");
+    const rssi = channel("rssi");
+    const snr = channel("snr");
     const node = deviceStateFor(
       snapshot.device_states ?? [],
       entry.source,
       entry.device,
     );
-    const none = t("dashboard.not_reported");
     return [
       [
         t("metrics.battery"),
-        e(battery ? `${formatValue(battery.value, 2)} V` : none),
+        e(shown(battery, (c) => `${formatValue(c.value, 2)} V`)),
       ],
       [
         t("registry.signal"),
         e(
-          rssi
-            ? [
-                `${formatValue(rssi.value, 0)} dBm`,
-                snr ? `SNR ${formatValue(snr.value, 1)} dB` : "",
-              ]
-                .filter(Boolean)
-                .join(" · ")
-            : none,
+          shown(rssi, (c) =>
+            [
+              `${formatValue(c.value, 0)} dBm`,
+              snr && ["ok", "recorded", "stale"].includes(snr.state)
+                ? `SNR ${formatValue(snr.value, 1)} dB`
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          ),
         ),
       ],
       [
@@ -167,10 +177,10 @@ export function mountRegistry(root, { state, kind, notify }) {
       ];
       return cells;
     });
-    list.innerHTML = `<div class="panel scroll"><table class="registry-table"><caption class="sr-only">${message("registered")}</caption><thead><tr>${rows[0].map(([label]) => `<th scope="col">${e(label)}</th>`).join("")}</tr></thead><tbody>${rows
+    list.innerHTML = `<div class="panel scroll"><table class="registry-table" role="table"><caption class="sr-only">${message("registered")}</caption><thead role="rowgroup"><tr role="row">${rows[0].map(([label]) => `<th scope="col" role="columnheader">${e(label)}</th>`).join("")}</tr></thead><tbody role="rowgroup">${rows
       .map(
         (cells) =>
-          `<tr>${cells.map(([label, html]) => `<td data-label="${e(label)}">${html}</td>`).join("")}</tr>`,
+          `<tr role="row">${cells.map(([label, html]) => `<td role="cell" data-label="${e(label)}">${html}</td>`).join("")}</tr>`,
       )
       .join("")}</tbody></table></div>`;
     for (const b of list.querySelectorAll("[data-edit]"))

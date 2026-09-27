@@ -1119,3 +1119,73 @@ test("receivers have their own page and one status line on the dashboard", async
   await page.goto("/receivers");
   await expect(page.getByText("No receivers yet")).toBeVisible();
 });
+
+test("device health shows current, old and failed diagnostics honestly", async ({
+  page,
+}) => {
+  const state = pairingSnapshot();
+  const at = new Date(Date.now() - 60000).toISOString();
+  state.samples.push({
+    source_id: "site",
+    device_id: "000048ca433c776c",
+    sample_id: "s1",
+    received_at: at,
+    expected_interval_seconds: 300,
+    readings: [
+      {
+        sensor_id: "battery",
+        metric: "voltage",
+        unit: "V",
+        value: 4.12,
+        status: "ok",
+      },
+      {
+        sensor_id: "radio",
+        metric: "rssi",
+        unit: "dBm",
+        value: -71,
+        status: "ok",
+      },
+      {
+        sensor_id: "radio",
+        metric: "snr",
+        unit: "dB",
+        value: 9.5,
+        status: "ok",
+      },
+      {
+        sensor_id: "soil",
+        metric: "voltage",
+        unit: "V",
+        value: 1.5,
+        status: "ok",
+      },
+    ],
+  });
+  state.workspace.devices.push({
+    id: 7,
+    transport: "mqtt",
+    source: "site",
+    device: "000048ca433c776c",
+    name: "Coop",
+    location: "",
+    revision: 1,
+    received_at: at,
+    interval: 300,
+  });
+  await liveDevices(page, state);
+  const row = page.getByRole("row").filter({ hasText: "Coop" });
+  await expect(row.locator('td[data-label="Battery"]')).toHaveText("4.12 V");
+  await expect(row.locator('td[data-label="Signal"]')).toHaveText(
+    "-71 dBm · SNR 9.5 dB",
+  );
+  state.samples[0].readings[0].status = "error";
+  state.samples[0].readings[0].value = null;
+  await liveDevices(page, state);
+  await expect(row.locator('td[data-label="Battery"]')).not.toHaveText(
+    "Not reported",
+  );
+  await expect(row.locator('td[data-label="Battery"]')).not.toContainText(
+    "1.5",
+  );
+});

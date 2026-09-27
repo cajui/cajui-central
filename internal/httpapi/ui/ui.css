@@ -1780,6 +1780,10 @@ cj-reading {
 .registry-table cj-badge {
   white-space: nowrap;
 }
+.registry-table td a {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 /* On a phone each row becomes a labelled block, so no column hides off-screen. */
 @media (max-width: 760px) {
   .registry-table thead {
