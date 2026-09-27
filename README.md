@@ -341,19 +341,20 @@ repository.
 
 ## Interface
 
-The sidebar separates **Dashboard**, **Devices**, and **Sensors**. Setup and display
+The sidebar separates **Dashboard**, **Devices**, **Receivers** and **Sensors**. Setup and display
 are independent: a dashboard item references a registration, not a copy of its name
 or measurements. No frontend build or additional service is needed.
 
-1. Open **Devices → Add device**. Choose an observed device, name it, and optionally
-   assign a location.
-2. Open **Sensors → Add sensor**. Choose an observed sensor; the picker shows its
-   parent device and measurement types. Its device must be registered first.
+1. Open **Devices → Add device**. Pair a transmitter by radio or choose an observed
+   device, name it, and optionally assign a location.
+2. Its sensors appear on **Sensors** and the dashboard by themselves, named after what
+   they measure (for example "Temperature and humidity"); **Edit** renames one.
 3. Open **Dashboard → Organize dashboard**. Create named sections, select devices,
    complete sensors or individual measurements, and move sections/items up or down.
    Save to persist the arrangement, or cancel to discard the draft.
 
-The automatic arrangement shows registered sensors and devices in separate sections.
+The automatic arrangement shows the sensors and devices of added devices in separate
+sections.
 An explicitly empty arrangement remains empty. Removing a dashboard item or section
 never deletes its registration or history. Names and locations can be edited; their
 stable identities remain unchanged. There is no registration deletion or telemetry

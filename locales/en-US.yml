@@ -106,7 +106,7 @@ en-US:
     details_for: Details for %{name}
   registry:
     devices:
-      description: Name the devices that send your measurements.
+      description: The devices that send your measurements.
       add: Add device
       edit: Edit device
       save: Save device
@@ -123,7 +123,7 @@ en-US:
         other: '%{count} devices available to add.'
         zero: '%{count} devices available to add.'
     sensors:
-      description: Name your sensors and see which device reports each measurement.
+      description: The sensors of your devices and what each one measures.
       add: Add sensor
       edit: Edit sensor
       save: Save sensor

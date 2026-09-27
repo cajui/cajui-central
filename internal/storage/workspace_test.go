@@ -170,14 +170,16 @@ func TestWorkspaceLayoutValidationAndConflict(t *testing.T) {
 	if err := s.SaveDevice(ctx, d, workspace.Settings{Name: "Device"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SaveLayout(ctx, layout); !errors.Is(err, workspace.ErrUnregistered) {
+	// Once its device was added, a sensor goes on the dashboard without a name of its own.
+	if err := s.SaveLayout(ctx, layout); err != nil {
 		t.Fatal(err)
 	}
+	layout.Revision = 1
 	if err := s.SaveSensor(ctx, sen, workspace.Settings{Name: "Sensor"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, bad := range []workspace.Item{{Kind: "device", DeviceID: 999}, {Kind: "sensor", SensorID: 999}, {Kind: "measurement", SensorID: sen, Metric: "missing", Unit: "degC"}} {
-		if err := s.SaveLayout(ctx, workspace.Layout{Sections: []workspace.Section{{Title: "Bad", Items: []workspace.Item{bad}}}}); !errors.Is(err, workspace.ErrNotFound) {
+		if err := s.SaveLayout(ctx, workspace.Layout{Revision: 1, Sections: []workspace.Section{{Title: "Bad", Items: []workspace.Item{bad}}}}); !errors.Is(err, workspace.ErrNotFound) {
 			t.Fatal(err)
 		}
 	}
@@ -188,17 +190,17 @@ func TestWorkspaceLayoutValidationAndConflict(t *testing.T) {
 		t.Fatal(err)
 	}
 	c = catalog(t, s)
-	if c.Layout.Revision != 1 || !reflect.DeepEqual(c.Layout.Sections, layout.Sections) {
+	if c.Layout.Revision != 2 || !reflect.DeepEqual(c.Layout.Sections, layout.Sections) {
 		t.Fatal(c.Layout)
 	}
-	if err := s.SaveLayout(ctx, workspace.Layout{Revision: 1, Sections: []workspace.Section{}}); err != nil {
+	if err := s.SaveLayout(ctx, workspace.Layout{Revision: 2, Sections: []workspace.Section{}}); err != nil {
 		t.Fatal(err)
 	}
 	c = catalog(t, s)
 	if c.Layout.Sections == nil || c.Devices[0].Name == "" || len(c.Sensors) != 1 {
 		t.Fatal("removing dashboard items changed registration")
 	}
-	if err := s.SaveLayout(ctx, workspace.Layout{Revision: 2}); err != nil {
+	if err := s.SaveLayout(ctx, workspace.Layout{Revision: 3}); err != nil {
 		t.Fatal(err)
 	}
 	if catalog(t, s).Layout.Sections != nil {

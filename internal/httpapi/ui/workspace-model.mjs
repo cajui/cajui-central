@@ -1,4 +1,4 @@
-import { t, metricLabel } from "./i18n.mjs";
+import { t, metricLabel, locale } from "./i18n.mjs";
 import {
   buildChannels,
   buildDeviceGroups,
@@ -78,8 +78,10 @@ export function workspaceGroups(state, now = Date.parse(state.generated_at)) {
       );
       Object.assign(s, {
         registryID: record?.id,
-        registered: !!record?.name,
-        name: record?.name || label(s.id),
+        // A sensor of an added device is shown whether or not it has its own name.
+        registered: !!record?.name || (!!d.name && !!record),
+        name:
+          record?.name || (record ? defaultSensorName(record) : label(s.id)),
         location: record?.location || "",
       });
       for (const c of s.channels) {
@@ -104,6 +106,36 @@ export function registeredGroups(groups) {
   return groups
     .filter((g) => g.registered)
     .map((g) => ({ ...g, sensors: g.sensors.filter((s) => s.registered) }));
+}
+// The name a sensor shows until someone gives it one: what it measures, for example
+// "Temperature and humidity". A sensor never has to be named to be shown.
+// Storage lists metrics alphabetically; climate reads temperature first.
+const metricOrder = ["temperature", "humidity"];
+export function defaultSensorName(sensor) {
+  const rank = (metric) => {
+    const i = metricOrder.indexOf(metric);
+    return i < 0 ? metricOrder.length : i;
+  };
+  const names = [
+    ...new Set(
+      (sensor?.measurements ?? [])
+        .filter((m) => !isLinkDiagnostic({ sensor: sensor.sensor, ...m }))
+        .sort((a, b) => rank(a.metric) - rank(b.metric))
+        .map((m) => metricLabel(m.metric, label(m.metric))),
+    ),
+  ];
+  if (!names.length) return label(sensor?.sensor ?? "");
+  const text = new Intl.ListFormat(locale(), { type: "conjunction" }).format(
+    names.map((n, i) => (i ? n.toLocaleLowerCase(locale()) : n)),
+  );
+  return text;
+}
+// Sensors shown on the pages: those of added (named) devices, each with a name.
+export function shownSensors(catalog) {
+  const named = new Set(catalog.devices.filter((d) => d.name).map((d) => d.id));
+  return environmentalSensors(catalog)
+    .filter((s) => named.has(s.device_id))
+    .map((s) => ({ ...s, name: s.name || defaultSensorName(s) }));
 }
 export function environmentalSensors(catalog) {
   return catalog.sensors.filter((s) =>
@@ -131,9 +163,10 @@ export function withoutRevoked(state) {
   };
 }
 export function automaticSections(catalog) {
-  const sensors = environmentalSensors(catalog)
-    .filter((s) => s.name)
-    .map((s) => ({ kind: "sensor", sensor_id: s.id }));
+  const sensors = shownSensors(catalog).map((s) => ({
+    kind: "sensor",
+    sensor_id: s.id,
+  }));
   const devices = catalog.devices
     .filter((d) => d.name)
     .map((d) => ({ kind: "device", device_id: d.id }));
@@ -151,28 +184,26 @@ export function itemChoices(catalog) {
         label: t("layout.device_choice", { name: d.name }),
         item: { kind: "device", device_id: d.id },
       })),
-    ...environmentalSensors(catalog)
-      .filter((s) => s.name)
-      .flatMap((s) => [
-        {
-          label: t("layout.sensor_choice", {
-            name: s.name,
-            device: devices.get(s.device_id)?.name,
-          }),
-          item: { kind: "sensor", sensor_id: s.id },
-        },
-        ...s.measurements
-          .filter((m) => !isLinkDiagnostic({ sensor: s.sensor, ...m }))
-          .map((m) => ({
-            label: `${metricLabel(m.metric, label(m.metric))} (${m.unit}) · ${s.name} · ${devices.get(s.device_id)?.name}`,
-            item: {
-              kind: "measurement",
-              sensor_id: s.id,
-              metric: m.metric,
-              unit: m.unit,
-            },
-          })),
-      ]),
+    ...shownSensors(catalog).flatMap((s) => [
+      {
+        label: t("layout.sensor_choice", {
+          name: s.name,
+          device: devices.get(s.device_id)?.name,
+        }),
+        item: { kind: "sensor", sensor_id: s.id },
+      },
+      ...s.measurements
+        .filter((m) => !isLinkDiagnostic({ sensor: s.sensor, ...m }))
+        .map((m) => ({
+          label: `${metricLabel(m.metric, label(m.metric))} (${m.unit}) · ${s.name} · ${devices.get(s.device_id)?.name}`,
+          item: {
+            kind: "measurement",
+            sensor_id: s.id,
+            metric: m.metric,
+            unit: m.unit,
+          },
+        })),
+    ]),
   ];
 }
 export function resolveItem(item, groups) {

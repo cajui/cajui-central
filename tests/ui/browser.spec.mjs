@@ -545,10 +545,14 @@ test("persistent registration, independent dashboard composition and safe edits"
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.setViewportSize({ width: 820, height: 1180 });
+  // Sensors come with their device: none is listed, and none can be added by hand.
   await page.goto("/sensors");
-  await page.getByRole("button", { name: "Add sensor", exact: true }).click();
-  await expect(page.getByRole("dialog")).toContainText("Name the device first");
-  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Add sensor", exact: true }),
+  ).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: /^Edit Temperature and humidity/ }),
+  ).toHaveCount(0);
   await page.goto("/devices");
   await page.getByRole("button", { name: "Add device", exact: true }).click();
   await page
@@ -560,14 +564,12 @@ test("persistent registration, independent dashboard composition and safe edits"
   await expect(
     page.getByRole("button", { name: `Edit ${deviceName}`, exact: true }),
   ).toBeVisible();
+  // Once the device was added its sensor is listed with a name from its readings.
   await page.goto("/sensors");
-  await page.getByRole("button", { name: "Add sensor", exact: true }).click();
-  const available = page
-    .getByRole("dialog")
-    .getByRole("listitem")
-    .filter({ hasText: deviceName });
-  await available
-    .getByRole("button", { name: "Select ambient", exact: true })
+  const row = page.getByRole("row").filter({ hasText: deviceName });
+  await expect(row).toContainText("Temperature and humidity");
+  await row
+    .getByRole("button", { name: "Edit Temperature and humidity", exact: true })
     .click();
   await page.getByLabel("Name", { exact: true }).fill(sensorName);
   await page.getByRole("button", { name: "Save sensor", exact: true }).click();
@@ -750,11 +752,9 @@ test("language selection persists across navigation and server-rendered pages", 
   await expect(
     page.getByRole("heading", { name: "Sensores", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Adicionar sensor", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toContainText("Adicionar sensor");
-  await page.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(
+    page.getByRole("searchbox", { name: "Buscar sensores" }),
+  ).toBeVisible();
   await page.reload();
   await expect(
     page.getByRole("combobox", { name: "Idioma", exact: true }),

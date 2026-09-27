@@ -10,7 +10,7 @@ import {
   deviceStateFor,
   receiverLabel,
 } from "./model.mjs";
-import { environmentalSensors, workspaceGroups } from "./workspace-model.mjs";
+import { shownSensors, workspaceGroups } from "./workspace-model.mjs";
 import {
   saveWorkspace,
   createDialog,
@@ -48,12 +48,14 @@ export function mountRegistry(root, { state, kind, notify }) {
   root.querySelector("#refresh").addEventListener("click", () => refresh());
   function update() {
     const catalog = snapshot.workspace;
-    entries = sensors ? environmentalSensors(catalog) : catalog.devices;
+    // Sensors come with their device: every sensor of an added device is listed, with
+    // a name from its readings until it is renamed.
+    entries = sensors ? shownSensors(catalog) : catalog.devices;
     groups = workspaceGroups(snapshot);
     devices = new Map(catalog.devices.map((d) => [d.id, d]));
     available = entries.filter((d) => !d.name);
     const note = root.querySelector("#discovery-note");
-    note.classList.toggle("hidden", !available.length);
+    note.classList.toggle("hidden", sensors || !available.length);
     note.textContent = `${message("count", { count: available.length })} ${message("discovery")}`;
   }
   function dataFor(entry) {
@@ -446,6 +448,7 @@ export function mountRegistry(root, { state, kind, notify }) {
     dialog.showModal();
   }
   root.querySelector("#add-entry").addEventListener("click", openAdd);
+  root.querySelector("#add-entry").hidden = sensors;
   async function refresh() {
     if (pending) return;
     pending = true;

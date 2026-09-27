@@ -106,7 +106,7 @@ pt-BR:
     details_for: Detalhes de %{name}
   registry:
     devices:
-      description: Dê um nome aos transmissores que enviam suas medições.
+      description: Os transmissores que enviam suas medições.
       add: Adicionar transmissor
       edit: Editar transmissor
       save: Salvar transmissor
@@ -123,7 +123,7 @@ pt-BR:
         other: '%{count} transmissores disponíveis para adicionar.'
         zero: '%{count} transmissores disponíveis para adicionar.'
     sensors:
-      description: Dê um nome aos sensores e veja qual transmissor envia cada medição.
+      description: Os sensores dos seus transmissores e o que cada um mede.
       add: Adicionar sensor
       edit: Editar sensor
       save: Salvar sensor
