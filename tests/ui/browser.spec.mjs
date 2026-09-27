@@ -1055,8 +1055,53 @@ test("revocation lives with the device name, not on the dashboard", async ({
     }),
   );
   await page.goto("/");
-  await expect(page.locator(".receiver-card")).toHaveCount(1);
+  await expect(page.locator(".receiver-status")).toHaveCount(1);
   await expect(
     page.getByRole("button", { name: "Search for transmitters" }),
   ).toHaveCount(0);
+});
+
+test("receivers have their own page and one status line on the dashboard", async ({
+  page,
+}) => {
+  const state = pairingSnapshot();
+  state.device_states[0].queue = { depth: 0, capacity: 128 };
+  state.device_states[0].firmware = { version: "1.2.0", state: "valid" };
+  const inject = async (path, snapshot) => {
+    const html = await (await page.request.get(`${path}?lang=en-US`)).text();
+    await page.route(`**${path}`, (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: html.replace(
+          /(<script type="application\/json" id="initial-state">)[\s\S]*?(<\/script>)/,
+          `$1${JSON.stringify(snapshot).replaceAll("<", "\\u003c")}$2`,
+        ),
+      }),
+    );
+  };
+  await inject("/receivers", state);
+  await page.goto("/receivers");
+  await expect(
+    page.getByRole("heading", { name: "Receivers", exact: true, level: 1 }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Receivers" }).first(),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(page.locator(".receiver-card")).toContainText("Receiver 5E10");
+  await expect(page.locator(".receiver-card")).toContainText("0 of 128");
+  const offline = structuredClone(state);
+  offline.device_states[0].availability = "offline";
+  await inject("/", offline);
+  await page.goto("/");
+  const line = page.locator(".receiver-status");
+  await expect(line).toHaveCount(1);
+  await expect(line).toHaveAttribute("href", "/receivers");
+  await expect(line).toContainText("Offline");
+  await expect(line).toContainText("Check the receiver's power and Wi-Fi");
+  await expect(page.locator(".receiver-card")).toHaveCount(0);
+  const empty = pairingSnapshot();
+  empty.device_states = [];
+  await inject("/receivers", empty);
+  await page.goto("/receivers");
+  await expect(page.getByText("No receivers yet")).toBeVisible();
 });

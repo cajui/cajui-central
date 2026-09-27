@@ -3,16 +3,17 @@ import "./components.mjs";
 import { icon, mark } from "./icons.mjs";
 import { mountDashboard } from "./dashboard.mjs";
 import { mountRegistry } from "./registry.mjs";
+import { mountReceivers } from "./receivers.mjs";
 const state = JSON.parse(document.querySelector("#initial-state").textContent);
 setLocale(state.locale ?? document.documentElement.lang);
 document.documentElement.lang = locale();
 const route = location.pathname;
 const title =
-  route === "/devices"
-    ? t("common.devices")
-    : route === "/sensors"
-      ? t("common.sensors")
-      : t("common.dashboard");
+  {
+    "/devices": t("common.devices"),
+    "/receivers": t("common.receivers"),
+    "/sensors": t("common.sensors"),
+  }[route] ?? t("common.dashboard");
 
 try {
   const theme = localStorage.getItem("cajui-theme");
@@ -25,6 +26,7 @@ const sidebar = document.querySelector("#sidebar");
 sidebar.innerHTML = `<a class="wordmark" href="/" aria-label="${t("nav.home")}">${mark()}<span>Cajuí<small>Central</small></span></a><p class="eyebrow sidebar-label">${t("nav.workspace")}</p><nav class="nav" aria-label="${t("nav.workspace")}">${[
   ["/", t("common.dashboard"), "overview"],
   ["/devices", t("common.devices"), "device"],
+  ["/receivers", t("common.receivers"), "signal"],
   ["/sensors", t("common.sensors"), "temperature"],
 ]
   .map(
@@ -106,5 +108,6 @@ function notify(text) {
 const root = document.querySelector("#app");
 if (route === "/devices" || route === "/sensors")
   mountRegistry(root, { state, kind: route.slice(1), notify });
+else if (route === "/receivers") mountReceivers(root, { state });
 else mountDashboard(root, { state, notify });
 document.documentElement.classList.add("ready");

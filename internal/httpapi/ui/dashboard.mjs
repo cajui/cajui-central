@@ -9,8 +9,6 @@ import {
   states,
   receiverLabel,
   deviceStateFor,
-  firmwareText,
-  uptimeText,
   receiverSummary,
   linkText,
 } from "./model.mjs";
@@ -23,6 +21,7 @@ import {
 } from "./workspace-model.mjs";
 import { openLayoutEditor } from "./layout-editor.mjs";
 import { fetchSnapshot } from "./snapshot-api.mjs";
+import { receiverStatusLine } from "./receivers.mjs";
 
 // A value the firmware reported that this version has no text for.
 function known(key, fallback) {
@@ -42,7 +41,7 @@ export function mountDashboard(root, { state = {}, notify }) {
   root.innerHTML = `<header class="page-heading"><div><h1>${t("common.dashboard")}</h1><p>${t("dashboard.description")}</p></div><div class="top-actions"><button class="button" id="organize">${t("dashboard.organize")}</button><button class="button" id="export">${icon("download")}${t("dashboard.export")}</button><button class="button primary" id="refresh">${icon("refresh")}${t("common.refresh")}</button></div></header>
     <div id="fetch-error" class="notice hidden" role="status"></div>
     <section id="summary" class="device-summary" aria-label="${t("dashboard.summary")}"></section>
-    <section id="receivers" class="receiver-strip" aria-label="${t("receivers.heading")}" hidden></section>
+    <nav id="receivers" class="receiver-status-list" aria-label="${t("receivers.heading")}" hidden></nav>
     <div class="toolbar"><div class="segmented" aria-label="${t("dashboard.filter")}"><button data-filter="all" aria-pressed="true">${t("dashboard.all")}</button><button data-filter="attention" aria-pressed="false">${t("dashboard.attention")}</button></div><label class="search">${icon("search")}<span class="sr-only">${t("dashboard.search_label")}</span><input id="search" type="search" placeholder="${t("dashboard.search")}" autocomplete="off"></label></div>
     <section id="devices" class="device-groups" aria-label="${t("dashboard.items")}"></section>
     <section class="panel history-panel" id="history-panel" hidden><div class="panel-heading"><div><h2 id="history-heading" tabindex="-1">${t("common.history")}</h2><p id="history-context"></p></div><label><span class="sr-only">${t("dashboard.period")}</span><select id="period" class="input"><option value="24">${t("dashboard.hours24")}</option><option value="6">${t("dashboard.hours6")}</option><option value="1">${t("dashboard.hour")}</option><option value="0">${t("dashboard.all_data")}</option></select></label></div><label for="metric-select">${t("common.measurement")}</label><select id="metric-select" class="input"></select><cj-chart id="history"></cj-chart><div class="plot-footer"><span class="legend" id="chart-legend"></span><span id="plot-count"></span></div></section>
@@ -106,78 +105,7 @@ export function mountDashboard(root, { state = {}, notify }) {
     const target = root.querySelector("#receivers");
     const list = receivers();
     target.hidden = !list.length;
-    target.innerHTML = list.length
-      ? `<h2>${t("receivers.heading")}</h2><div class="receiver-items"></div>`
-      : "";
-    const now = Date.parse(snapshot.generated_at);
-    for (const r of list) {
-      const summary = receiverSummary(r);
-      const transmitters = (snapshot.device_states ?? []).filter(
-        (s) =>
-          s.role === "transmitter" &&
-          s.source_id === r.source_id &&
-          s.receiver_id === r.device_id &&
-          s.binding !== "revoked",
-      ).length;
-      const wifi = r.wifi?.rssi_dbm;
-      const rows = [
-        [t("receivers.firmware"), firmwareText(r.firmware)],
-        [t("receivers.uptime"), uptimeText(r.uptime_s)],
-        [
-          t("receivers.wifi"),
-          typeof wifi === "number"
-            ? `${formatValue(wifi, 0)} dBm`
-            : t("common.unknown"),
-        ],
-        [
-          t("receivers.queue"),
-          r.queue && typeof r.queue.depth === "number"
-            ? t("receivers.queue_value", {
-                depth: formatValue(r.queue.depth, 0),
-                capacity: formatValue(r.queue.capacity, 0),
-              })
-            : t("common.unknown"),
-        ],
-        [
-          t("receivers.forwarded"),
-          typeof r.forwarding?.published === "number"
-            ? t("receivers.readings", {
-                count: r.forwarding.published,
-              })
-            : t("common.unknown"),
-        ],
-        [
-          t("receivers.retries"),
-          typeof r.forwarding?.retries === "number"
-            ? formatValue(r.forwarding.retries, 0)
-            : t("common.unknown"),
-        ],
-        [
-          t("receivers.reset"),
-          r.reset_reason
-            ? known(
-                `receivers.reset_reasons.${r.reset_reason}`,
-                t("receivers.reset_reasons.other"),
-              )
-            : t("common.unknown"),
-        ],
-        [
-          t("receivers.availability_changed"),
-          // A retained snapshot's time is when Central connected, not when it changed.
-          r.availability_at && !r.availability_retained
-            ? age(r.availability_at, now)
-            : t("common.unknown"),
-        ],
-      ];
-      const badge = { online: "ok", offline: "error", unknown: "empty" }[
-        summary.status
-      ];
-      const card = document.createElement("article");
-      card.className = "panel receiver-card";
-      card.dataset.status = summary.status;
-      card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("signal")}</span><div><h3>${e(receiverLabel(r.device_id))}</h3><p class="muted">${e(t("receivers.transmitters", { count: transmitters }))}</p></div><span class="badge" data-state="${badge}">${e(t(`receivers.${summary.status}`))}</span></div>${summary.notices.length ? `<ul class="receiver-notices">${summary.notices.map((n) => `<li data-level="${n.level}">${n.level === "info" ? "" : icon("alert")}<span>${e(n.text)}</span></li>`).join("")}</ul>` : ""}<dl class="detail-list receiver-details">${rows.map(([k, v]) => `<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join("")}</dl>`;
-      target.querySelector(".receiver-items").append(card);
-    }
+    target.replaceChildren(...list.map(receiverStatusLine));
   }
   function matchingGroups() {
     const search = query.trim().toLowerCase();

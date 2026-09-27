@@ -1987,12 +1987,49 @@ cj-reading {
 }
 
 /* Receivers: cajui-firmware management state (connection, queue, firmware). */
-.receiver-strip {
-  margin-top: var(--space-6);
+/* On the dashboard a receiver is one line; its card lives on the receivers page. */
+.receiver-status-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
 }
-.receiver-strip > h2 {
-  font-size: var(--text-label);
-  margin-bottom: var(--space-3);
+.receiver-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: var(--text-detail);
+}
+.receiver-status:hover {
+  border-color: var(--muted);
+}
+.receiver-status svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.receiver-status[data-status="error"],
+.receiver-status[data-status="offline"] {
+  flex-basis: 100%;
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.receiver-status[data-status="warning"] {
+  flex-basis: 100%;
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.receiver-status-note {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
 }
 .receiver-items {
   display: grid;
