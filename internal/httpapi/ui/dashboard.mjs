@@ -60,7 +60,11 @@ export function mountDashboard(root, { state = {}, notify }) {
     for (const c of channels) {
       c.updated = age(c.at, now);
       if (c.metric === "co2") c.title = t("metrics.co2");
-      if (isLinkDiagnostic(c)) c.title = c.metric.toUpperCase();
+      if (isLinkDiagnostic(c))
+        c.title =
+          c.sensor === "battery"
+            ? t("metrics.battery")
+            : c.metric.toUpperCase();
     }
     if (!channels.some((c) => c.key === selected)) selected = "";
     // A transmitter whose receiver is offline cannot report: that needs attention too.

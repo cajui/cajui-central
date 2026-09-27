@@ -51,7 +51,7 @@ func TestDiagnostics(t *testing.T) {
 	for _, tc := range []struct {
 		s, m, u string
 		want    bool
-	}{{"radio", "rssi", "dBm", true}, {"radio", "snr", "dB", true}, {"ambient", "snr", "dB", false}, {"radio", "snr", "other", false}, {"radio", "other", "dBm", false}} {
+	}{{"radio", "rssi", "dBm", true}, {"radio", "snr", "dB", true}, {"ambient", "snr", "dB", false}, {"radio", "snr", "other", false}, {"radio", "other", "dBm", false}, {"battery", "voltage", "V", true}, {"battery", "voltage", "mV", false}, {"ambient", "voltage", "V", false}} {
 		if IsDiagnostic(tc.s, tc.m, tc.u) != tc.want {
 			t.Fatal(tc)
 		}

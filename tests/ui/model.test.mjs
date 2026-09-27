@@ -237,6 +237,14 @@ test("device groups keep physical sensors together and isolate radio diagnostics
     isLinkDiagnostic({ sensor: "radio", metric: "rssi", unit: "V" }),
     false,
   );
+  assert.equal(
+    isLinkDiagnostic({ sensor: "battery", metric: "voltage", unit: "V" }),
+    true,
+  );
+  assert.equal(
+    isLinkDiagnostic({ sensor: "ambient", metric: "voltage", unit: "V" }),
+    false,
+  );
   const independent = buildChannels(
     {
       samples: [sample, { ...sample, source_id: "source-b" }],

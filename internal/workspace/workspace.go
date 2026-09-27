@@ -118,7 +118,9 @@ func (l Layout) Validate() error {
 	return nil
 }
 
-// IsDiagnostic matches only the established link-diagnostic convention.
+// IsDiagnostic matches only the established device-diagnostic conventions of cajui-firmware:
+// the receiver's measurement of the radio link and the node's own battery voltage.
 func IsDiagnostic(sensor, metric, unit string) bool {
-	return sensor == "radio" && (metric == "rssi" && unit == "dBm" || metric == "snr" && unit == "dB")
+	return sensor == "radio" && (metric == "rssi" && unit == "dBm" || metric == "snr" && unit == "dB") ||
+		sensor == "battery" && metric == "voltage" && unit == "V"
 }
