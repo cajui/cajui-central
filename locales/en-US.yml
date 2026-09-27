@@ -112,8 +112,8 @@ en-US:
       save: Save device
       search: Search devices
       discovery: Choose Add device to name them.
-      empty: No named devices yet
-      choose: Choose Add device to select one from the available devices.
+      empty: No devices added yet
+      choose: Choose Add device to pair the first one by radio.
       registered: Named devices
       select: Select a detected device to give it a name.
       available: Available devices
@@ -129,8 +129,8 @@ en-US:
       save: Save sensor
       search: Search sensors
       discovery: Available sensors come from received measurements; name their device first.
-      empty: No named sensors yet
-      choose: Choose Add sensor to select one from the available sensors.
+      empty: No sensors yet
+      choose: Sensors appear here when an added device sends measurements.
       registered: Named sensors
       select: Select a detected sensor to give it a name.
       available: Available sensors

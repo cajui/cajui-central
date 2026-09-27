@@ -112,8 +112,8 @@ pt-BR:
       save: Salvar transmissor
       search: Buscar transmissores
       discovery: Escolha Adicionar transmissor para dar um nome a eles.
-      empty: Nenhum transmissor com nome ainda
-      choose: Escolha Adicionar transmissor para selecionar um dos transmissores disponíveis.
+      empty: Nenhum transmissor adicionado
+      choose: Toque em Adicionar transmissor para parear o primeiro pelo rádio.
       registered: Transmissores com nome
       select: Selecione um transmissor detectado para dar um nome a ele.
       available: Transmissores disponíveis
@@ -129,8 +129,8 @@ pt-BR:
       save: Salvar sensor
       search: Buscar sensores
       discovery: Os sensores disponíveis vêm das medições recebidas; dê um nome primeiro ao transmissor correspondente.
-      empty: Nenhum sensor com nome ainda
-      choose: Escolha Adicionar sensor para selecionar um dos sensores disponíveis.
+      empty: Nenhum sensor ainda
+      choose: Os sensores aparecem aqui quando um transmissor adicionado envia medições.
       registered: Sensores com nome
       select: Selecione um sensor detectado para dar um nome a ele.
       available: Sensores disponíveis
