@@ -161,6 +161,9 @@ en-US:
       searching_left: Searching · %{time} left
       no_requests: No requests yet.
       awaiting_data: Paired, waiting for its first reading
+      revoked: 'Revoked: the receiver no longer accepts this transmitter. To bring it back, use Add device and hold its PRG button for three seconds.'
+      known: Already paired. Adding it again pairs it anew; its name and history stay.
+      after_add: After you add it, a new device appears here to be named.
       signal: Signal %{value} dBm
     send: Devices and sensors appear here after their first measurement.
   layout:

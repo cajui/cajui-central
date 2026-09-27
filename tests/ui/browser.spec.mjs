@@ -1204,3 +1204,81 @@ test("the theme follows the system until one is chosen", async ({ page }) => {
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });
+
+test("a known transmitter asking again shows its name, not a new device", async ({
+  page,
+}) => {
+  const state = pairingSnapshot();
+  state.device_states[0].pairing = {
+    open: true,
+    remaining_s: 90,
+    requests: [{ node_id: "000048ca433c776c", rssi_dbm: -82, conflict: false }],
+  };
+  state.workspace.devices.push({
+    id: 7,
+    transport: "mqtt",
+    source: "site",
+    device: "000048ca433c776c",
+    name: "Coop",
+    location: "",
+    revision: 1,
+    received_at: state.generated_at,
+    interval: 300,
+  });
+  await liveDevices(page, state);
+  await page.getByRole("button", { name: "Add device", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  const request = dialog.locator(".pairing-request");
+  await expect(request).toContainText("Coop");
+  await expect(request).toContainText("Already paired");
+  await expect(request).not.toContainText("Transmitter 776C");
+  await expect(dialog).not.toContainText("After you add it");
+  state.device_states[0].pairing.requests.push({
+    node_id: "000048ca433c9f01",
+    rssi_dbm: -70,
+    conflict: false,
+  });
+  await liveDevices(page, state);
+  await page.getByRole("button", { name: "Add device", exact: true }).click();
+  await expect(dialog).toContainText("After you add it");
+  await expect(dialog).not.toContainText("No new devices detected");
+  state.device_states[0].availability = "offline";
+  await liveDevices(page, state);
+  await page.getByRole("button", { name: "Add device", exact: true }).click();
+  await expect(dialog).not.toContainText("After you add it");
+});
+
+test("a revoked transmitter says so instead of offering Revoke", async ({
+  page,
+}) => {
+  const state = pairingSnapshot();
+  state.device_states.push({
+    source_id: "site",
+    device_id: "000048ca433c776c",
+    role: "transmitter",
+    receiver_id: "000048ca433c5e10",
+    binding: "revoked",
+    received_at: state.generated_at,
+  });
+  state.workspace.devices.push({
+    id: 7,
+    transport: "mqtt",
+    source: "site",
+    device: "000048ca433c776c",
+    name: "Coop",
+    location: "",
+    revision: 1,
+    received_at: state.generated_at,
+    interval: 300,
+  });
+  await liveDevices(page, state);
+  const row = page.getByRole("row").filter({ hasText: "Coop" });
+  await expect(row.locator('td[data-label="Receiver"]')).toHaveText(
+    "Receiver 5E10 · Revoked",
+  );
+  await page.getByRole("button", { name: "Edit Coop", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText("Revoked: the receiver");
+  await expect(
+    page.getByRole("button", { name: "Revoke transmitter" }),
+  ).toHaveCount(0);
+});
