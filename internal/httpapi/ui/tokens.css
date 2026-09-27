@@ -95,3 +95,42 @@
   --light-soft: #403820;
   --shadow: none;
 }
+/* Before app.mjs runs, a dark system gets dark tokens too, so the first paint does not
+   flash light; the explicit attribute wins once set. Keep both blocks in step. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --canvas: #141e19;
+    --surface: #1c2922;
+    --surface-alt: #25352c;
+    --ink: #ecf3e9;
+    --muted: #b4c2b6;
+    --line: #3b4d40;
+    --brand: #aed5b6;
+    --brand-hover: #cee8d0;
+    --brand-soft: #2a4234;
+    --on-brand: #14271c;
+    --good: #b2dcbc;
+    --good-soft: #28412f;
+    --warning: #f3d18f;
+    --warning-soft: #423721;
+    --danger: #f3b4ad;
+    --danger-soft: #452c2a;
+    --info: #b0d7ee;
+    --info-soft: #263b47;
+    --plot: #a6d4b4;
+    --plot-secondary: #9fcce8;
+    --focus: #b3d8bc;
+    --temperature: #ffba87;
+    --temperature-soft: #442d20;
+    --humidity: #8cd3f6;
+    --humidity-soft: #213c4b;
+    --air: #cfb5fb;
+    --air-soft: #372b49;
+    --soil: #c2d994;
+    --soil-soft: #313d23;
+    --light: #f2d879;
+    --light-soft: #403820;
+    --shadow: none;
+  }
+}

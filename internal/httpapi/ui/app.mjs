@@ -15,13 +15,17 @@ const title =
     "/sensors": t("common.sensors"),
   }[route] ?? t("common.dashboard");
 
+// A theme chosen with the toggle wins; until then the page follows the system.
+let chosenTheme = null;
 try {
   const theme = localStorage.getItem("cajui-theme");
-  if (theme === "dark" || theme === "light")
-    document.documentElement.dataset.theme = theme;
+  if (theme === "dark" || theme === "light") chosenTheme = theme;
 } catch {
   /* Storage is optional. */
 }
+const systemDark = matchMedia("(prefers-color-scheme: dark)");
+document.documentElement.dataset.theme =
+  chosenTheme ?? (systemDark.matches ? "dark" : "light");
 const sidebar = document.querySelector("#sidebar");
 sidebar.innerHTML = `<a class="wordmark" href="/" aria-label="${t("nav.home")}">${mark()}<span>Cajuí<small>Central</small></span></a><p class="eyebrow sidebar-label">${t("nav.workspace")}</p><nav class="nav" aria-label="${t("nav.workspace")}">${[
   ["/", t("common.dashboard"), "overview"],
@@ -85,6 +89,13 @@ themeButton.addEventListener("click", () => {
   } catch {
     /* Theme still works without storage. */
   }
+  chosenTheme = theme;
+  themeLabel();
+  window.dispatchEvent(new Event("cajui-theme"));
+});
+systemDark.addEventListener("change", (event) => {
+  if (chosenTheme) return;
+  document.documentElement.dataset.theme = event.matches ? "dark" : "light";
   themeLabel();
   window.dispatchEvent(new Event("cajui-theme"));
 });
