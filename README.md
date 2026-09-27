@@ -102,7 +102,7 @@ go tool cover -html=coverage.out   # coverage report, after make check
 All `/api` routes require `Authorization: Bearer <CAJUI_API_TOKEN>`.
 
 - `GET /healthz`: 200 when the database is reachable, 503 otherwise.
-- `GET /`, `/devices`, `/sensors`: local workspace pages (no login, loopback hosts only).
+- `GET /`, `/devices`, `/receivers`, `/sensors`: local workspace pages (no login, loopback hosts only).
 - `GET /api/v1/readings`: JSON list, most recently received first.
 - `GET /api/v1/device-states`: latest [device state](#device-state) per device.
 - `POST /ui-api/commands`, `GET /ui-api/commands/{id}`: [device commands](#device-commands)
@@ -227,7 +227,9 @@ until a live message replaces it. An empty message on either topic, which clears
 retained topic, removes that state or availability. A device seen under several sources
 has moved; only its most recent state is listed. State is not telemetry and never enters
 sample history.
-Central has no write access to these topics.
+Central has no write access to these topics. The receivers page shows each receiver's
+state; the dashboard keeps one status line per receiver, highlighted when it is offline
+or has a queue or dropped-sample notice.
 
 The generated ACL lets each producer write `manage/v1/<source_id>/+/availability`,
 `.../state` and `.../results` and read `.../commands`; Central and `homeassistant` read

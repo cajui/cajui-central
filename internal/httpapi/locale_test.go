@@ -63,7 +63,7 @@ func TestRequestLocale(t *testing.T) {
 
 func TestLocalizedPagesAndSnapshot(t *testing.T) {
 	h := testHandler(t)
-	for _, route := range []string{"/", "/devices", "/sensors"} {
+	for _, route := range []string{"/", "/devices", "/receivers", "/sensors"} {
 		for _, language := range []string{"pt-BR", "en-US"} {
 			w := request(h, "GET", route+"?lang="+language, "", "", "")
 			if w.Code != 200 || w.Header().Get("Content-Language") != language {

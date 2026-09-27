@@ -3,6 +3,7 @@ pt-BR:
   common:
     dashboard: Painel
     devices: Transmissores
+    receivers: Receptores
     sensors: Sensores
     device: Transmissor
     measurement: Medição
@@ -279,6 +280,9 @@ pt-BR:
       zero: '%{count} segundos'
   receivers:
     heading: Receptores
+    description: Conexão, fila e firmware de cada receptor.
+    empty: Nenhum receptor ainda
+    empty_hint: Um receptor aparece aqui assim que se conecta ao broker.
     name: Receptor %{id}
     online: Conectado
     offline: Sem conexão

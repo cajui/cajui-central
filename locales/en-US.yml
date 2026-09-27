@@ -3,6 +3,7 @@ en-US:
   common:
     dashboard: Dashboard
     devices: Devices
+    receivers: Receivers
     sensors: Sensors
     device: Device
     measurement: Measurement
@@ -276,6 +277,9 @@ en-US:
       zero: '%{count} seconds'
   receivers:
     heading: Receivers
+    description: Connection, queue and firmware of each receiver.
+    empty: No receivers yet
+    empty_hint: A receiver appears here once it connects to the broker.
     name: Receiver %{id}
     online: Online
     offline: Offline

@@ -65,6 +65,7 @@ func New(repo Repository, token string, logger *slog.Logger, options ...Option) 
 	mux.HandleFunc("GET /{$}", s.localPage(s.index))
 	mux.HandleFunc("GET /devices", s.localPage(s.index))
 	mux.HandleFunc("GET /sensors", s.localPage(s.index))
+	mux.HandleFunc("GET /receivers", s.localPage(s.index))
 	mux.HandleFunc("PUT /ui-api/{kind}/{id}", s.editWorkspace)
 	mux.HandleFunc("GET /ui/{path...}", serveUIAsset)
 	mux.HandleFunc("POST /ui-api/commands", s.localPage(s.sendCommand))
@@ -156,6 +157,9 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.URL.Path == "/sensors" {
 		title = "common.sensors"
+	}
+	if r.URL.Path == "/receivers" {
+		title = "common.receivers"
 	}
 	if err = dashboard.Execute(w, dashboardPage{Title: catalogs[language][title], Route: r.URL.Path, State: dashboardState{Locale: language, Readings: readings, Samples: samples, Devices: devices, DeviceStates: states, Workspace: &catalog, UIToken: s.uiToken, GeneratedAt: time.Now().UTC()}}); err != nil {
 		s.logger.Error("render dashboard", "error", err)
