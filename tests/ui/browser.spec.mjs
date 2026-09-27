@@ -961,6 +961,9 @@ test("one dialog pairs a transmitter by radio and names it as it appears", async
   await expect(dialog).toContainText("Pair by radio");
   await expect(dialog).toContainText("hold the PRG button");
   await expect(dialog).toContainText("No new devices detected");
+  await expect(dialog).toContainText(
+    "Devices and sensors appear here after their first measurement.",
+  );
   const receiver = state.device_states[0];
   receiver.pairing = {
     open: true,
