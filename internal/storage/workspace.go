@@ -224,7 +224,11 @@ func (s *Store) saveSettings(ctx context.Context, table string, id int64, settin
 	if id <= 0 {
 		return workspace.ErrInvalid
 	}
-	if err := settings.Validate(); err != nil {
+	validate := settings.Validate
+	if table == "workspace_sensors" {
+		validate = settings.ValidateSensor
+	}
+	if err := validate(); err != nil {
 		return err
 	}
 	tx, err := s.db.BeginTx(ctx, nil)

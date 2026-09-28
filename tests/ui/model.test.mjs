@@ -711,10 +711,16 @@ test("an unnamed sensor of an added device is shown with a name from its reading
     ],
   };
   assert.deepEqual(
-    shownSensors(catalog).map((s) => [s.id, s.name]),
+    shownSensors(catalog).map((s) => [s.id, s.name, s.stored]),
     [
-      [1, "Temperature and humidity"],
-      [2, "Ambient"],
+      [1, "Temperature and humidity", ""],
+      [2, "Ambient", "Ambient"],
     ],
   );
+  // Two unnamed probes of one device measuring the same thing are told apart.
+  catalog.sensors.push({ ...climate, id: 5, sensor: "dht22_b" });
+  const names = shownSensors(catalog)
+    .filter((s) => !s.stored)
+    .map((s) => s.name);
+  assert.equal(new Set(names).size, 2);
 });

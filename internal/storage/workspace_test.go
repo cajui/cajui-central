@@ -85,6 +85,17 @@ func TestWorkspaceInventoryNamesAndPersistence(t *testing.T) {
 	if err = s.SaveSensor(ctx, sen.ID, workspace.Settings{Name: "Renamed", Revision: 1}); err != nil {
 		t.Fatal(err)
 	}
+	// A sensor's own name is optional: clearing it returns to the name built from its
+	// readings. A device still needs one.
+	if err = s.SaveSensor(ctx, sen.ID, workspace.Settings{Location: "Shelf", Revision: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if got := catalog(t, s).Sensors[0]; got.Name != "" || got.Location != "Shelf" {
+		t.Fatal(got)
+	}
+	if err = s.SaveDevice(ctx, d.ID, workspace.Settings{Revision: 1}); !errors.Is(err, workspace.ErrInvalid) {
+		t.Fatal(err)
+	}
 	var count int
 	if err = s.db.QueryRow(`SELECT COUNT(*) FROM readings`).Scan(&count); err != nil || count != 106 {
 		t.Fatal(count, err)

@@ -68,15 +68,15 @@ function commandButton(label, command, act, primary) {
   button.addEventListener("click", () => act(button, command));
   return button;
 }
-function stage(kind, title, body) {
+function stage(kind, title, body, id = "pairing-heading") {
   const box = document.createElement("div");
   box.className = "pairing-stage";
   box.dataset.stage = kind;
-  box.innerHTML = `<h3 id="pairing-heading">${e(title)}</h3>${body}`;
+  box.innerHTML = `<h3 id="${id}">${e(title)}</h3>${body}`;
   return box;
 }
 // One transmitter in the flow: a request to add, one being added, or one just added.
-function item(title, meta, note, status) {
+function item(title, meta, note, status, focus) {
   const li = document.createElement("li");
   li.className = "pairing-item";
   li.innerHTML = `<span class="pairing-item-text"><strong>${e(title)}</strong>${meta ? `<span class="muted">${e(meta)}</span>` : ""}${note ? `<span class="muted">${e(note)}</span>` : ""}</span>`;
@@ -86,6 +86,12 @@ function item(title, meta, note, status) {
       "beforeend",
       `<span class="pairing-progress" role="status">${status.phase === "applied" ? icon("check") : ""}<span>${e(status.text)}</span></span>`,
     );
+    // While busy the row has no button; its status keeps focus instead of the body.
+    if (focus) {
+      const progress = li.querySelector(".pairing-progress");
+      progress.tabIndex = -1;
+      progress.dataset.focus = focus;
+    }
   }
   return li;
 }
@@ -108,7 +114,11 @@ export function pairingSection(snapshot, act, progress = new Map()) {
     return section;
   }
   const now = Date.parse(snapshot.generated_at);
-  for (const r of receivers) {
+  // Progress is kept per receiver and node: two receivers of one source may hear the
+  // same transmitter.
+  const stepFor = (r, node) => progress.get(`${r.device_id}/${node}`);
+  receivers.forEach((r, index) => {
+    const headingID = index ? `pairing-heading-${index}` : "pairing-heading";
     const status = receiverSummary(r).status;
     const badge = { online: "ok", offline: "error", unknown: "empty" }[status];
     section.insertAdjacentHTML(
@@ -122,12 +132,13 @@ export function pairingSection(snapshot, act, progress = new Map()) {
           "offline",
           t("registry.pairing.offline_title"),
           `<p>${e(t("registry.pairing.offline"))}</p>`,
+          headingID,
         ),
       );
     } else if (!r.pairing?.open) {
       // After a pairing here the steps are known; offer another one without them.
       const again = [...progress.values()].some(
-        (step) => step.phase === "applied" && step.source === r.source_id,
+        (step) => step.phase === "applied" && step.receiver === r.device_id,
       );
       const box = stage(
         "idle",
@@ -139,6 +150,7 @@ export function pairingSection(snapshot, act, progress = new Map()) {
         again
           ? ""
           : `<ol class="pairing-steps">${["step_search", "step_button", "step_accept"].map((k) => `<li>${e(t(`registry.pairing.${k}`))}</li>`).join("")}</ol>`,
+        headingID,
       );
       box.append(
         commandButton(
@@ -155,6 +167,7 @@ export function pairingSection(snapshot, act, progress = new Map()) {
         "searching",
         t("registry.pairing.searching_title"),
         `${left === null ? "" : `<p class="pairing-clock">${e(t("registry.pairing.time_left", { time: clockText(left) }))}</p>`}<p>${e(t("registry.pairing.hold_button"))}</p>`,
+        headingID,
       );
       box.append(
         commandButton(
@@ -173,7 +186,7 @@ export function pairingSection(snapshot, act, progress = new Map()) {
     for (const request of status === "online" && r.pairing?.open
       ? (r.pairing.requests ?? [])
       : []) {
-      const step = progress.get(request.node_id);
+      const step = stepFor(r, request.node_id);
       if (step?.phase === "applied") continue;
       shown.add(request.node_id);
       const known = knownDevice(snapshot, r.source_id, request.node_id);
@@ -197,6 +210,7 @@ export function pairingSection(snapshot, act, progress = new Map()) {
             ? t("registry.pairing.known")
             : "",
         step ? { phase: step.phase, text: step.text } : null,
+        ["pairing.accept", r.source_id, r.device_id, request.node_id].join("/"),
       );
       if (!busy) {
         const add = commandButton(
@@ -212,8 +226,9 @@ export function pairingSection(snapshot, act, progress = new Map()) {
       }
       list.append(li);
     }
-    for (const [node, step] of progress) {
-      if (shown.has(node) || step.source !== r.source_id) continue;
+    for (const step of progress.values()) {
+      const node = step.node;
+      if (shown.has(node) || step.receiver !== r.device_id) continue;
       if (step.phase !== "applied" && step.phase !== "failed") continue;
       const device = knownDevice(snapshot, r.source_id, node);
       const reporting =
@@ -244,6 +259,6 @@ export function pairingSection(snapshot, act, progress = new Map()) {
       list.append(li);
     }
     if (list.children.length) section.append(list);
-  }
+  });
   return section;
 }

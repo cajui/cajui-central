@@ -84,7 +84,7 @@ pt-BR:
     no_items: Nenhum item corresponde ao filtro nesta seção.
     section_empty: Nada para mostrar nesta seção.
     make_yours: Personalize seu painel
-    get_started: Dê um nome aos seus transmissores e sensores e escolha o que mostrar aqui.
+    get_started: Adicione seus transmissores e escolha o que mostrar aqui.
     manage_devices: Gerenciar transmissores
     manage_sensors: Gerenciar sensores
     inspect: 'Ver %{measurement}: %{value} %{unit}, %{status}, sensor %{sensor}, transmissor %{device}'
@@ -131,7 +131,7 @@ pt-BR:
       discovery: Os sensores disponíveis vêm das medições recebidas; dê um nome primeiro ao transmissor correspondente.
       empty: Nenhum sensor ainda
       choose: Os sensores aparecem aqui quando um transmissor adicionado envia medições.
-      registered: Sensores com nome
+      registered: Sensores
       select: Selecione um sensor detectado para dar um nome a ele.
       available: Sensores disponíveis
       no_new: Nenhum novo sensor detectado
@@ -143,7 +143,6 @@ pt-BR:
     try_search: Tente outro nome ou localização.
     name_location: Nome / localização
     signal: Sinal
-    counts: '%{registered} com nome / %{detected} detectados'
     archive: Remover da lista
     archive_name: Remover %{name} da lista
     archive_confirm: 'Remover %{name} da lista? As leituras continuam guardadas, e ele volta com o mesmo nome se enviar dados de novo.'
@@ -369,7 +368,6 @@ pt-BR:
     revoke: Revogar transmissor
     revoke_confirm: Revogar %{name}? Ele deixa de ser aceito até ser pareado de novo pelo botão.
     requests: Pedindo para entrar
-    no_requests: Segure o botão PRG do transmissor por três segundos para ele pedir.
     conflict: Dois aparelhos usaram este ID; busque de novo.
     in_progress: Outro comando ainda está em andamento; aguarde a resposta.
     sending: Enviando ao receptor…

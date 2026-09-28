@@ -84,7 +84,7 @@ en-US:
     no_items: No matching items in this section.
     section_empty: Nothing to show in this section.
     make_yours: Make this dashboard yours
-    get_started: Name your devices and sensors, then choose what to show here.
+    get_started: Add your devices, then choose what to show here.
     manage_devices: Manage devices
     manage_sensors: Manage sensors
     inspect: 'Inspect %{measurement}: %{value} %{unit}, %{status}, sensor %{sensor}, device %{device}'
@@ -131,7 +131,7 @@ en-US:
       discovery: Available sensors come from received measurements; name their device first.
       empty: No sensors yet
       choose: Sensors appear here when an added device sends measurements.
-      registered: Named sensors
+      registered: Sensors
       select: Select a detected sensor to give it a name.
       available: Available sensors
       no_new: No new sensors detected
@@ -143,7 +143,6 @@ en-US:
     try_search: Try a different name or location.
     name_location: Name / location
     signal: Signal
-    counts: '%{registered} named / %{detected} detected'
     archive: Remove from list
     archive_name: Remove %{name} from the list
     archive_confirm: 'Remove %{name} from the list? Its readings stay stored, and it comes back with its name if it sends data again.'
@@ -367,7 +366,6 @@ en-US:
     revoke: Revoke transmitter
     revoke_confirm: Revoke %{name}? It stops being accepted until it is paired again with its button.
     requests: Asking to join
-    no_requests: Hold the transmitter's PRG button for three seconds to make it ask.
     conflict: Two devices claimed this ID; search again.
     in_progress: Another command is still running; wait for its answer.
     sending: Sending to the receiver…

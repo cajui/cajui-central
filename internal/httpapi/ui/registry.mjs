@@ -175,13 +175,7 @@ export function mountRegistry(root, { state, kind, notify }) {
             sensors ? t("common.device") : t("common.sensors"),
             sensors
               ? `<a href="/devices">${e(device.name || device.device)}</a>`
-              : e(
-                  t("registry.counts", {
-                    registered:
-                      group?.sensors.filter((s) => s.registered).length ?? 0,
-                    detected: group?.sensors.length ?? 0,
-                  }),
-                ),
+              : e(t("counts.sensors", { count: group?.sensors.length ?? 0 })),
           ],
           [
             sensors ? t("common.measurements") : t("common.last_report"),
@@ -242,7 +236,7 @@ export function mountRegistry(root, { state, kind, notify }) {
     const body = document.createElement("div");
     body.className = "dialog-body";
     const { device } = dataFor(entry);
-    body.innerHTML = `<p>${sensors ? e(t("registry.sensor_identity", { device: device.name || device.device, sensor: entry.sensor })) : `${e(entry.transport.toUpperCase())} · ${e(entry.source)} · ${e(entry.device)}`}</p><form class="workspace-form"><label>${t("common.name")}<input class="input" name="name" required maxlength="80" value="${e(entry.name)}" autocomplete="off"></label><label>${t("common.location")} <span class="muted">${t("common.optional")}</span><input class="input" name="location" maxlength="80" value="${e(entry.location)}" autocomplete="off"></label><p class="muted">${t("registry.identity_note")}</p><p class="form-error" role="alert"></p><button class="button primary" type="submit">${message("save")}</button></form>`;
+    body.innerHTML = `<p>${sensors ? e(t("registry.sensor_identity", { device: device.name || device.device, sensor: entry.sensor })) : `${e(entry.transport.toUpperCase())} · ${e(entry.source)} · ${e(entry.device)}`}</p><form class="workspace-form"><label>${t("common.name")}${sensors ? ` <span class="muted">${t("common.optional")}</span>` : ""}<input class="input" name="name" ${sensors ? `placeholder="${e(entry.placeholder)}"` : "required"} maxlength="80" value="${e(sensors ? entry.stored : entry.name)}" autocomplete="off"></label><label>${t("common.location")} <span class="muted">${t("common.optional")}</span><input class="input" name="location" maxlength="80" value="${e(entry.location)}" autocomplete="off"></label><p class="muted">${t("registry.identity_note")}</p><p class="form-error" role="alert"></p><button class="button primary" type="submit">${message("save")}</button></form>`;
     dialog.append(body);
     const form = body.querySelector("form");
     localizeValidation(form);
@@ -364,9 +358,11 @@ export function mountRegistry(root, { state, kind, notify }) {
       : "";
     return commands.run(button, command, (phase, text) => {
       if (node)
-        progress.set(node, {
+        progress.set(`${command.device_id}/${node}`, {
           phase,
           text,
+          node,
+          receiver: command.device_id,
           source: command.source_id,
           name: known,
           at: Date.parse(snapshot.generated_at),
@@ -386,7 +382,7 @@ export function mountRegistry(root, { state, kind, notify }) {
     body.className = "dialog-body";
     if (!sensors) body.append(pairingSection(snapshot, act, progress));
     // Devices this dialog just paired are named from their own row above.
-    const mine = new Set(progress.keys());
+    const mine = new Set([...progress.values()].map((step) => step.node));
     const unnamed = available.filter(
       (entry) => sensors || !mine.has(entry.device),
     );

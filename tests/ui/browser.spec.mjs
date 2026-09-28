@@ -558,7 +558,7 @@ test("persistent registration, independent dashboard composition and safe edits"
   await page
     .getByRole("button", { name: `Select ${node}`, exact: true })
     .click();
-  await page.getByLabel("Name", { exact: true }).fill(deviceName);
+  await page.getByRole("textbox", { name: /^Name/ }).fill(deviceName);
   await page.getByLabel("Location", { exact: false }).fill("North");
   await page.getByRole("button", { name: "Save device", exact: true }).click();
   await expect(
@@ -571,7 +571,7 @@ test("persistent registration, independent dashboard composition and safe edits"
   await row
     .getByRole("button", { name: "Edit Temperature and humidity", exact: true })
     .click();
-  await page.getByLabel("Name", { exact: true }).fill(sensorName);
+  await page.getByRole("textbox", { name: /^Name/ }).fill(sensorName);
   await page.getByRole("button", { name: "Save sensor", exact: true }).click();
   await expect(
     page.getByRole("button", { name: `Edit ${sensorName}`, exact: true }),
@@ -585,12 +585,12 @@ test("persistent registration, independent dashboard composition and safe edits"
   await page
     .getByRole("button", { name: `Edit ${sensorName}`, exact: true })
     .click();
-  await page.getByLabel("Name", { exact: true }).fill(renamed);
+  await page.getByRole("textbox", { name: /^Name/ }).fill(renamed);
   await page.getByRole("button", { name: "Save sensor", exact: true }).click();
   await expect(
     page.getByRole("button", { name: `Edit ${renamed}`, exact: true }),
   ).toBeVisible();
-  await other.getByLabel("Name", { exact: true }).fill("Stale edit");
+  await other.getByRole("textbox", { name: /^Name/ }).fill("Stale edit");
   await other.getByRole("button", { name: "Save sensor", exact: true }).click();
   await expect(other.getByRole("alert")).toContainText("changed");
   await other.close();
@@ -708,13 +708,13 @@ test("persistent registration, independent dashboard composition and safe edits"
   await page
     .getByRole("button", { name: `Edit ${renamed}`, exact: true })
     .click();
-  await page.getByLabel("Name", { exact: true }).fill("Unsaved name");
+  await page.getByRole("textbox", { name: /^Name/ }).fill("Unsaved name");
   await page.route("**/ui-api/sensors/*", (route) =>
     route.fulfill({ status: 503 }),
   );
   await page.getByRole("button", { name: "Save sensor", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Could not save");
-  await expect(page.getByLabel("Name", { exact: true })).toHaveValue(
+  await expect(page.getByRole("textbox", { name: /^Name/ })).toHaveValue(
     "Unsaved name",
   );
   expect(errors).toEqual([]);

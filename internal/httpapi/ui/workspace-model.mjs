@@ -81,7 +81,11 @@ export function workspaceGroups(state, now = Date.parse(state.generated_at)) {
         // A sensor of an added device is shown whether or not it has its own name.
         registered: !!record?.name || (!!d.name && !!record),
         name:
-          record?.name || (record ? defaultSensorName(record) : label(s.id)),
+          record?.name ||
+          (record
+            ? (shownSensors(catalog).find((x) => x.id === record.id)?.name ??
+              defaultSensorName(record))
+            : label(s.id)),
         location: record?.location || "",
       });
       for (const c of s.channels) {
@@ -131,11 +135,26 @@ export function defaultSensorName(sensor) {
   return text;
 }
 // Sensors shown on the pages: those of added (named) devices, each with a name.
+// stored keeps the name someone typed ("" when none), so an edit never saves the
+// generated one. Two sensors of a device that measure the same thing are told apart.
 export function shownSensors(catalog) {
   const named = new Set(catalog.devices.filter((d) => d.name).map((d) => d.id));
-  return environmentalSensors(catalog)
-    .filter((s) => named.has(s.device_id))
-    .map((s) => ({ ...s, name: s.name || defaultSensorName(s) }));
+  const sensors = environmentalSensors(catalog).filter((s) =>
+    named.has(s.device_id),
+  );
+  const count = new Map();
+  for (const s of sensors.filter((s) => !s.name)) {
+    const key = `${s.device_id}\u0000${defaultSensorName(s)}`;
+    count.set(key, (count.get(key) ?? 0) + 1);
+  }
+  return sensors.map((s) => {
+    const base = defaultSensorName(s);
+    const placeholder =
+      count.get(`${s.device_id}\u0000${base}`) > 1
+        ? `${base} (${label(s.sensor)})`
+        : base;
+    return { ...s, stored: s.name, placeholder, name: s.name || placeholder };
+  });
 }
 export function environmentalSensors(catalog) {
   return catalog.sensors.filter((s) =>
