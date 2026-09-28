@@ -84,7 +84,7 @@ pt-BR:
     no_items: Nenhum item corresponde ao filtro nesta seção.
     section_empty: Nada para mostrar nesta seção.
     make_yours: Personalize seu painel
-    get_started: Dê um nome aos seus transmissores e sensores e escolha o que mostrar aqui.
+    get_started: Adicione seus transmissores e escolha o que mostrar aqui.
     manage_devices: Gerenciar transmissores
     manage_sensors: Gerenciar sensores
     inspect: 'Ver %{measurement}: %{value} %{unit}, %{status}, sensor %{sensor}, transmissor %{device}'
@@ -106,14 +106,14 @@ pt-BR:
     details_for: Detalhes de %{name}
   registry:
     devices:
-      description: Dê um nome aos transmissores que enviam suas medições.
+      description: Os transmissores que enviam suas medições.
       add: Adicionar transmissor
       edit: Editar transmissor
       save: Salvar transmissor
       search: Buscar transmissores
       discovery: Escolha Adicionar transmissor para dar um nome a eles.
-      empty: Nenhum transmissor com nome ainda
-      choose: Escolha Adicionar transmissor para selecionar um dos transmissores disponíveis.
+      empty: Nenhum transmissor adicionado
+      choose: Toque em Adicionar transmissor para parear o primeiro pelo rádio.
       registered: Transmissores com nome
       select: Selecione um transmissor detectado para dar um nome a ele.
       available: Transmissores disponíveis
@@ -123,15 +123,15 @@ pt-BR:
         other: '%{count} transmissores disponíveis para adicionar.'
         zero: '%{count} transmissores disponíveis para adicionar.'
     sensors:
-      description: Dê um nome aos sensores e veja qual transmissor envia cada medição.
+      description: Os sensores dos seus transmissores e o que cada um mede.
       add: Adicionar sensor
       edit: Editar sensor
       save: Salvar sensor
       search: Buscar sensores
       discovery: Os sensores disponíveis vêm das medições recebidas; dê um nome primeiro ao transmissor correspondente.
-      empty: Nenhum sensor com nome ainda
-      choose: Escolha Adicionar sensor para selecionar um dos sensores disponíveis.
-      registered: Sensores com nome
+      empty: Nenhum sensor ainda
+      choose: Os sensores aparecem aqui quando um transmissor adicionado envia medições.
+      registered: Sensores
       select: Selecione um sensor detectado para dar um nome a ele.
       available: Sensores disponíveis
       no_new: Nenhum novo sensor detectado
@@ -143,7 +143,6 @@ pt-BR:
     try_search: Tente outro nome ou localização.
     name_location: Nome / localização
     signal: Sinal
-    counts: '%{registered} com nome / %{detected} detectados'
     archive: Remover da lista
     archive_name: Remover %{name} da lista
     archive_confirm: 'Remover %{name} da lista? As leituras continuam guardadas, e ele volta com o mesmo nome se enviar dados de novo.'
@@ -155,16 +154,12 @@ pt-BR:
     register_parent: Dê um nome ao transmissor primeiro
     name_action: Dar nome
     pairing:
-      heading: Parear pelo rádio
       naming_heading: Dar um nome
       no_receiver: Nenhum receptor está conectado ao Central. Ligue um receptor para parear transmissores pelo rádio.
       offline: Sem conexão. Ligue o receptor para parear.
       step_search: Toque em Buscar transmissores.
       step_button: No transmissor, segure o botão PRG por três segundos.
-      step_accept: Toque em Adicionar no pedido que aparecer aqui e dê um nome a ele.
-      searching: Buscando
-      searching_left: Buscando · faltam %{time}
-      no_requests: Nenhum pedido ainda.
+      step_accept: Toque em Adicionar quando ele aparecer abaixo.
       awaiting_data: Pareado, aguardando a primeira leitura
       revoked_heading: Revogados
       revoked_note: O receptor não aceita mais estes transmissores. O nome e o histórico continuam.
@@ -173,8 +168,22 @@ pt-BR:
       repair_name: Parear %{name} de novo
       revoked: 'Revogado: o receptor não aceita mais este transmissor. Para ele voltar, use Adicionar transmissor e segure o botão PRG dele por três segundos.'
       known: Já pareado. Adicionar de novo refaz o pareamento; o nome e o histórico continuam.
-      after_add: Depois de adicionado, um transmissor novo aparece aqui para receber um nome.
       signal: Sinal %{value} dBm
+      no_receiver_title: Nenhum receptor conectado
+      via: Pelo %{receiver}
+      offline_title: Receptor sem conexão
+      idle_title: Parear um transmissor
+      again_title: Parear outro transmissor
+      searching_title: Procurando transmissores
+      time_left: faltam %{time}
+      hold_button: No transmissor, segure o botão PRG por três segundos. Ele aparece logo abaixo.
+      id: ID %{id}
+      new_device: Transmissor novo
+      retry: Tentar de novo
+      done_waiting: Pareado. Aguardando a primeira leitura…
+      done_reporting: Pareado e enviando leituras.
+      done_name: Pareado e enviando leituras. Dê um nome a ele.
+      finish: Concluir
     send: Transmissores e sensores aparecem aqui após a primeira medição.
   layout:
     help: Crie seções e escolha transmissores, sensores completos ou medições individuais. Remover um item daqui
@@ -359,7 +368,6 @@ pt-BR:
     revoke: Revogar transmissor
     revoke_confirm: Revogar %{name}? Ele deixa de ser aceito até ser pareado de novo pelo botão.
     requests: Pedindo para entrar
-    no_requests: Segure o botão PRG do transmissor por três segundos para ele pedir.
     conflict: Dois aparelhos usaram este ID; busque de novo.
     in_progress: Outro comando ainda está em andamento; aguarde a resposta.
     sending: Enviando ao receptor…

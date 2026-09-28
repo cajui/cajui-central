@@ -905,8 +905,9 @@ dialog::backdrop {
 }
 .toast {
   position: fixed;
-  bottom: 24px;
-  left: 50%;
+  inset: auto auto 24px 50%;
+  margin: 0;
+  border: 0;
   transform: translateX(-50%);
   background: var(--ink);
   color: var(--canvas);
@@ -2173,6 +2174,96 @@ cj-reading {
 }
 
 /* Adding a device: radio pairing first, then naming, both in one dialog. */
+.pairing {
+  gap: var(--space-4);
+}
+.pairing-via {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-detail);
+}
+/* The current step carries the dialog: one tinted block with its title and action. */
+.pairing-stage {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  padding: var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+}
+.pairing-stage > h3 {
+  margin: 0;
+  font-size: 20px;
+}
+.pairing-stage p {
+  margin: 0;
+}
+.pairing-stage[data-stage="searching"] {
+  background: var(--brand-soft);
+}
+.pairing-stage[data-stage="offline"],
+.pairing-stage[data-stage="none"] {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.pairing-clock {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.pairing-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.pairing-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.pairing-item-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pairing-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+}
+.pairing-item[data-phase="applied"] {
+  border-color: var(--good);
+  background: var(--good-soft);
+}
+.pairing-item[data-phase="applied"] .pairing-progress {
+  color: var(--good);
+}
+.pairing-item[data-phase="failed"] .pairing-progress {
+  color: var(--danger);
+}
+.pairing-progress svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-4);
+}
 .add-step {
   display: grid;
   gap: var(--space-3);

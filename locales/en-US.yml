@@ -84,7 +84,7 @@ en-US:
     no_items: No matching items in this section.
     section_empty: Nothing to show in this section.
     make_yours: Make this dashboard yours
-    get_started: Name your devices and sensors, then choose what to show here.
+    get_started: Add your devices, then choose what to show here.
     manage_devices: Manage devices
     manage_sensors: Manage sensors
     inspect: 'Inspect %{measurement}: %{value} %{unit}, %{status}, sensor %{sensor}, device %{device}'
@@ -106,14 +106,14 @@ en-US:
     details_for: Details for %{name}
   registry:
     devices:
-      description: Name the devices that send your measurements.
+      description: The devices that send your measurements.
       add: Add device
       edit: Edit device
       save: Save device
       search: Search devices
       discovery: Choose Add device to name them.
-      empty: No named devices yet
-      choose: Choose Add device to select one from the available devices.
+      empty: No devices added yet
+      choose: Choose Add device to pair the first one by radio.
       registered: Named devices
       select: Select a detected device to give it a name.
       available: Available devices
@@ -123,15 +123,15 @@ en-US:
         other: '%{count} devices available to add.'
         zero: '%{count} devices available to add.'
     sensors:
-      description: Name your sensors and see which device reports each measurement.
+      description: The sensors of your devices and what each one measures.
       add: Add sensor
       edit: Edit sensor
       save: Save sensor
       search: Search sensors
       discovery: Available sensors come from received measurements; name their device first.
-      empty: No named sensors yet
-      choose: Choose Add sensor to select one from the available sensors.
-      registered: Named sensors
+      empty: No sensors yet
+      choose: Sensors appear here when an added device sends measurements.
+      registered: Sensors
       select: Select a detected sensor to give it a name.
       available: Available sensors
       no_new: No new sensors detected
@@ -143,7 +143,6 @@ en-US:
     try_search: Try a different name or location.
     name_location: Name / location
     signal: Signal
-    counts: '%{registered} named / %{detected} detected'
     archive: Remove from list
     archive_name: Remove %{name} from the list
     archive_confirm: 'Remove %{name} from the list? Its readings stay stored, and it comes back with its name if it sends data again.'
@@ -155,16 +154,12 @@ en-US:
     register_parent: Name the device first
     name_action: Name it
     pairing:
-      heading: Pair by radio
       naming_heading: Give it a name
       no_receiver: No receiver is connected to Central. Turn a receiver on to pair devices by radio.
       offline: Offline. Turn the receiver on to pair.
       step_search: Choose Search for transmitters.
       step_button: On the transmitter, hold the PRG button for three seconds.
-      step_accept: Choose Add on the request that appears here, then give it a name.
-      searching: Searching
-      searching_left: Searching · %{time} left
-      no_requests: No requests yet.
+      step_accept: Choose Add when it appears below.
       awaiting_data: Paired, waiting for its first reading
       revoked_heading: Revoked
       revoked_note: The receiver no longer accepts these devices. Their names and history stay.
@@ -173,8 +168,22 @@ en-US:
       repair_name: Pair %{name} again
       revoked: 'Revoked: the receiver no longer accepts this transmitter. To bring it back, use Add device and hold its PRG button for three seconds.'
       known: Already paired. Adding it again pairs it anew; its name and history stay.
-      after_add: After you add it, a new device appears here to be named.
       signal: Signal %{value} dBm
+      no_receiver_title: No receiver connected
+      via: Through %{receiver}
+      offline_title: Receiver offline
+      idle_title: Pair a transmitter
+      again_title: Pair another transmitter
+      searching_title: Searching for transmitters
+      time_left: '%{time} left'
+      hold_button: On the transmitter, hold the PRG button for three seconds. It appears below.
+      id: ID %{id}
+      new_device: New transmitter
+      retry: Try again
+      done_waiting: Paired. Waiting for its first reading…
+      done_reporting: Paired and sending readings.
+      done_name: Paired and sending readings. Give it a name.
+      finish: Done
     send: Devices and sensors appear here after their first measurement.
   layout:
     help: Create sections and choose devices, complete sensors or individual measurements. Removing an item here
@@ -357,7 +366,6 @@ en-US:
     revoke: Revoke transmitter
     revoke_confirm: Revoke %{name}? It stops being accepted until it is paired again with its button.
     requests: Asking to join
-    no_requests: Hold the transmitter's PRG button for three seconds to make it ask.
     conflict: Two devices claimed this ID; search again.
     in_progress: Another command is still running; wait for its answer.
     sending: Sending to the receiver…

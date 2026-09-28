@@ -28,6 +28,15 @@ func validText(s string, required bool) bool {
 	}
 	return !strings.ContainsFunc(s, unicode.IsControl)
 }
+
+// ValidateSensor allows an empty name: a sensor then shows a name built from what it
+// measures, in the viewer's language, instead of a stored one.
+func (s Settings) ValidateSensor() error {
+	if !validText(s.Name, false) || !validText(s.Location, false) || s.Revision < 0 {
+		return ErrInvalid
+	}
+	return nil
+}
 func (s Settings) Validate() error {
 	if !validText(s.Name, true) || !validText(s.Location, false) || s.Revision < 0 {
 		return ErrInvalid

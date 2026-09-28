@@ -224,7 +224,11 @@ func (s *Store) saveSettings(ctx context.Context, table string, id int64, settin
 	if id <= 0 {
 		return workspace.ErrInvalid
 	}
-	if err := settings.Validate(); err != nil {
+	validate := settings.Validate
+	if table == "workspace_sensors" {
+		validate = settings.ValidateSensor
+	}
+	if err := validate(); err != nil {
 		return err
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -290,7 +294,9 @@ func (s *Store) SaveLayout(ctx context.Context, layout workspace.Layout) error {
 				err = tx.QueryRowContext(ctx, `SELECT name FROM workspace_devices WHERE id=?`, item.DeviceID).Scan(&name)
 			} else {
 				var sensor string
-				err = tx.QueryRowContext(ctx, `SELECT name,sensor FROM workspace_sensors WHERE id=?`, item.SensorID).Scan(&name, &sensor)
+				// A sensor needs no name of its own: it belongs on the dashboard once its
+				// device was added (named); unnamed sensors show a name from their readings.
+				err = tx.QueryRowContext(ctx, `SELECT d.name,s.sensor FROM workspace_sensors s JOIN workspace_devices d ON d.id=s.device_id WHERE s.id=?`, item.SensorID).Scan(&name, &sensor)
 				if err == nil && item.Kind == "measurement" {
 					if workspace.IsDiagnostic(sensor, item.Metric, item.Unit) {
 						return workspace.ErrInvalid

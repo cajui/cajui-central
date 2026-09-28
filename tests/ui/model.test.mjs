@@ -673,3 +673,54 @@ test("revoked transmitters and their sensors leave the dashboard catalog", async
   assert.equal(catalog.layout.revision, 4);
   assert.equal(state.workspace.devices.length, 3);
 });
+
+test("an unnamed sensor of an added device is shown with a name from its readings", async () => {
+  const { defaultSensorName, shownSensors } = await import(
+    "../../internal/httpapi/ui/workspace-model.mjs"
+  );
+  setLocale("pt-BR");
+  const climate = {
+    id: 1,
+    device_id: 1,
+    sensor: "dht22",
+    name: "",
+    measurements: [
+      { metric: "humidity", unit: "%" },
+      { metric: "temperature", unit: "degC" },
+    ],
+  };
+  assert.equal(defaultSensorName(climate), "Temperatura e umidade");
+  setLocale("en-US");
+  assert.equal(defaultSensorName(climate), "Temperature and humidity");
+  const catalog = {
+    devices: [
+      { id: 1, name: "Coop" },
+      { id: 2, name: "" },
+    ],
+    sensors: [
+      climate,
+      { ...climate, id: 2, name: "Ambient" },
+      { ...climate, id: 3, device_id: 2 },
+      {
+        id: 4,
+        device_id: 1,
+        sensor: "radio",
+        name: "",
+        measurements: [{ metric: "rssi", unit: "dBm" }],
+      },
+    ],
+  };
+  assert.deepEqual(
+    shownSensors(catalog).map((s) => [s.id, s.name, s.stored]),
+    [
+      [1, "Temperature and humidity", ""],
+      [2, "Ambient", "Ambient"],
+    ],
+  );
+  // Two unnamed probes of one device measuring the same thing are told apart.
+  catalog.sensors.push({ ...climate, id: 5, sensor: "dht22_b" });
+  const names = shownSensors(catalog)
+    .filter((s) => !s.stored)
+    .map((s) => s.name);
+  assert.equal(new Set(names).size, 2);
+});

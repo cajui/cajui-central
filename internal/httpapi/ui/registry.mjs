@@ -10,7 +10,7 @@ import {
   deviceStateFor,
   receiverLabel,
 } from "./model.mjs";
-import { environmentalSensors, workspaceGroups } from "./workspace-model.mjs";
+import { shownSensors, workspaceGroups } from "./workspace-model.mjs";
 import {
   saveWorkspace,
   createDialog,
@@ -23,7 +23,7 @@ import {
   offers,
   shortID,
   awaitingFirstReading,
-  pairingRequests,
+  knownDevice,
   pairingSection,
 } from "./pairing.mjs";
 
@@ -48,12 +48,14 @@ export function mountRegistry(root, { state, kind, notify }) {
   root.querySelector("#refresh").addEventListener("click", () => refresh());
   function update() {
     const catalog = snapshot.workspace;
-    entries = sensors ? environmentalSensors(catalog) : catalog.devices;
+    // Sensors come with their device: every sensor of an added device is listed, with
+    // a name from its readings until it is renamed.
+    entries = sensors ? shownSensors(catalog) : catalog.devices;
     groups = workspaceGroups(snapshot);
     devices = new Map(catalog.devices.map((d) => [d.id, d]));
     available = entries.filter((d) => !d.name);
     const note = root.querySelector("#discovery-note");
-    note.classList.toggle("hidden", !available.length);
+    note.classList.toggle("hidden", sensors || !available.length);
     note.textContent = `${message("count", { count: available.length })} ${message("discovery")}`;
   }
   function dataFor(entry) {
@@ -173,13 +175,7 @@ export function mountRegistry(root, { state, kind, notify }) {
             sensors ? t("common.device") : t("common.sensors"),
             sensors
               ? `<a href="/devices">${e(device.name || device.device)}</a>`
-              : e(
-                  t("registry.counts", {
-                    registered:
-                      group?.sensors.filter((s) => s.registered).length ?? 0,
-                    detected: group?.sensors.length ?? 0,
-                  }),
-                ),
+              : e(t("counts.sensors", { count: group?.sensors.length ?? 0 })),
           ],
           [
             sensors ? t("common.measurements") : t("common.last_report"),
@@ -240,7 +236,7 @@ export function mountRegistry(root, { state, kind, notify }) {
     const body = document.createElement("div");
     body.className = "dialog-body";
     const { device } = dataFor(entry);
-    body.innerHTML = `<p>${sensors ? e(t("registry.sensor_identity", { device: device.name || device.device, sensor: entry.sensor })) : `${e(entry.transport.toUpperCase())} · ${e(entry.source)} · ${e(entry.device)}`}</p><form class="workspace-form"><label>${t("common.name")}<input class="input" name="name" required maxlength="80" value="${e(entry.name)}" autocomplete="off"></label><label>${t("common.location")} <span class="muted">${t("common.optional")}</span><input class="input" name="location" maxlength="80" value="${e(entry.location)}" autocomplete="off"></label><p class="muted">${t("registry.identity_note")}</p><p class="form-error" role="alert"></p><button class="button primary" type="submit">${message("save")}</button></form>`;
+    body.innerHTML = `<p>${sensors ? e(t("registry.sensor_identity", { device: device.name || device.device, sensor: entry.sensor })) : `${e(entry.transport.toUpperCase())} · ${e(entry.source)} · ${e(entry.device)}`}</p><form class="workspace-form"><label>${t("common.name")}${sensors ? ` <span class="muted">${t("common.optional")}</span>` : ""}<input class="input" name="name" ${sensors ? `placeholder="${e(entry.placeholder)}"` : "required"} maxlength="80" value="${e(sensors ? entry.stored : entry.name)}" autocomplete="off"></label><label>${t("common.location")} <span class="muted">${t("common.optional")}</span><input class="input" name="location" maxlength="80" value="${e(entry.location)}" autocomplete="off"></label><p class="muted">${t("registry.identity_note")}</p><p class="form-error" role="alert"></p><button class="button primary" type="submit">${message("save")}</button></form>`;
     dialog.append(body);
     const form = body.querySelector("form");
     localizeValidation(form);
@@ -353,6 +349,27 @@ export function mountRegistry(root, { state, kind, notify }) {
       })
       .join("");
   }
+  // Steps of the pairing commands sent from the open add dialog, by node.
+  let progress = new Map();
+  function act(button, command) {
+    const node = command.node_id;
+    const known = node
+      ? knownDevice(snapshot, command.source_id, node)?.name
+      : "";
+    return commands.run(button, command, (phase, text) => {
+      if (node)
+        progress.set(`${command.device_id}/${node}`, {
+          phase,
+          text,
+          node,
+          receiver: command.device_id,
+          source: command.source_id,
+          name: known,
+          at: Date.parse(snapshot.generated_at),
+        });
+      renderAdd();
+    });
+  }
   // The add dialog follows the live snapshot until a form replaces its list.
   function renderAdd() {
     const dialog = addDialog;
@@ -363,20 +380,41 @@ export function mountRegistry(root, { state, kind, notify }) {
     dialog.querySelector(".dialog-body")?.remove();
     const body = document.createElement("div");
     body.className = "dialog-body";
-    if (!sensors) body.append(pairingSection(snapshot, commands.run));
-    const naming = document.createElement("section");
-    naming.className = "add-step";
-    const waiting = sensors ? [] : awaitingFirstReading(snapshot);
-    const heading = sensors
-      ? ""
-      : `<h3>${e(t("registry.pairing.naming_heading"))}</h3>`;
-    naming.innerHTML =
-      available.length || waiting.length
-        ? `${heading}<p>${message("select")}</p><ul class="add-list" aria-label="${e(message("available"))}">${availableItems()}${waiting.map((s) => `<li><span><strong>${e(t("commands.request_name", { id: shortID(s.device_id) }))}</strong><span class="muted">${e(t("registry.pairing.awaiting_data"))}</span></span></li>`).join("")}</ul>`
-        : !sensors && pairingRequests(snapshot)
-          ? `${heading}<p class="muted">${e(t("registry.pairing.after_add"))}</p>`
-          : `${heading}<div class="empty"><h3>${message("no_new")}</h3><p>${t("registry.send")}</p></div>`;
-    body.append(naming);
+    if (!sensors) body.append(pairingSection(snapshot, act, progress));
+    // Devices this dialog just paired are named from their own row above.
+    const mine = new Set([...progress.values()].map((step) => step.node));
+    const unnamed = available.filter(
+      (entry) => sensors || !mine.has(entry.device),
+    );
+    const waiting = sensors
+      ? []
+      : awaitingFirstReading(snapshot).filter((s) => !mine.has(s.device_id));
+    if (unnamed.length || waiting.length) {
+      const naming = document.createElement("section");
+      naming.className = "add-step";
+      const saved = available;
+      available = unnamed;
+      naming.innerHTML = `${sensors ? "" : `<h3>${e(t("registry.pairing.naming_heading"))}</h3>`}<p>${message("select")}</p><ul class="add-list" aria-label="${e(message("available"))}">${availableItems()}${waiting.map((s) => `<li><span><strong>${e(t("commands.request_name", { id: shortID(s.device_id) }))}</strong><span class="muted">${e(t("registry.pairing.awaiting_data"))}</span></span></li>`).join("")}</ul>`;
+      available = saved;
+      body.append(naming);
+    } else if (sensors) {
+      body.insertAdjacentHTML(
+        "beforeend",
+        `<div class="empty"><h3>${message("no_new")}</h3><p>${t("registry.send")}</p></div>`,
+      );
+    }
+    if ([...progress.values()].some((step) => step.phase === "applied")) {
+      const done = document.createElement("div");
+      done.className = "dialog-actions";
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "button primary";
+      close.dataset.focus = "done";
+      close.textContent = t("registry.pairing.finish");
+      close.addEventListener("click", () => dialog.close());
+      done.append(close);
+      body.append(done);
+    }
     dialog.append(body);
     for (const b of body.querySelectorAll("[data-select]"))
       b.addEventListener("click", () =>
@@ -390,6 +428,7 @@ export function mountRegistry(root, { state, kind, notify }) {
   }
   // opener names the list button that opened the dialog, which a refresh may replace.
   function openAdd(opener) {
+    progress = new Map();
     addDialog = createDialog(root, message("add"));
     const dialog = addDialog;
     dialog.addEventListener("close", () => {
@@ -405,6 +444,7 @@ export function mountRegistry(root, { state, kind, notify }) {
     dialog.showModal();
   }
   root.querySelector("#add-entry").addEventListener("click", openAdd);
+  root.querySelector("#add-entry").hidden = sensors;
   async function refresh() {
     if (pending) return;
     pending = true;

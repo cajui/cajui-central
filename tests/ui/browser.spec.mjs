@@ -545,31 +545,33 @@ test("persistent registration, independent dashboard composition and safe edits"
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.setViewportSize({ width: 820, height: 1180 });
+  // Sensors come with their device: none is listed, and none can be added by hand.
   await page.goto("/sensors");
-  await page.getByRole("button", { name: "Add sensor", exact: true }).click();
-  await expect(page.getByRole("dialog")).toContainText("Name the device first");
-  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Add sensor", exact: true }),
+  ).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: /^Edit Temperature and humidity/ }),
+  ).toHaveCount(0);
   await page.goto("/devices");
   await page.getByRole("button", { name: "Add device", exact: true }).click();
   await page
     .getByRole("button", { name: `Select ${node}`, exact: true })
     .click();
-  await page.getByLabel("Name", { exact: true }).fill(deviceName);
+  await page.getByRole("textbox", { name: /^Name/ }).fill(deviceName);
   await page.getByLabel("Location", { exact: false }).fill("North");
   await page.getByRole("button", { name: "Save device", exact: true }).click();
   await expect(
     page.getByRole("button", { name: `Edit ${deviceName}`, exact: true }),
   ).toBeVisible();
+  // Once the device was added its sensor is listed with a name from its readings.
   await page.goto("/sensors");
-  await page.getByRole("button", { name: "Add sensor", exact: true }).click();
-  const available = page
-    .getByRole("dialog")
-    .getByRole("listitem")
-    .filter({ hasText: deviceName });
-  await available
-    .getByRole("button", { name: "Select ambient", exact: true })
+  const row = page.getByRole("row").filter({ hasText: deviceName });
+  await expect(row).toContainText("Temperature and humidity");
+  await row
+    .getByRole("button", { name: "Edit Temperature and humidity", exact: true })
     .click();
-  await page.getByLabel("Name", { exact: true }).fill(sensorName);
+  await page.getByRole("textbox", { name: /^Name/ }).fill(sensorName);
   await page.getByRole("button", { name: "Save sensor", exact: true }).click();
   await expect(
     page.getByRole("button", { name: `Edit ${sensorName}`, exact: true }),
@@ -583,12 +585,12 @@ test("persistent registration, independent dashboard composition and safe edits"
   await page
     .getByRole("button", { name: `Edit ${sensorName}`, exact: true })
     .click();
-  await page.getByLabel("Name", { exact: true }).fill(renamed);
+  await page.getByRole("textbox", { name: /^Name/ }).fill(renamed);
   await page.getByRole("button", { name: "Save sensor", exact: true }).click();
   await expect(
     page.getByRole("button", { name: `Edit ${renamed}`, exact: true }),
   ).toBeVisible();
-  await other.getByLabel("Name", { exact: true }).fill("Stale edit");
+  await other.getByRole("textbox", { name: /^Name/ }).fill("Stale edit");
   await other.getByRole("button", { name: "Save sensor", exact: true }).click();
   await expect(other.getByRole("alert")).toContainText("changed");
   await other.close();
@@ -706,13 +708,13 @@ test("persistent registration, independent dashboard composition and safe edits"
   await page
     .getByRole("button", { name: `Edit ${renamed}`, exact: true })
     .click();
-  await page.getByLabel("Name", { exact: true }).fill("Unsaved name");
+  await page.getByRole("textbox", { name: /^Name/ }).fill("Unsaved name");
   await page.route("**/ui-api/sensors/*", (route) =>
     route.fulfill({ status: 503 }),
   );
   await page.getByRole("button", { name: "Save sensor", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Could not save");
-  await expect(page.getByLabel("Name", { exact: true })).toHaveValue(
+  await expect(page.getByRole("textbox", { name: /^Name/ })).toHaveValue(
     "Unsaved name",
   );
   expect(errors).toEqual([]);
@@ -750,11 +752,9 @@ test("language selection persists across navigation and server-rendered pages", 
   await expect(
     page.getByRole("heading", { name: "Sensores", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Adicionar sensor", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toContainText("Adicionar sensor");
-  await page.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(
+    page.getByRole("searchbox", { name: "Buscar sensores" }),
+  ).toBeVisible();
   await page.reload();
   await expect(
     page.getByRole("combobox", { name: "Idioma", exact: true }),
@@ -946,24 +946,34 @@ test("one dialog pairs a transmitter by radio and names it as it appears", async
   await page.clock.install();
   const state = pairingSnapshot();
   const serve = await liveDevices(page, state);
-  await page.route("**/ui-api/commands", (route) =>
+  await page.route("**/ui-api/commands", (route) => {
+    const type = JSON.parse(route.request().postData()).type;
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        command_id: type === "pairing.accept" ? "c2" : "c1",
+        status: type === "pairing.accept" ? "pending" : "applied",
+        type,
+      }),
+    });
+  });
+  await page.route("**/ui-api/commands/c2", (route) =>
     route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        command_id: "c1",
+        command_id: "c2",
         status: "applied",
-        type: JSON.parse(route.request().postData()).type,
+        type: "pairing.accept",
       }),
     }),
   );
   await page.getByRole("button", { name: "Add device", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Pair by radio");
+  await expect(
+    dialog.getByRole("heading", { name: "Pair a transmitter" }),
+  ).toBeVisible();
   await expect(dialog).toContainText("hold the PRG button");
-  await expect(dialog).toContainText("No new devices detected");
-  await expect(dialog).toContainText(
-    "Devices and sensors appear here after their first measurement.",
-  );
+  await expect(dialog).not.toContainText("No new devices detected");
   const receiver = state.device_states[0];
   receiver.pairing = {
     open: true,
@@ -974,11 +984,21 @@ test("one dialog pairs a transmitter by radio and names it as it appears", async
   await dialog
     .getByRole("button", { name: "Search for transmitters", exact: true })
     .click();
+  // The notice sits in the top layer, above the modal's backdrop.
+  await expect(page.locator("#toast")).toBeVisible();
   await expect(page.locator("#toast")).toHaveText(
     "Search started for two minutes.",
   );
-  await expect(dialog).toContainText("Searching · 2:00 left");
-  await expect(dialog).toContainText("Transmitter 776C");
+  await expect(
+    dialog.getByRole("heading", { name: "Searching for transmitters" }),
+  ).toBeVisible();
+  await expect(dialog).toContainText("2:00 left");
+  const request = dialog.locator(".pairing-item");
+  await expect(request).toContainText("New transmitter");
+  await expect(request).toContainText("ID 776C · Signal -60 dBm");
+  await request.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(request).toContainText("waiting for the transmitter to confirm");
+  await expect(request.getByRole("button")).toHaveCount(0);
   receiver.pairing = { open: false, requests: [] };
   state.device_states.push({
     source_id: "site",
@@ -989,9 +1009,13 @@ test("one dialog pairs a transmitter by radio and names it as it appears", async
     received_at: state.generated_at,
   });
   await serve(state);
-  await dialog.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(page.locator("#toast")).toHaveText("Transmitter paired.");
-  await expect(dialog).toContainText("Paired, waiting for its first reading");
+  await page.clock.fastForward(1100);
+  await expect(dialog.locator(".pairing-item")).toContainText(
+    "Paired. Waiting for its first reading…",
+  );
+  await expect(
+    dialog.getByRole("button", { name: "Done", exact: true }),
+  ).toBeVisible();
   state.workspace.devices.push({
     id: 7,
     transport: "mqtt",
@@ -1005,16 +1029,14 @@ test("one dialog pairs a transmitter by radio and names it as it appears", async
   });
   await serve(state);
   await page.clock.fastForward(3100);
-  await expect(dialog).not.toContainText("waiting for its first reading");
-  await dialog
-    .getByRole("button", { name: "Select 000048ca433c776c", exact: true })
-    .click();
+  await expect(dialog.locator(".pairing-item")).toContainText(
+    "Paired and sending readings. Give it a name.",
+  );
+  await expect(dialog).not.toContainText("Give it a name</h3>");
+  await dialog.getByRole("button", { name: "Name it", exact: true }).click();
   await expect(dialog.getByLabel("Name")).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();
-  await expect(page.locator("#discovery-note")).toContainText(
-    "1 device available to add.",
-  );
 });
 test("revocation lives with the device name, not on the dashboard", async ({
   page,
@@ -1228,24 +1250,17 @@ test("a known transmitter asking again shows its name, not a new device", async 
   await liveDevices(page, state);
   await page.getByRole("button", { name: "Add device", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  const request = dialog.locator(".pairing-request");
+  const request = dialog.locator(".pairing-item");
   await expect(request).toContainText("Coop");
   await expect(request).toContainText("Already paired");
-  await expect(request).not.toContainText("Transmitter 776C");
-  await expect(dialog).not.toContainText("After you add it");
-  state.device_states[0].pairing.requests.push({
-    node_id: "000048ca433c9f01",
-    rssi_dbm: -70,
-    conflict: false,
-  });
-  await liveDevices(page, state);
-  await page.getByRole("button", { name: "Add device", exact: true }).click();
-  await expect(dialog).toContainText("After you add it");
-  await expect(dialog).not.toContainText("No new devices detected");
+  await expect(request).not.toContainText("New transmitter");
   state.device_states[0].availability = "offline";
   await liveDevices(page, state);
   await page.getByRole("button", { name: "Add device", exact: true }).click();
-  await expect(dialog).not.toContainText("After you add it");
+  await expect(
+    dialog.getByRole("heading", { name: "Receiver offline" }),
+  ).toBeVisible();
+  await expect(dialog.locator(".pairing-item")).toHaveCount(0);
 });
 
 test("a revoked transmitter says so instead of offering Revoke", async ({
@@ -1290,7 +1305,7 @@ test("a revoked transmitter says so instead of offering Revoke", async ({
   await page
     .getByRole("button", { name: "Pair Coop again", exact: true })
     .click();
-  await expect(page.getByRole("dialog")).toContainText("Pair by radio");
+  await expect(page.getByRole("dialog")).toContainText("Pair a transmitter");
   await page.keyboard.press("Escape");
   let archived = null;
   await page.route("**/ui-api/devices/7/archive", (route) => {

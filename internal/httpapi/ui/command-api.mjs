@@ -69,7 +69,9 @@ export function commandRunner({ session, notify, done }) {
     get running() {
       return running;
     },
-    async run(button, command) {
+    // step, when given, follows the command where the operator is looking:
+    // "sending", "waiting", then "applied" or "failed" with the answer's text.
+    async run(button, command, step = () => {}) {
       if (running) {
         notify(t("commands.in_progress"));
         return;
@@ -77,14 +79,23 @@ export function commandRunner({ session, notify, done }) {
       running = true;
       button.disabled = true;
       notify(t("commands.sending"));
+      step("sending", t("commands.sending"));
       try {
         const record = await sendCommand(session(), command);
         const answer = await awaitAnswer(record, {
-          onPending: () => notify(t("commands.waiting_node")),
+          onPending: () => {
+            notify(t("commands.waiting_node"));
+            step("waiting", t("commands.waiting_node"));
+          },
         });
         notify(answerText(answer));
+        step(
+          answer.status === "applied" ? "applied" : "failed",
+          answerText(answer),
+        );
       } catch (error) {
         notify(error.message);
+        step("failed", error.message);
       } finally {
         running = false;
         button.disabled = false;
