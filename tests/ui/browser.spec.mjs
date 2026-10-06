@@ -1845,7 +1845,10 @@ test("history dialogs isolate sensor and device diagnostics and restore focus", 
   await opener.click();
   const dialog = page.locator("#history-panel");
   await expect(page.locator("dialog[open]")).toHaveCount(1);
-  await expect(dialog).toHaveAttribute("aria-labelledby", "history-heading");
+  await expect(dialog).toHaveAttribute(
+    "aria-labelledby",
+    "history-heading history-accessible",
+  );
   await expect(page.locator("#metric-select option")).toHaveText([
     "Temperature · °C",
     "Humidity · %",
@@ -1909,7 +1912,7 @@ test("history receipt times use the browser zone independently of UI language", 
   browser,
 }) => {
   for (const [timezoneId, time] of [
-    ["America/Fortaleza", "09:00:00"],
+    ["Asia/Tokyo", "21:00:00"],
     ["UTC", "12:00:00"],
   ]) {
     const context = await browser.newContext({ timezoneId });
@@ -1939,4 +1942,65 @@ test("history receipt times use the browser zone independently of UI language", 
       await context.close();
     }
   }
+});
+
+test("chart refresh follows latest until explicit inspection and preserves slider focus", async ({
+  page,
+}) => {
+  await liveWorkspace(page);
+  await page.locator(".reading-button").first().click();
+  const chart = page.locator("#history");
+  const slider = chart.locator("input[type=range]");
+  const append = () =>
+    chart.evaluate((el) => {
+      const points = [
+        ...el.data.points,
+        { time: el.data.points.at(-1).time + 60000, value: 27 },
+      ];
+      el.data = { ...el.data, points };
+    });
+  await slider.focus();
+  await append();
+  await expect(slider).toBeFocused();
+  expect(await slider.inputValue()).toBe(await slider.getAttribute("max"));
+  await page.keyboard.press("Home");
+  const pinned = await chart.locator(".chart-selection").textContent();
+  await append();
+  await expect(slider).toBeFocused();
+  await expect(chart.locator(".chart-selection")).toHaveText(pinned);
+  await chart.locator("summary").click();
+  await page.keyboard.press("Escape");
+  await page.locator(".reading-button").first().click();
+  await expect(chart.locator("details")).not.toHaveAttribute("open", "");
+  expect(await slider.inputValue()).toBe(await slider.getAttribute("max"));
+  await slider.focus();
+  await page.keyboard.press("Home");
+  await chart.locator("summary").click();
+  await page.locator("#metric-select").selectOption({ label: "Humidity · %" });
+  await expect(chart.locator("details")).not.toHaveAttribute("open", "");
+  expect(await slider.inputValue()).toBe(await slider.getAttribute("max"));
+});
+
+test("focused history selector keeps receiving fresh readings and exposes channel state", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const { snapshot, serve } = await liveWorkspace(page);
+  await page.locator(".reading-button").first().click();
+  await page.locator("#metric-select").focus();
+  const next = structuredClone(snapshot);
+  next.samples[0].readings[0].status = "error";
+  next.workspace.sensors[0].measurements[0].status = "error";
+  await serve(next);
+  await page.clock.fastForward(31000);
+  await expect(page.locator("#metric-select")).toBeFocused();
+  await expect(page.locator("#history-value")).toContainText("—");
+  await expect(page.locator("#history-state")).toHaveAttribute(
+    "state",
+    "error",
+  );
+  await expect(page.locator("#history-state")).toContainText("Reading error");
+  await expect(page.locator("#history-panel")).toHaveAccessibleName(
+    /Sensor 1.*Temperature history.*Device 1.*receiver/,
+  );
 });

@@ -62,6 +62,7 @@ en-US:
     rssi: RSSI
     snr: SNR
   dashboard:
+    history_accessible: '%{measurement} history · Device %{device} · Source %{source}'
     received_time: Received at Central
     latest_reading: Latest reading
     history_limit: Recent loaded readings only; the selected period may be incomplete.
@@ -94,10 +95,6 @@ en-US:
     manage_devices: Manage devices
     manage_sensors: Manage sensors
     inspect: 'Inspect %{measurement}: %{value} %{unit}, %{status}, sensor %{sensor}, device %{device}'
-    history_title: '%{measurement} history'
-    history_context: Device %{device} · %{sensor} · Source %{source}
-    radio: Radio link
-    sensor_context: Sensor %{sensor}
     device_id: Device ID
     interval: Expected interval
     not_reported: Not reported

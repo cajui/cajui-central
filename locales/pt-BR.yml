@@ -62,6 +62,7 @@ pt-BR:
     rssi: RSSI
     snr: SNR
   dashboard:
+    history_accessible: 'Histórico de %{measurement} · Transmissor %{device} · Origem %{source}'
     received_time: Recebido no Central
     latest_reading: Leitura mais recente
     history_limit: Apenas leituras recentes carregadas; o período selecionado pode estar incompleto.
@@ -94,10 +95,6 @@ pt-BR:
     manage_devices: Gerenciar transmissores
     manage_sensors: Gerenciar sensores
     inspect: 'Ver %{measurement}: %{value} %{unit}, %{status}, sensor %{sensor}, transmissor %{device}'
-    history_title: Histórico de %{measurement}
-    history_context: Transmissor %{device} · %{sensor} · Origem %{source}
-    radio: Enlace de rádio
-    sensor_context: Sensor %{sensor}
     device_id: ID do transmissor
     interval: Intervalo esperado
     not_reported: Não informado
