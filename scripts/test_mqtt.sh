@@ -42,6 +42,14 @@ publish_as demo-source demo-source telemetry/v1/other/device/samples | grep -q '
 # A producer created at runtime may publish only under its own namespace.
 producer=integration-producer
 compose run --rm credentials producer "$producer" > /dev/null
+# Traverse the directory for the known setup file, without listing credentials or
+# reading another producer's file. Test the actual producer directory boundary.
+docker run --rm --user 65532:65532 -v "$secrets":/secrets:ro --entrypoint sh eclipse-mosquitto:2.0.22 -c '
+  test -r /secrets/producers/receiver-1 &&
+  test ! -r /secrets/producers/integration-producer &&
+  test ! -r /secrets/producers && test -x /secrets/producers
+'
+
 allowed() {
   out=$(publish_as "$producer" "producers/$producer" "telemetry/v1/$producer/device/samples")
   printf '%s\n' "$out" | grep -q 'Not authorized' && echo denied || echo allowed

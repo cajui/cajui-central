@@ -241,3 +241,13 @@ func (brokenRepo) ArchiveSensor(context.Context, int64, int64) error {
 func (brokenRepo) ArchiveReceiver(context.Context, string, string, time.Time) error {
 	return errors.New("private database failure")
 }
+
+func TestConnectionsSSRMarksCurrentPage(t *testing.T) {
+	h := testHandler(t)
+	for _, path := range []string{"/receivers", "/broker"} {
+		w := request(h, "GET", path, "", "", "")
+		if w.Code != 200 || !strings.Contains(w.Body.String(), `href="`+path+`" aria-current="page"`) {
+			t.Fatal("missing SSR current page", path)
+		}
+	}
+}

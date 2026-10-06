@@ -2403,21 +2403,6 @@ cj-reading {
 .broker-stream {
   margin-bottom: 16px;
 }
-.broker-message {
-  border-top: 1px solid var(--border, #ddd);
-  padding: 16px 0;
-  overflow-wrap: anywhere;
-}
-.broker-topic {
-  display: block;
-  margin-top: 8px;
-  overflow-wrap: anywhere;
-}
-.broker-message pre {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-size: 14px;
-}
 .broker-settings code {
   overflow-wrap: anywhere;
 }
@@ -2431,12 +2416,6 @@ cj-reading {
 .receiver-setup .input {
   width: 100%;
   box-sizing: border-box;
-}
-.setup-steps {
-  padding-left: 24px;
-}
-.setup-steps li {
-  padding: 4px 0;
 }
 .broker-stream summary,
 .broker-settings summary {

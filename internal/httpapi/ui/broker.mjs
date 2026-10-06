@@ -23,6 +23,7 @@ const kindKeys = {
 
 export function mountBroker(root, { state }) {
   const opened = new Set();
+  const rowCache = new Map();
   const clock = new Intl.DateTimeFormat(locale(), {
     hour: "2-digit",
     minute: "2-digit",
@@ -81,43 +82,86 @@ export function mountBroker(root, { state }) {
       (snapshot?.messages ?? []).map((m) => String(m.id)),
     );
     for (const id of opened) if (!visibleIDs.has(id)) opened.delete(id);
-    target.innerHTML = messages.length
-      ? `<table class="broker-table"><caption class="sr-only">${t("broker.messages")}</caption><thead><tr><th scope="col">${t("broker.time")}</th><th scope="col">${t("broker.device")}</th><th scope="col" class="broker-kind">${t("broker.kind")}</th><th scope="col" class="broker-result">${t("common.status")}</th><th scope="col">${t("broker.details")}</th></tr></thead><tbody>${messages
-          .map((m) => {
-            const id = String(m.id),
-              expanded = opened.has(id);
-            const date = new Date(m.at),
-              valid = Number.isFinite(date.getTime());
-            const kind = m.kind || m.topic.split("/").at(-1);
-            const registered = (state.workspace?.devices ?? []).find(
-              (d) => d.source === m.source && d.device === m.device,
-            );
-            const managed = (state.device_states ?? []).find(
-              (d) => d.source_id === m.source && d.device_id === m.device,
-            );
-            const deviceLabel =
-              registered?.name ||
-              (managed?.role === "receiver"
-                ? receiverLabel(m.device)
-                : m.device) ||
-              "—";
-            const kindLabel = kindKeys[kind] ? t(kindKeys[kind]) : "—";
-            const badge = `<span class="badge" data-state="${m.status === "accepted" ? "ok" : m.status === "ignored" ? "empty" : "error"}">${e(t(statusKeys[m.status]))}</span>`;
-            return `<tr class="broker-message"><td><time datetime="${e(m.at)}" title="${valid ? e(timestamp.format(date)) : ""}">${valid ? e(clock.format(date)) : "—"}</time></td><td class="broker-device"><span title="${e(m.device)}">${e(deviceLabel)}</span></td><td class="broker-kind">${e(kindLabel)}</td><td class="broker-result">${badge}</td><td><button class="button broker-expand" data-message="${e(id)}" aria-expanded="${expanded}" aria-controls="broker-detail-${e(id)}" aria-label="${e(t(expanded ? "broker.collapse_message" : "broker.expand_message", { id }))}">${t(expanded ? "broker.collapse" : "broker.expand")}</button></td></tr><tr class="broker-detail" id="broker-detail-${e(id)}" ${expanded ? "" : "hidden"}><td colspan="5"><dl class="detail-list"><div><dt>${t("broker.time")}</dt><dd>${valid ? e(timestamp.format(date)) : "—"}</dd></div><div><dt>${t("broker.device")}</dt><dd>${e(m.device || "—")}</dd></div><div><dt>${t("broker.source")}</dt><dd>${e(m.source || "—")}</dd></div><div><dt>${t("broker.kind")}</dt><dd>${e(kindLabel)}</dd></div><div><dt>${t("common.status")}</dt><dd>${badge}</dd></div><div><dt>${t("broker.topic")}</dt><dd><code>${e(m.topic)}</code></dd></div><div><dt>${t("broker.size")}</dt><dd>${e(m.bytes)} B</dd></div></dl>${m.retained ? `<p>${t("broker.retained")}</p>` : ""}${m.payload !== undefined ? `<pre>${e(JSON.stringify(m.payload, null, 2))}</pre>` : `<p class="muted">${t("broker.payload_omitted")}</p>`}</td></tr>`;
-          })
-          .join("")}</tbody></table>`
-      : `<p class="empty">${t("broker.empty")}</p>`;
-    for (const button of target.querySelectorAll("button[data-message]")) {
-      button.addEventListener("click", () => {
-        const id = button.dataset.message;
-        if (opened.has(id)) opened.delete(id);
-        else opened.add(id);
-        renderMessages();
-      });
-      if (button.dataset.message === focused)
+    const registeredDevices = new Map(
+      (state.workspace?.devices ?? []).map((d) => [
+        JSON.stringify([d.source, d.device]),
+        d,
+      ]),
+    );
+    const managedDevices = new Map(
+      (state.device_states ?? []).map((d) => [
+        JSON.stringify([d.source_id, d.device_id]),
+        d,
+      ]),
+    );
+    if (!target.querySelector("table"))
+      target.innerHTML = `<table class="broker-table"><caption class="sr-only">${t("broker.messages")}</caption><thead><tr><th scope="col">${t("broker.time")}</th><th scope="col">${t("broker.device")}</th><th scope="col" class="broker-kind">${t("broker.kind")}</th><th scope="col" class="broker-result">${t("common.status")}</th><th scope="col">${t("broker.details")}</th></tr></thead><tbody></tbody></table><p class="empty" hidden>${t("broker.empty")}</p>`;
+    const table = target.querySelector("table"),
+      tbody = table.tBodies[0];
+    table.hidden = !messages.length;
+    target.querySelector(".empty").hidden = !!messages.length;
+    const rows = messages.map((m) => {
+      const id = String(m.id),
+        expanded = opened.has(id);
+      const date = new Date(m.at),
+        valid = Number.isFinite(date.getTime());
+      const kind = m.kind || m.topic.split("/").at(-1);
+      const key = JSON.stringify([m.source, m.device]);
+      const registered = registeredDevices.get(key);
+      const managed = managedDevices.get(key);
+      const deviceLabel =
+        registered?.name ||
+        (managed?.role === "receiver" ? receiverLabel(m.device) : m.device) ||
+        "—";
+      const kindLabel = kindKeys[kind] ? t(kindKeys[kind]) : "—";
+      const badge = `<span class="badge" data-state="${m.status === "accepted" ? "ok" : m.status === "ignored" ? "empty" : "error"}">${e(t(statusKeys[m.status]))}</span>`;
+      return {
+        id,
+        html: `<tr class="broker-message"><td><time datetime="${e(m.at)}" title="${valid ? e(timestamp.format(date)) : ""}">${valid ? e(clock.format(date)) : "—"}</time></td><td class="broker-device"><span title="${e(m.device)}">${e(deviceLabel)}</span></td><td class="broker-kind">${e(kindLabel)}</td><td class="broker-result">${badge}</td><td><button class="button broker-expand" data-message="${e(id)}" aria-expanded="${expanded}" aria-controls="broker-detail-${e(id)}" aria-label="${e(t(expanded ? "broker.collapse_message" : "broker.expand_message", { id }))}">${t(expanded ? "broker.collapse" : "broker.expand")}</button></td></tr><tr class="broker-detail" id="broker-detail-${e(id)}" ${expanded ? "" : "hidden"}><td colspan="5"><dl class="detail-list"><div><dt>${t("broker.time")}</dt><dd>${valid ? e(timestamp.format(date)) : "—"}</dd></div><div><dt>${t("broker.device")}</dt><dd>${e(m.device || "—")}</dd></div><div><dt>${t("broker.source")}</dt><dd>${e(m.source || "—")}</dd></div><div><dt>${t("broker.kind")}</dt><dd>${e(kindLabel)}</dd></div><div><dt>${t("common.status")}</dt><dd>${badge}</dd></div><div><dt>${t("broker.topic")}</dt><dd><code>${e(m.topic)}</code></dd></div><div><dt>${t("broker.size")}</dt><dd>${e(m.bytes)} B</dd></div></dl>${m.retained ? `<p>${t("broker.retained")}</p>` : ""}${m.payload !== undefined ? `<pre>${e(JSON.stringify(m.payload, null, 2))}</pre>` : `<p class="muted">${t("broker.payload_omitted")}</p>`}</td></tr>`,
+      };
+    });
+    const wanted = new Set(rows.map((r) => r.id));
+    for (const [id, cached] of rowCache) {
+      if (!wanted.has(id)) {
+        for (const node of cached.nodes) node.remove();
+      }
+      if (!visibleIDs.has(id)) rowCache.delete(id);
+    }
+    let cursor = tbody.firstChild;
+    for (const row of rows) {
+      let cached = rowCache.get(row.id);
+      if (!cached || cached.html !== row.html) {
+        if (cached)
+          for (const node of cached.nodes) {
+            if (cursor === node) cursor = node.nextSibling;
+            node.remove();
+          }
+        const fragment = document.createElement("tbody");
+        fragment.innerHTML = row.html;
+        cached = { html: row.html, nodes: [...fragment.children] };
+        rowCache.set(row.id, cached);
+      }
+      for (const node of cached.nodes) {
+        if (node === cursor) cursor = cursor.nextSibling;
+        else tbody.insertBefore(node, cursor);
+      }
+    }
+    if (focused) {
+      const button = [...target.querySelectorAll("button[data-message]")].find(
+        (b) => b.dataset.message === focused,
+      );
+      if (button && button !== document.activeElement)
         button.focus({ preventScroll: true });
     }
   }
+  root.querySelector("#broker-messages").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-message]");
+    if (!button) return;
+    const id = button.dataset.message;
+    if (opened.has(id)) opened.delete(id);
+    else opened.add(id);
+    renderMessages();
+  });
   async function refresh() {
     if (busy || !alive) return;
     busy = true;

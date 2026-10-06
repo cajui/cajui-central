@@ -67,7 +67,7 @@ func (s *Store) DeleteAvailability(ctx context.Context, source, device string) e
 func (s *Store) DeviceStates(ctx context.Context) ([]devicestate.Stored, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT s.state,s.received_at,s.retained,a.availability,a.received_at,a.retained
  FROM device_states s LEFT JOIN device_availability a USING(source_id,device_id)
- WHERE s.archived=0 AND NOT EXISTS (SELECT 1 FROM device_states n WHERE n.device_id=s.device_id AND n.source_id<>s.source_id
+ WHERE s.archived=0 AND NOT EXISTS (SELECT 1 FROM device_states n WHERE n.archived=0 AND n.device_id=s.device_id AND n.source_id<>s.source_id
   AND (n.received_at>s.received_at OR (n.received_at=s.received_at AND n.source_id>s.source_id)))
  ORDER BY s.role='transmitter',s.source_id,s.device_id LIMIT 200`)
 	if err != nil {

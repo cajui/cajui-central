@@ -173,8 +173,12 @@ export function mountReceivers(root, { state, notify }) {
       openReceiverSetup(root, snapshot, refresh),
     );
   render();
-  if (new URLSearchParams(location.search).get("setup") === "1")
+  const url = new URL(location.href);
+  if (url.searchParams.get("setup") === "1") {
+    url.searchParams.delete("setup");
+    history.replaceState(history.state, "", url);
     openReceiverSetup(root, snapshot, refresh);
+  }
   const timer = setInterval(() => {
     if (!document.hidden) refresh();
   }, 30000);

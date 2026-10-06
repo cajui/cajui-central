@@ -68,3 +68,20 @@ func TestReceiverSetupConfiguration(t *testing.T) {
 		t.Fatal("oversized host accepted")
 	}
 }
+
+func TestReceiverUsernameWithoutPasswordFile(t *testing.T) {
+	values := map[string]string{"CAJUI_API_TOKEN": strings.Repeat("x", 24)}
+	get := func(k string) string { return values[k] }
+	for _, user := range []string{"central", "homeassistant", "bad name", "bad:name", strings.Repeat("a", 500)} {
+		values["CAJUI_RECEIVER_USERNAME"] = user
+		if _, err := Load(get); err == nil {
+			t.Fatalf("accepted invalid external receiver user %q", user)
+		}
+	}
+	for _, user := range []string{"", "receiver-1"} {
+		values["CAJUI_RECEIVER_USERNAME"] = user
+		if _, err := Load(get); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

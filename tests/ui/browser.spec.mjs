@@ -1417,16 +1417,40 @@ test("broker viewer filters normalized JSON and fits a tablet", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 820, height: 1180 });
-  await page.route("**/ui-api/broker", (r) =>
-    r.fulfill({ json: brokerFixture() }),
-  );
+  const broker = brokerFixture();
+  await page.route("**/ui-api/broker", (r) => r.fulfill({ json: broker }));
   await page.goto("/broker?lang=en-US");
   await expect(page.locator(".broker-message")).toHaveCount(2);
   await page.locator(".broker-message button").first().click();
   await expect(page.locator(".broker-detail:not([hidden]) pre")).toContainText(
     "<script>bad()</script>",
   );
-  await page.locator("#broker-refresh").click();
+  const original = await page
+    .locator(".broker-detail:not([hidden]) pre")
+    .elementHandle();
+  await page.evaluate(() => {
+    const range = document.createRange();
+    range.selectNodeContents(
+      document.querySelector(".broker-detail:not([hidden]) pre"),
+    );
+    const selection = getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
+  const selected = await page.evaluate(() => getSelection().toString());
+  broker.messages.unshift({
+    ...broker.messages[0],
+    id: 3,
+    device: "new-device",
+  });
+  const refreshed = page.waitForResponse((r) =>
+    r.url().endsWith("/ui-api/broker"),
+  );
+  await page.evaluate(() => document.querySelector("#broker-refresh").click());
+  await refreshed;
+  await expect(page.locator(".broker-message")).toHaveCount(3);
+  expect(await original.evaluate((el) => el.isConnected)).toBeTruthy();
+  expect(await page.evaluate(() => getSelection().toString())).toBe(selected);
   await expect(
     page.locator('.broker-message button[aria-expanded="true"]'),
   ).toHaveCount(1);
@@ -1438,7 +1462,7 @@ test("broker viewer filters normalized JSON and fits a tablet", async ({
   await page.locator("#broker-status").selectOption("accepted");
   await expect(page.locator(".broker-message")).toHaveCount(0);
   await page.locator("#broker-search").fill("");
-  await expect(page.locator(".broker-message")).toHaveCount(1);
+  await expect(page.locator(".broker-message")).toHaveCount(2);
   await page.locator("#broker-pause").click();
   await expect(page.locator("#broker-pause")).toHaveText("Resume");
   expect(
@@ -1474,9 +1498,17 @@ test("receiver wizard retrieves secrets explicitly and waits for new connections
   });
   state.device_states[0].availability = "offline";
   state.device_states[0].received_at = "2020-01-01T00:00:00Z";
+  await page.route("**/ui-api/receiver-states", (r) => {
+    snapshots++;
+    return r.fulfill({
+      json: {
+        generated_at: state.generated_at,
+        device_states: state.device_states,
+      },
+    });
+  });
   const html = await (await page.request.get("/receivers?lang=en-US")).text();
   await page.route("**/receivers", (r) => {
-    snapshots++;
     return r.fulfill({
       contentType: "text/html",
       body: html.replace(
@@ -1597,4 +1629,42 @@ test("receiver setup asks for a missing address only in the details step", async
   await expect(page.locator("#receiver-step-title")).toHaveText(
     "Encontrar receptor",
   );
+});
+
+test("receiver setup consumes its URL trigger and prevents duplicate dialogs", async ({
+  page,
+}) => {
+  await page.route("**/ui-api/broker", (r) =>
+    r.fulfill({ json: brokerFixture() }),
+  );
+  await page.goto("/receivers?lang=en-US&setup=1");
+  await expect(page.locator("dialog.receiver-wizard")).toHaveCount(1);
+  expect(new URL(page.url()).searchParams.has("setup")).toBeFalsy();
+  await page.locator("#add-receiver").evaluate((el) => {
+    el.click();
+    el.click();
+  });
+  await expect(page.locator("dialog.receiver-wizard")).toHaveCount(1);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.reload();
+  await expect(page.locator("html.ready")).toBeVisible();
+  await expect(page.locator("dialog")).toHaveCount(0);
+});
+test("HTTP devices do not offer radio revocation", async ({ page }) => {
+  const state = pairingSnapshot();
+  state.workspace.devices = [
+    {
+      id: 1,
+      transport: "http",
+      source: "http",
+      device: "http-device",
+      name: "HTTP device",
+      location: "",
+      revision: 0,
+    },
+  ];
+  await liveDevices(page, state);
+  await expect(
+    page.getByRole("button", { name: /Revoke transmitter/ }),
+  ).toHaveCount(0);
 });

@@ -300,7 +300,7 @@ export function mountRegistry(root, { state, kind, notify }) {
       : null;
   }
   function revokeButton(entry, dialog) {
-    if (!entry) return null;
+    if (!entry || entry.transport !== "mqtt") return null;
     const states = snapshot.device_states ?? [];
     const node = bindingOf(entry);
     const receiver = node?.receiver_id

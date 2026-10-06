@@ -40,7 +40,7 @@ func TestDiagnosticsBoundedAndPrivate(t *testing.T) {
 			t.Fatal("secret exposed")
 		}
 	}
-	if d.Host != "broker" || d.Port != 1883 || d.ReceiverEndpoint() != "" {
+	if d.Host != "broker" || d.Port != 1883 {
 		t.Fatal(d)
 	}
 	if len(d.Messages[0].Payload) != 0 {
@@ -55,7 +55,7 @@ func TestDiagnosticsConcurrentSnapshots(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 150; j++ {
-				c.observe("unknown", nil, false, false, nil)
+				c.observe("unknown", nil, false, false, nil, nil)
 				c.Diagnostics()
 				c.connectionProblem("connection")
 			}

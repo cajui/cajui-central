@@ -225,3 +225,47 @@ func TestArchiveReceiverSurvivesRestartAndRetainedMessages(t *testing.T) {
 		t.Fatal(rows, err)
 	}
 }
+
+func TestArchiveLatestSourceFallsBackWithoutRefreshingOlderState(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	old := stateFixture(t, "receiver-state.json", "00000000000000d1")
+	old.SourceID = "older-source"
+	newer := old
+	newer.SourceID = "newer-source"
+	at := time.Now().UTC().Add(-time.Hour)
+	if err = db.SaveDeviceState(ctx, old, at, true); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.SaveAvailability(ctx, old.SourceID, old.DeviceID, "offline", at, true); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.SaveDeviceState(ctx, newer, at.Add(time.Minute), false); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.ArchiveReceiver(ctx, newer.SourceID, newer.DeviceID, at.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	states, err := db.DeviceStates(ctx)
+	if err != nil || len(states) != 1 {
+		t.Fatal(states, err)
+	}
+	got := states[0]
+	if got.SourceID != old.SourceID || !got.ReceivedAt.Equal(at) || !got.Retained || got.Availability == nil || *got.Availability != "offline" {
+		t.Fatal("fallback changed original freshness", got)
+	}
+	// Archived snapshots still cannot restore the newer source.
+	n := int64(123)
+	newer.UptimeS = &n
+	if err = db.SaveDeviceState(ctx, newer, at.Add(2*time.Minute), true); err != nil {
+		t.Fatal(err)
+	}
+	states, err = db.DeviceStates(ctx)
+	if err != nil || len(states) != 1 || states[0].SourceID != old.SourceID {
+		t.Fatal(states, err)
+	}
+}

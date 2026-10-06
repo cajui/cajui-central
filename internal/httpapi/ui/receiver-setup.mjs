@@ -1,10 +1,18 @@
 import { t } from "./i18n.mjs";
 import { escapeHTML as e, receiverLabel } from "./model.mjs";
 import { createDialog, localizeValidation } from "./workspace-api.mjs";
-import { brokerSnapshot, receiverCredentials } from "./broker-api.mjs";
-import { fetchSnapshot } from "./snapshot-api.mjs";
+import {
+  brokerSnapshot,
+  receiverCredentials,
+  receiverStates,
+} from "./broker-api.mjs";
 
 export async function openReceiverSetup(root, state, onDone) {
+  const existing = root.querySelector("dialog.receiver-wizard[open]");
+  if (existing) {
+    existing.focus();
+    return;
+  }
   const dialog = createDialog(root, t("setup.add"));
   dialog.classList.add("receiver-wizard");
   const body = document.createElement("div");
@@ -34,7 +42,7 @@ export async function openReceiverSetup(root, state, onDone) {
   try {
     const [broker, baseline] = await Promise.all([
       brokerSnapshot(state),
-      fetchSnapshot("/receivers"),
+      receiverStates(state),
     ]);
     if (!alive()) return;
     if (!broker.configured || !broker.connected) {
@@ -208,7 +216,7 @@ export async function openReceiverSetup(root, state, onDone) {
         if (busy || !alive()) return;
         busy = true;
         try {
-          const next = await fetchSnapshot("/receivers");
+          const next = await receiverStates(state);
           if (!alive() || attempt !== generation) return;
           const matches = (next.device_states ?? []).filter(
             (r) =>

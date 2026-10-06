@@ -54,7 +54,7 @@ func Load(getenv func(string) string) (Config, error) {
 	c.ReceiverUsername = getenv("CAJUI_RECEIVER_USERNAME")
 	c.ReceiverPasswordFile = getenv("CAJUI_RECEIVER_PASSWORD_FILE")
 	c.ReceiverHost = getenv("CAJUI_RECEIVER_HOST")
-	if c.ReceiverPasswordFile != "" && (!regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`).MatchString(c.ReceiverUsername) || c.ReceiverUsername == "central" || c.ReceiverUsername == "homeassistant" || c.ReceiverUsername == c.MQTT.Username) {
+	if (c.ReceiverUsername != "" || c.ReceiverPasswordFile != "") && (!regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`).MatchString(c.ReceiverUsername) || c.ReceiverUsername == "central" || c.ReceiverUsername == "homeassistant" || c.ReceiverUsername == c.MQTT.Username) {
 		return c, errors.New("invalid CAJUI_RECEIVER_USERNAME")
 	}
 	if raw := getenv("CAJUI_RECEIVER_PORT"); raw != "" {

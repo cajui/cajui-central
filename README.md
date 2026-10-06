@@ -503,12 +503,14 @@ The Go suite checks asset routing, CSP, escaped snapshot data and API compatibil
 These tests run in CI. Prettier is a development formatter, not a compilation step.
 
 Devices and sensors offer **Remove from list** next to **Edit**; receivers offer it on
-their cards. Transmitter revocation is visible in the device list and requires an online
+their cards. Transmitter revocation is shown for MQTT devices only and requires an online
 receiver advertising that capability. Receiver and sensor removal preserves history.
 `POST /ui-api/sensors/{id}/archive` takes `{"revision":n}`;
 `POST /ui-api/receivers/{source}/{device}/archive` takes the displayed `received_at`
 timestamp. Both require the same local origin and UI capability as workspace edits.
-Stale revisions or receiver timestamps return 409.
+Stale revisions or receiver timestamps return 409. Archiving a receiver hides only
+that source/device pair. An older, unarchived origin for the same device may become
+visible, keeping its original timestamp, availability and retained status.
 
 ### Receiver setup and MQTT diagnostics
 
@@ -523,7 +525,9 @@ Wi-Fi on the receiver first, then enter the broker's LAN address, port and produ
 credentials. The wizard lists receivers that become online after it opens, excluding those already
 online at the start and retained snapshots. Confirm the receiver that appears, or
 choose yours if several connect. No identifier needs to be typed. It does not enroll transmitters or configure
-Wi-Fi remotely.
+Wi-Fi remotely. Its two-second search polls `GET /ui-api/receiver-states`, a local
+UI-capability-protected endpoint that reads only device states and returns
+`generated_at` and receiver-only `device_states`, without loading telemetry or HTML.
 
 The bundled broker creates a dedicated `receiver-1` producer account. Compose lets
 Central read only that producer's password file, in addition to its own credentials.
@@ -531,7 +535,10 @@ The wizard retrieves the receiver password only after an explicit local action;
 it is absent from page snapshots, diagnostics and browser storage. Multiple receivers
 can share this account initially; this does not provide per-receiver credential revocation.
 For an external broker, create a producer account with the appropriate topic ACLs.
-Never give receivers Central's account.
+Never give receivers Central's account. Username validation also applies when no
+password file is configured. Passwords must contain 1–64 printable non-space ASCII
+bytes, matching the receiver firmware. Credential read failures return a generic
+503; server logs identify the failure category without recording passwords or paths.
 
 Optional server settings:
 
@@ -539,19 +546,25 @@ Optional server settings:
 | --- | --- |
 | `CAJUI_RECEIVER_USERNAME` | Dedicated producer username shown in setup |
 | `CAJUI_RECEIVER_PASSWORD_FILE` | Operator-configured producer password file |
-| `CAJUI_RECEIVER_HOST` | Broker address reachable from receivers, not the Docker service name |
+| `CAJUI_RECEIVER_HOST` | Explicit broker address reachable from receivers; if unset, setup requires manual entry |
 | `CAJUI_RECEIVER_PORT` | Externally reachable broker port |
+
+Central does not infer the receiver address from its own broker connection URL:
+an address reachable inside a container may not resolve on the receiver's network.
 
 **Connections → MQTT broker** shows connection status, subscriptions and read-only
 connection settings. It keeps the last 100 inbound observations in memory, newest
 first, with filters, pause and normalized JSON for accepted messages. Only topics
 subscribed to by Central are visible. Invalid payloads are omitted. Counters and
-this diagnostic buffer reset on restart; stored measurements remain intact.
+this diagnostic buffer reset on restart; stored measurements remain intact. The
+buffer uses a fixed-size ring and reuses validated values from ingestion, avoiding
+a second payload decode.
 This is a diagnostic view, not a broker administration console or durable audit log.
 Broker settings still come from environment variables and secret files.
 
 MQTT diagnostics use a compact table with local receipt time (including seconds),
 device, message type and result. Expand a row for the full timestamp/time zone,
 identifiers, topic, size and normalized JSON. Expanded rows stay open during refresh
-and filtering while the message remains in the buffer. Narrow screens move type and
+and filtering while the message remains in the buffer. Unchanged rows keep their
+DOM nodes during polling, preserving text selection when new messages arrive. Narrow screens move type and
 result into the details.

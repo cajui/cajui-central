@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/cajui/cajui-central/internal/devicestate"
@@ -47,7 +46,7 @@ type Diagnostics struct {
 
 // Diagnostics is bounded, process-local and independent of durable sample delivery.
 func (c *Consumer) Diagnostics() Diagnostics {
-	d := Diagnostics{Configured: c.config.URL != "", Connected: c.Connected(), Username: c.config.Username, ClientID: c.config.ClientID, Limit: MessageLimit, Messages: []ObservedMessage{}, Topics: []string{}}
+	d := Diagnostics{Configured: c.Configured(), Connected: c.Connected(), Username: c.config.Username, ClientID: c.config.ClientID, Limit: MessageLimit, Messages: []ObservedMessage{}, Topics: []string{}}
 	if u, err := url.Parse(c.config.URL); err == nil {
 		d.Host = u.Hostname()
 		d.Port, _ = strconv.Atoi(u.Port())
@@ -58,15 +57,17 @@ func (c *Consumer) Diagnostics() Diagnostics {
 	}
 	sort.Strings(d.Topics)
 	c.observationMu.Lock()
-	defer c.observationMu.Unlock()
-	d.Total = c.observed
-	d.Rejected = c.rejected
-	d.Problem = c.problem
-	for i := len(c.messages) - 1; i >= 0; i-- {
-		m := c.messages[i]
-		m.Payload = append(json.RawMessage(nil), m.Payload...)
-		d.Messages = append(d.Messages, m)
+	d.Total, d.Rejected, d.Problem = c.observed, c.rejected, c.problem
+	for offset := 0; offset < c.messageCount; offset++ {
+		index := (c.messageHead - 1 - offset + MessageLimit) % MessageLimit
+		d.Messages = append(d.Messages, c.messages[index])
 	}
+	c.observationMu.Unlock()
+	// Stored payloads are immutable; copy for callers outside the ingestion lock.
+	for i := range d.Messages {
+		d.Messages[i].Payload = append(json.RawMessage(nil), d.Messages[i].Payload...)
+	}
+
 	return d
 }
 func (c *Consumer) connectionProblem(code string) {
@@ -74,7 +75,7 @@ func (c *Consumer) connectionProblem(code string) {
 	defer c.observationMu.Unlock()
 	c.problem = code
 }
-func (c *Consumer) observe(topic string, payload []byte, retained, accepted bool, err error) {
+func (c *Consumer) observe(topic string, payload []byte, retained, accepted bool, err error, normalized any) {
 	status := "accepted"
 	switch {
 	case errors.Is(err, telemetry.ErrInvalid), errors.Is(err, telemetry.ErrConflict):
@@ -84,27 +85,15 @@ func (c *Consumer) observe(topic string, payload []byte, retained, accepted bool
 	case !accepted:
 		status = "ignored"
 	}
-	var normalized any
 	source, device, kind, managed := devicestate.ParseTopic(topic)
-	if err == nil && accepted {
-		switch {
-		case managed && len(payload) == 0:
-			kind = "deleted"
-		case managed && kind == "state":
-			normalized, _ = devicestate.Decode(source, device, payload)
-		case managed && kind == "availability":
-			normalized, _ = devicestate.DecodeAvailability(payload)
-		case managed && kind == "results":
-			normalized, _ = devicestate.DecodeResult(payload)
-		default:
-			sample, e := telemetry.DecodeSample(payload)
-			if e == nil {
-				normalized = sample
-				source = sample.SourceID
-				device = sample.DeviceID
-				kind = "samples"
-			}
-		}
+	if err != nil || !accepted {
+		normalized = nil
+	}
+	if managed && accepted && err == nil && len(payload) == 0 {
+		kind = "deleted"
+	}
+	if sample, ok := normalized.(telemetry.Sample); ok {
+		source, device, kind = sample.SourceID, sample.DeviceID, "samples"
 	}
 	m := ObservedMessage{At: time.Now().UTC(), Topic: topic, Source: source, Device: device, Kind: kind, Retained: retained, Status: status, Bytes: len(payload)}
 	// An untrusted topic cannot grow the diagnostic ring without bounds.
@@ -124,17 +113,9 @@ func (c *Consumer) observe(topic string, payload []byte, retained, accepted bool
 	if status == "rejected" || status == "retry" {
 		c.rejected++
 	}
-	if len(c.messages) == MessageLimit {
-		copy(c.messages, c.messages[1:])
-		c.messages = c.messages[:MessageLimit-1]
+	c.messages[c.messageHead] = m
+	c.messageHead = (c.messageHead + 1) % MessageLimit
+	if c.messageCount < MessageLimit {
+		c.messageCount++
 	}
-	c.messages = append(c.messages, m)
-}
-
-// ReceiverEndpoint hides container-only addresses from setup instructions.
-func (d Diagnostics) ReceiverEndpoint() string {
-	if d.Host == "broker" || d.Host == "localhost" || d.Host == "127.0.0.1" || d.Host == "::1" {
-		return ""
-	}
-	return strings.TrimSpace(d.Host)
 }
