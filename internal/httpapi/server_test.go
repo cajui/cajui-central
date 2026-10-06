@@ -234,3 +234,10 @@ func (brokenRepo) SaveSensor(context.Context, int64, workspace.Settings) error {
 func (brokenRepo) SaveLayout(context.Context, workspace.Layout) error {
 	return errors.New("private database failure")
 }
+
+func (brokenRepo) ArchiveSensor(context.Context, int64, int64) error {
+	return errors.New("private database failure")
+}
+func (brokenRepo) ArchiveReceiver(context.Context, string, string, time.Time) error {
+	return errors.New("private database failure")
+}

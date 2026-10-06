@@ -42,7 +42,7 @@ func (s *Store) migrate() error {
 	if err = tx.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return err
 	}
-	if version > 6 {
+	if version > 7 {
 		return fmt.Errorf("unsupported schema version %d", version)
 	}
 	if version == 0 {
@@ -84,6 +84,13 @@ func (s *Store) migrate() error {
 	}
 	if version < 6 {
 		if _, err = tx.Exec(archiveSchema); err != nil {
+			return err
+		}
+	}
+	if version < 7 {
+		if _, err = tx.Exec(`ALTER TABLE workspace_sensors ADD COLUMN archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1));
+ALTER TABLE device_states ADD COLUMN archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1));
+PRAGMA user_version=7;`); err != nil {
 			return err
 		}
 	}

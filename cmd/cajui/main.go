@@ -42,7 +42,7 @@ func run(ctx context.Context) error {
 	var options []httpapi.Option
 	if c.MQTT.URL != "" {
 		consumer := mqttingest.New(c.MQTT, db, slog.Default())
-		options = append(options, httpapi.WithCommands(consumer))
+		options = append(options, httpapi.WithCommands(consumer), httpapi.WithBroker(consumer, httpapi.ReceiverSetup{Username: c.ReceiverUsername, PasswordFile: c.ReceiverPasswordFile, Host: c.ReceiverHost, Port: c.ReceiverPort}))
 		mqttContext, stop := context.WithCancel(ctx)
 		done := make(chan struct{})
 		go func() { defer close(done); consumer.Run(mqttContext) }()

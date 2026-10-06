@@ -9,7 +9,7 @@
 </head>
 <body data-page="live">
 <a href="#main" class="skip-link">{{$.Text "nav.skip"}}</a>
-<div class="shell product-shell"><aside class="sidebar" id="sidebar"><a class="wordmark" href="/">Cajuí Central</a><nav class="nav" aria-label="{{$.Text "nav.workspace"}}"><a href="/" {{if eq .Route "/"}}aria-current="page"{{end}}>{{$.Text "common.dashboard"}}</a><a href="/devices" {{if eq .Route "/devices"}}aria-current="page"{{end}}>{{$.Text "common.devices"}}</a><a href="/sensors" {{if eq .Route "/sensors"}}aria-current="page"{{end}}>{{$.Text "common.sensors"}}</a></nav></aside><div class="workspace"><header class="topbar" id="topbar">{{.Title}}</header>
+<div class="shell product-shell"><aside class="sidebar" id="sidebar"><a class="wordmark" href="/">Cajuí Central</a><nav class="nav" aria-label="{{$.Text "nav.workspace"}}"><a href="/" {{if eq .Route "/"}}aria-current="page"{{end}}>{{$.Text "common.dashboard"}}</a><a href="/devices" {{if eq .Route "/devices"}}aria-current="page"{{end}}>{{$.Text "common.devices"}}</a><a href="/sensors" {{if eq .Route "/sensors"}}aria-current="page"{{end}}>{{$.Text "common.sensors"}}</a></nav><nav class="nav" aria-label="{{$.Text "nav.connections"}}"><a href="/receivers">{{$.Text "common.receivers"}}</a><a href="/broker">{{$.Text "broker.title"}}</a></nav></aside><div class="workspace"><header class="topbar" id="topbar">{{.Title}}</header>
 
 <main class="content" id="main"><div id="app">
 <h1>{{$.Text "ssr.heading"}}</h1><p class="muted">{{$.Text "ssr.description"}}</p>

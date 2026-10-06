@@ -30,6 +30,12 @@ docker run --rm --network "${project}_default" \
   -v "$secrets":/secrets:ro -v "$PWD":/src -w /src \
   -v cajui-go-mod:/go/pkg/mod -v cajui-go-build:/root/.cache/go-build \
   golang:1.27 make check
+# Central's non-root UID can read the setup account, but not arbitrary producers.
+docker run --rm --user 65532:65532 -v "$secrets":/secrets:ro --entrypoint sh eclipse-mosquitto:2.0.22 -c '
+  test -r /secrets/producers/receiver-1 && test ! -r /secrets/demo-source
+'
+publish_as receiver-1 producers/receiver-1 telemetry/v1/other/device/samples | grep -q 'Not authorized' \
+  || { echo 'Setup account crossed its source namespace'; exit 1; }
 # MQTT 3.1.1 PUBACK has no negative reason code. MQTT 5 makes ACL rejection observable.
 publish_as demo-source demo-source telemetry/v1/other/device/samples | grep -q 'Not authorized' \
   || { echo 'ACL rejection was not observed'; exit 1; }

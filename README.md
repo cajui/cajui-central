@@ -375,6 +375,9 @@ and new telemetry commit together; duplicate retries never refresh inventory tim
 Known sensors remain listed when absent from the most recent 100 samples/readings.
 Schema version 6 adds `workspace_devices.archived`: an archived device and its sensors
 leave the catalog, their telemetry stays, and the next observation brings them back.
+Schema version 7 adds removal flags for sensors and receiver states. Removing an item
+keeps its history and names. Fresh telemetry restores a sensor; a fresh, non-retained
+state restores a receiver. Removal does not revoke radio or MQTT credentials.
 An older binary refuses a database migrated to a newer schema.
 Back up before upgrading; an older binary cannot open a version 3 database. To roll
 back, restore a pre-upgrade backup together with the older binary.
@@ -498,3 +501,57 @@ accessibility checks in both themes. The automatic
 accessibility audit covers selected WCAG A/AA rules, not a complete conformance review.
 The Go suite checks asset routing, CSP, escaped snapshot data and API compatibility.
 These tests run in CI. Prettier is a development formatter, not a compilation step.
+
+Devices and sensors offer **Remove from list** next to **Edit**; receivers offer it on
+their cards. Transmitter revocation is visible in the device list and requires an online
+receiver advertising that capability. Receiver and sensor removal preserves history.
+`POST /ui-api/sensors/{id}/archive` takes `{"revision":n}`;
+`POST /ui-api/receivers/{source}/{device}/archive` takes the displayed `received_at`
+timestamp. Both require the same local origin and UI capability as workspace edits.
+Stale revisions or receiver timestamps return 409.
+
+### Receiver setup and MQTT diagnostics
+
+**Connections → Receivers → Add receiver** guides the first connection in three steps:
+connect to the receiver and save Wi-Fi, transfer MQTT connection details, then find
+and confirm the receiver. Known values are selectable text with copy actions; the
+password is retrieved only when Show password is selected. An optional address editor
+changes only the values shown by the assistant, not server configuration. Missing
+addresses require entry before discovery. Back navigation preserves the details and
+hides the password again. Configure
+Wi-Fi on the receiver first, then enter the broker's LAN address, port and producer
+credentials. The wizard lists receivers that become online after it opens, excluding those already
+online at the start and retained snapshots. Confirm the receiver that appears, or
+choose yours if several connect. No identifier needs to be typed. It does not enroll transmitters or configure
+Wi-Fi remotely.
+
+The bundled broker creates a dedicated `receiver-1` producer account. Compose lets
+Central read only that producer's password file, in addition to its own credentials.
+The wizard retrieves the receiver password only after an explicit local action;
+it is absent from page snapshots, diagnostics and browser storage. Multiple receivers
+can share this account initially; this does not provide per-receiver credential revocation.
+For an external broker, create a producer account with the appropriate topic ACLs.
+Never give receivers Central's account.
+
+Optional server settings:
+
+| Variable | Purpose |
+| --- | --- |
+| `CAJUI_RECEIVER_USERNAME` | Dedicated producer username shown in setup |
+| `CAJUI_RECEIVER_PASSWORD_FILE` | Operator-configured producer password file |
+| `CAJUI_RECEIVER_HOST` | Broker address reachable from receivers, not the Docker service name |
+| `CAJUI_RECEIVER_PORT` | Externally reachable broker port |
+
+**Connections → MQTT broker** shows connection status, subscriptions and read-only
+connection settings. It keeps the last 100 inbound observations in memory, newest
+first, with filters, pause and normalized JSON for accepted messages. Only topics
+subscribed to by Central are visible. Invalid payloads are omitted. Counters and
+this diagnostic buffer reset on restart; stored measurements remain intact.
+This is a diagnostic view, not a broker administration console or durable audit log.
+Broker settings still come from environment variables and secret files.
+
+MQTT diagnostics use a compact table with local receipt time (including seconds),
+device, message type and result. Expand a row for the full timestamp/time zone,
+identifiers, topic, size and normalized JSON. Expanded rows stay open during refresh
+and filtering while the message remains in the buffer. Narrow screens move type and
+result into the details.

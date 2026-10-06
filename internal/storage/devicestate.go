@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cajui/cajui-central/internal/devicestate"
+	"github.com/cajui/cajui-central/internal/workspace"
 )
 
 // Latest state and availability per device; history is not kept. Availability has its
@@ -33,7 +34,7 @@ func (s *Store) SaveDeviceState(ctx context.Context, state devicestate.State, at
 		return err
 	}
 	_, err = s.db.ExecContext(ctx, `INSERT INTO device_states(source_id,device_id,role,state,received_at,retained) VALUES(?,?,?,?,?,?)
- ON CONFLICT(source_id,device_id) DO UPDATE SET role=excluded.role,state=excluded.state,received_at=excluded.received_at,retained=excluded.retained
+ ON CONFLICT(source_id,device_id) DO UPDATE SET role=excluded.role,state=excluded.state,received_at=excluded.received_at,retained=excluded.retained,archived=CASE WHEN excluded.retained=0 THEN 0 ELSE device_states.archived END
  WHERE NOT (excluded.retained=1 AND device_states.state=excluded.state)`,
 		state.SourceID, state.DeviceID, state.Role, string(payload), at.UTC().Format(time.RFC3339Nano), retained)
 	return err
@@ -66,7 +67,7 @@ func (s *Store) DeleteAvailability(ctx context.Context, source, device string) e
 func (s *Store) DeviceStates(ctx context.Context) ([]devicestate.Stored, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT s.state,s.received_at,s.retained,a.availability,a.received_at,a.retained
  FROM device_states s LEFT JOIN device_availability a USING(source_id,device_id)
- WHERE NOT EXISTS (SELECT 1 FROM device_states n WHERE n.device_id=s.device_id AND n.source_id<>s.source_id
+ WHERE s.archived=0 AND NOT EXISTS (SELECT 1 FROM device_states n WHERE n.device_id=s.device_id AND n.source_id<>s.source_id
   AND (n.received_at>s.received_at OR (n.received_at=s.received_at AND n.source_id>s.source_id)))
  ORDER BY s.role='transmitter',s.source_id,s.device_id LIMIT 200`)
 	if err != nil {
@@ -117,4 +118,32 @@ func (s *Store) DeviceState(ctx context.Context, source, device string) (devices
 	}
 	err = json.Unmarshal([]byte(payload), &state)
 	return state, err
+}
+
+// ArchiveReceiver hides only the observed receiver state. It does not revoke broker access.
+// A fresh state makes it visible again; retained snapshots cannot undo removal.
+func (s *Store) ArchiveReceiver(ctx context.Context, source, device string, seen time.Time) error {
+	if source == "" || device == "" || seen.IsZero() {
+		return workspace.ErrInvalid
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var current string
+	err = tx.QueryRowContext(ctx, `SELECT received_at FROM device_states WHERE source_id=? AND device_id=? AND role='receiver' AND archived=0`, source, device).Scan(&current)
+	if errors.Is(err, sql.ErrNoRows) {
+		return workspace.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if current != seen.UTC().Format(time.RFC3339Nano) {
+		return workspace.ErrConflict
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE device_states SET archived=1 WHERE source_id=? AND device_id=?`, source, device); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

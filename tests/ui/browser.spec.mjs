@@ -927,6 +927,7 @@ function pairingSnapshot() {
         source_id: "site",
         device_id: "000048ca433c5e10",
         role: "receiver",
+        retained: false,
         availability: "online",
         capabilities: ["pairing", "revoke"],
         received_at: now,
@@ -1076,9 +1077,17 @@ test("revocation lives with the device name, not on the dashboard", async ({
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBeTruthy();
+  await expect(
+    row.getByRole("button", { name: "Revoke transmitter", exact: true }),
+  ).toBeVisible();
+  await expect(
+    row.getByRole("button", { name: "Remove Coop from the list", exact: true }),
+  ).toBeVisible();
   await edit.click();
   await expect(
-    page.getByRole("button", { name: "Revoke transmitter", exact: true }),
+    page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Revoke transmitter", exact: true }),
   ).toBeVisible();
   const home = await (await page.request.get("/?lang=en-US")).text();
   await page.route("**/", (route) =>
@@ -1125,6 +1134,23 @@ test("receivers have their own page and one status line on the dashboard", async
   ).toHaveAttribute("aria-current", "page");
   await expect(page.locator(".receiver-card")).toContainText("Receiver 5E10");
   await expect(page.locator(".receiver-card")).toContainText("0 of 128");
+  let removal = null;
+  await page.route(
+    "**/ui-api/receivers/site/000048ca433c5e10/archive",
+    (route) => {
+      removal = JSON.parse(route.request().postData());
+      return route.fulfill({ status: 204 });
+    },
+  );
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("button", {
+      name: "Remove Receiver 5E10 from the list",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator("#toast")).toContainText("removed from the list");
+  expect(removal).toEqual({ received_at: state.device_states[0].received_at });
   const offline = structuredClone(state);
   offline.device_states[0].availability = "offline";
   await inject("/", offline);
@@ -1345,4 +1371,230 @@ test("a revoked transmitter leaves the dashboard", async ({ page }) => {
     page.getByText("No matching items in this section."),
   ).toHaveCount(0);
   await expect(page.locator("#devices .empty")).toBeVisible();
+});
+
+function brokerFixture() {
+  return {
+    configured: true,
+    connected: true,
+    host: "broker",
+    port: 1883,
+    username: "central",
+    client_id: "test",
+    topics: ["telemetry/v1/+/+/samples"],
+    total: 2,
+    rejected: 1,
+    limit: 100,
+    receiver_host: "192.168.1.10",
+    receiver_port: 1883,
+    receiver_username: "receiver-1",
+    credentials_available: true,
+    messages: [
+      {
+        id: 2,
+        at: new Date().toISOString(),
+        topic: "telemetry/v1/demo/device/samples",
+        source: "demo",
+        device: "device",
+        status: "accepted",
+        bytes: 40,
+        payload: { text: "<script>bad()</script>", value: 24 },
+      },
+      {
+        id: 1,
+        at: new Date().toISOString(),
+        topic: "manage/v1/other/device/state",
+        source: "other",
+        device: "device",
+        status: "rejected",
+        retained: true,
+        bytes: 10,
+      },
+    ],
+  };
+}
+test("broker viewer filters normalized JSON and fits a tablet", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await page.route("**/ui-api/broker", (r) =>
+    r.fulfill({ json: brokerFixture() }),
+  );
+  await page.goto("/broker?lang=en-US");
+  await expect(page.locator(".broker-message")).toHaveCount(2);
+  await page.locator(".broker-message button").first().click();
+  await expect(page.locator(".broker-detail:not([hidden]) pre")).toContainText(
+    "<script>bad()</script>",
+  );
+  await page.locator("#broker-refresh").click();
+  await expect(
+    page.locator('.broker-message button[aria-expanded="true"]'),
+  ).toHaveCount(1);
+  await expect(page.locator(".broker-message time").first()).toHaveText(
+    /\d{2}:\d{2}:\d{2}/,
+  );
+  await page.locator("#broker-search").fill("other");
+  await expect(page.locator(".broker-message")).toHaveCount(1);
+  await page.locator("#broker-status").selectOption("accepted");
+  await expect(page.locator(".broker-message")).toHaveCount(0);
+  await page.locator("#broker-search").fill("");
+  await expect(page.locator(".broker-message")).toHaveCount(1);
+  await page.locator("#broker-pause").click();
+  await expect(page.locator("#broker-pause")).toHaveText("Resume");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({
+    path: "/tmp/cajui-broker-tablet.png",
+    fullPage: true,
+  });
+  const audit = await new AxeBuilder({ page }).analyze();
+  expect(audit.violations).toEqual([]);
+});
+test("receiver wizard retrieves secrets explicitly and waits for new connections without typing an identifier", async ({
+  page,
+}) => {
+  let credentials = 0,
+    snapshots = 0;
+  await page.route("**/ui-api/broker", (r) =>
+    r.fulfill({ json: brokerFixture() }),
+  );
+  await page.route("**/ui-api/receiver-credentials", (r) => {
+    credentials++;
+    return r.fulfill({
+      json: { username: "receiver-1", password: "fixture-secret" },
+    });
+  });
+  const state = pairingSnapshot();
+  state.device_states.push({
+    ...state.device_states[0],
+    device_id: "000048ca433c7777",
+  });
+  state.device_states[0].availability = "offline";
+  state.device_states[0].received_at = "2020-01-01T00:00:00Z";
+  const html = await (await page.request.get("/receivers?lang=en-US")).text();
+  await page.route("**/receivers", (r) => {
+    snapshots++;
+    return r.fulfill({
+      contentType: "text/html",
+      body: html.replace(
+        /(<script type="application\/json" id="initial-state">)[\s\S]*?(<\/script>)/,
+        () =>
+          '<script type="application/json" id="initial-state">' +
+          JSON.stringify(state) +
+          "</script>",
+      ),
+    });
+  });
+  await page.goto("/receivers");
+  await page.getByRole("button", { name: "Add receiver", exact: true }).click();
+  await expect(page.locator("#receiver-step-title")).toHaveText(
+    "Connect to receiver",
+  );
+  await expect(page.locator("#receiver-values")).toHaveCount(0);
+  await page.locator("#setup-next").click();
+  await expect(page.locator("#receiver-show")).toBeVisible();
+  await expect(page.locator("#receiver-values input")).toHaveCount(0);
+  expect(credentials).toBe(0);
+  expect(await page.content()).not.toContain("fixture-secret");
+  await page.locator("#receiver-show").click();
+  await expect(page.locator("#receiver-values")).toContainText(
+    "fixture-secret",
+  );
+  await page.locator("#receiver-show").click();
+  expect(await page.locator("#receiver-values").innerText()).not.toContain(
+    "fixture-secret",
+  );
+  const audit = await new AxeBuilder({ page }).analyze();
+  expect(audit.violations).toEqual([]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({
+    path: "/tmp/cajui-wizard-mobile.png",
+    fullPage: true,
+  });
+  await page.locator("#setup-back").click();
+  await expect(page.locator("#receiver-step-title")).toHaveText(
+    "Connect to receiver",
+  );
+  await page.locator("#setup-next").click();
+  expect(await page.locator("#receiver-values").innerText()).not.toContain(
+    "fixture-secret",
+  );
+  expect(credentials).toBe(1);
+  await expect(page.locator('[name="suffix"]')).toHaveCount(0);
+  await page.locator("#setup-next").click();
+  await expect.poll(() => snapshots).toBeGreaterThanOrEqual(3);
+  await expect(page.locator("#setup-result button")).toHaveCount(0);
+  state.device_states[0].availability = "online";
+  state.device_states[1].received_at = new Date(
+    Date.now() + 1000,
+  ).toISOString();
+  state.device_states[0].received_at = new Date(
+    Date.now() + 1000,
+  ).toISOString();
+  state.device_states[0].retained = true;
+  const previous = snapshots;
+  await expect.poll(() => snapshots).toBeGreaterThan(previous);
+  await expect(page.locator("#setup-result button")).toHaveCount(0);
+  state.device_states[0].retained = false;
+  await expect(page.locator("#setup-result button")).toBeVisible({
+    timeout: 10000,
+  });
+  const second = { ...state.device_states[0], device_id: "000048ca433c8888" };
+  state.device_states.push(second);
+  await expect(page.locator("#setup-result button")).toHaveCount(2);
+  await expect(page.locator("#setup-result")).toContainText(
+    "More than one receiver connected",
+  );
+  expect(await page.locator("#setup-result").innerText()).not.toContain("7777");
+  second.availability = "offline";
+  await expect(page.locator("#setup-result button")).toHaveCount(1);
+  await page.locator("#setup-result button").click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(await page.content()).not.toContain("fixture-secret");
+});
+
+test("receiver setup asks for a missing address only in the details step", async ({
+  page,
+}) => {
+  await page.route("**/ui-api/broker", (r) =>
+    r.fulfill({
+      json: {
+        ...brokerFixture(),
+        receiver_host: "",
+        credentials_available: false,
+      },
+    }),
+  );
+  await page.goto("/receivers?lang=pt-BR&setup=1");
+  await expect(page.locator("#receiver-step-title")).toHaveText(
+    "Conectar ao receptor",
+  );
+  await page.locator("#setup-next").click();
+  await expect(page.locator(".receiver-address")).toHaveAttribute("open", "");
+  await page.locator("#setup-next").click();
+  await expect(page.locator("#setup-error")).not.toBeEmpty();
+  await page.locator('[name="host"]').fill("localhost");
+  await page.locator('#receiver-address-form [type="submit"]').click();
+  await expect(page.locator("#receiver-step-title")).toHaveText(
+    "Dados de conexão",
+  );
+  await page.locator('[name="host"]').fill("192.168.1.20");
+  await page.locator('#receiver-address-form [type="submit"]').click();
+  await expect(page.locator("#receiver-values")).toContainText("192.168.1.20");
+  await expect(page.locator(".receiver-address")).not.toHaveAttribute(
+    "open",
+    "",
+  );
+  await page.locator("#setup-next").click();
+  await expect(page.locator("#receiver-step-title")).toHaveText(
+    "Encontrar receptor",
+  );
 });

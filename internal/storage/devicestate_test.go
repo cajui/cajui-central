@@ -2,6 +2,8 @@ package storage
 
 import (
 	"context"
+	"errors"
+	"github.com/cajui/cajui-central/internal/workspace"
 	"os"
 	"path/filepath"
 	"testing"
@@ -177,5 +179,49 @@ func TestDeviceStateStorageFailures(t *testing.T) {
 	}
 	if err = db.DeleteDeviceState(ctx, "s", "d"); err == nil {
 		t.Fatal("closed database deleted a state")
+	}
+}
+
+func TestArchiveReceiverSurvivesRestartAndRetainedMessages(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := stateFixture(t, "receiver-state.json", "00000000000000d1")
+	at := time.Now().UTC()
+	if err = s.SaveDeviceState(ctx, r, at, false); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.ArchiveReceiver(ctx, r.SourceID, r.DeviceID, at.Add(time.Second)); !errors.Is(err, workspace.ErrConflict) {
+		t.Fatal(err)
+	}
+	if err = s.ArchiveReceiver(ctx, r.SourceID, r.DeviceID, at); err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	s, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	uptime := int64(999)
+	r.UptimeS = &uptime // A changed retained snapshot must also remain hidden.
+	if err = s.SaveDeviceState(ctx, r, at.Add(time.Minute), true); err != nil {
+		t.Fatal(err)
+	}
+	if rows, err := s.DeviceStates(ctx); err != nil || len(rows) != 0 {
+		t.Fatal(rows, err)
+	}
+	if _, err = s.DeviceState(ctx, r.SourceID, r.DeviceID); err != nil {
+		t.Fatal("state lost", err)
+	}
+	if err = s.SaveDeviceState(ctx, r, at.Add(2*time.Minute), false); err != nil {
+		t.Fatal(err)
+	}
+	if rows, err := s.DeviceStates(ctx); err != nil || len(rows) != 1 {
+		t.Fatal(rows, err)
 	}
 }
