@@ -190,7 +190,7 @@ export function mountRegistry(root, { state, kind, notify }) {
           ],
           [
             t("common.actions"),
-            `<span class="row-actions"><button class="button" data-edit="${entry.id}" aria-label="${e(t("registry.edit_name", { name: entry.name }))}">${t("common.edit")}</button>${revoked(entry) && !sensors ? `<button class="button" data-repair="${entry.id}" aria-label="${e(t("registry.pairing.repair_name", { name: entry.name }))}">${t("registry.pairing.repair")}</button><button class="button danger-text" data-archive="${entry.id}" aria-label="${e(t("registry.archive_name", { name: entry.name }))}">${t("registry.archive")}</button>` : ""}</span>`,
+            `<span class="row-actions"><button class="button" data-edit="${entry.id}" aria-label="${e(t("registry.edit_name", { name: entry.name }))}">${t("common.edit")}</button>${revoked(entry) && !sensors ? `<button class="button" data-repair="${entry.id}" aria-label="${e(t("registry.pairing.repair_name", { name: entry.name }))}">${t("registry.pairing.repair")}</button>` : ""}${!sensors && !revoked(entry) ? `<span data-revocation="${entry.id}"></span>` : ""}<button class="button danger-text" data-archive="${entry.id}" aria-label="${e(t("registry.archive_name", { name: entry.name }))}">${t("registry.archive")}</button></span>`,
           ],
         ];
         return cells;
@@ -208,6 +208,13 @@ export function mountRegistry(root, { state, kind, notify }) {
     const gone = registered.filter(revoked);
     // Revoked devices keep their name and history but sit apart, below the working ones.
     list.innerHTML = `${active.length ? table(active, message("registered")) : ""}${gone.length ? `<section class="registry-revoked" aria-labelledby="revoked-heading"><h2 id="revoked-heading">${e(t("registry.pairing.revoked_heading"))}</h2><p class="muted">${e(t(sensors ? "registry.pairing.revoked_sensors_note" : "registry.pairing.revoked_note"))}</p>${table(gone, t("registry.pairing.revoked_heading"))}</section>` : ""}`;
+    for (const holder of list.querySelectorAll("[data-revocation]")) {
+      const entry = entries.find(
+        (d) => d.id === Number(holder.dataset.revocation),
+      );
+      const button = revokeButton(entry, null);
+      if (button) holder.append(button);
+    }
     for (const b of list.querySelectorAll("[data-archive]"))
       b.addEventListener("click", () =>
         archive(
@@ -267,7 +274,7 @@ export function mountRegistry(root, { state, kind, notify }) {
     if (!dialog.open) dialog.showModal();
     form.elements.name.focus();
   }
-  // Archiving hides a revoked device until it reports again; history stays.
+  // Removal hides the item until fresh telemetry arrives; history stays.
   async function archive(entry, button) {
     if (!window.confirm(t("registry.archive_confirm", { name: entry.name })))
       return;
@@ -275,7 +282,7 @@ export function mountRegistry(root, { state, kind, notify }) {
     try {
       await saveWorkspace(
         snapshot,
-        `devices/${entry.id}/archive`,
+        `${kind}/${entry.id}/archive`,
         { revision: entry.revision },
         "POST",
       );
@@ -293,17 +300,26 @@ export function mountRegistry(root, { state, kind, notify }) {
       : null;
   }
   function revokeButton(entry, dialog) {
-    if (entry.transport !== "mqtt") return null;
+    if (!entry || entry.transport !== "mqtt") return null;
     const states = snapshot.device_states ?? [];
     const node = bindingOf(entry);
     const receiver = node?.receiver_id
       ? deviceStateFor(states, entry.source, node.receiver_id)
       : null;
-    if (!offers(receiver, "revoke") || node.binding === "revoked") return null;
+    if (node?.binding === "revoked") return null;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "button danger";
     button.textContent = t("commands.revoke");
+    if (!offers(receiver, "revoke") || receiver.availability !== "online") {
+      button.disabled = true;
+      button.title = t("commands.revoke_unavailable");
+      button.setAttribute(
+        "aria-label",
+        `${t("commands.revoke")}: ${button.title}`,
+      );
+      return button;
+    }
     button.addEventListener("click", () => {
       if (commands.running) {
         notify(t("commands.in_progress"));
@@ -311,7 +327,7 @@ export function mountRegistry(root, { state, kind, notify }) {
       }
       const name = entry.name || entry.device;
       if (!window.confirm(t("commands.revoke_confirm", { name }))) return;
-      dialog.close();
+      dialog?.close();
       commands.run(button, {
         source_id: entry.source,
         device_id: node.receiver_id,

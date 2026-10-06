@@ -2,6 +2,23 @@ import AxeBuilder from "@axe-core/playwright";
 import { test, expect } from "@playwright/test";
 const referenceURL = "http://127.0.0.1:8092";
 
+// Existing page fixtures own their states; keep the live transport isolated from
+// the disposable server's inventory. Dedicated tests below drive actual SSE frames.
+test.beforeEach(async ({ page }) => {
+  await page.route("**/ui-api/device-states/events", (route) => route.abort());
+  await page.route("**/ui-api/device-states", async (route) => {
+    const snapshot = await page.evaluate(() =>
+      JSON.parse(document.querySelector("#initial-state").textContent),
+    );
+    await route.fulfill({
+      json: {
+        generated_at: snapshot.generated_at,
+        device_states: snapshot.device_states ?? [],
+      },
+    });
+  });
+});
+
 for (const viewport of [
   { width: 1440, height: 1000 },
   { width: 390, height: 844 },
@@ -927,6 +944,7 @@ function pairingSnapshot() {
         source_id: "site",
         device_id: "000048ca433c5e10",
         role: "receiver",
+        retained: false,
         availability: "online",
         capabilities: ["pairing", "revoke"],
         received_at: now,
@@ -1076,9 +1094,17 @@ test("revocation lives with the device name, not on the dashboard", async ({
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBeTruthy();
+  await expect(
+    row.getByRole("button", { name: "Revoke transmitter", exact: true }),
+  ).toBeVisible();
+  await expect(
+    row.getByRole("button", { name: "Remove Coop from the list", exact: true }),
+  ).toBeVisible();
   await edit.click();
   await expect(
-    page.getByRole("button", { name: "Revoke transmitter", exact: true }),
+    page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Revoke transmitter", exact: true }),
   ).toBeVisible();
   const home = await (await page.request.get("/?lang=en-US")).text();
   await page.route("**/", (route) =>
@@ -1125,6 +1151,23 @@ test("receivers have their own page and one status line on the dashboard", async
   ).toHaveAttribute("aria-current", "page");
   await expect(page.locator(".receiver-card")).toContainText("Receiver 5E10");
   await expect(page.locator(".receiver-card")).toContainText("0 of 128");
+  let removal = null;
+  await page.route(
+    "**/ui-api/receivers/site/000048ca433c5e10/archive",
+    (route) => {
+      removal = JSON.parse(route.request().postData());
+      return route.fulfill({ status: 204 });
+    },
+  );
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("button", {
+      name: "Remove Receiver 5E10 from the list",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator("#toast")).toContainText("removed from the list");
+  expect(removal).toEqual({ received_at: state.device_states[0].received_at });
   const offline = structuredClone(state);
   offline.device_states[0].availability = "offline";
   await inject("/", offline);
@@ -1346,3 +1389,377 @@ test("a revoked transmitter leaves the dashboard", async ({ page }) => {
   ).toHaveCount(0);
   await expect(page.locator("#devices .empty")).toBeVisible();
 });
+
+function brokerFixture() {
+  return {
+    configured: true,
+    connected: true,
+    host: "broker",
+    port: 1883,
+    username: "central",
+    client_id: "test",
+    topics: ["telemetry/v1/+/+/samples"],
+    total: 2,
+    rejected: 1,
+    limit: 100,
+    receiver_host: "192.168.1.10",
+    receiver_port: 1883,
+    receiver_username: "receiver-1",
+    credentials_available: true,
+    messages: [
+      {
+        id: 2,
+        at: new Date().toISOString(),
+        topic: "telemetry/v1/demo/device/samples",
+        source: "demo",
+        device: "device",
+        status: "accepted",
+        bytes: 40,
+        payload: { text: "<script>bad()</script>", value: 24 },
+      },
+      {
+        id: 1,
+        at: new Date().toISOString(),
+        topic: "manage/v1/other/device/state",
+        source: "other",
+        device: "device",
+        status: "rejected",
+        retained: true,
+        bytes: 10,
+      },
+    ],
+  };
+}
+test("broker viewer filters normalized JSON and fits a tablet", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 820, height: 1180 });
+  const broker = brokerFixture();
+  await page.route("**/ui-api/broker", (r) => r.fulfill({ json: broker }));
+  await page.goto("/broker?lang=en-US");
+  await expect(page.locator(".broker-message")).toHaveCount(2);
+  await page.locator(".broker-message button").first().click();
+  await expect(page.locator(".broker-detail:not([hidden]) pre")).toContainText(
+    "<script>bad()</script>",
+  );
+  const original = await page
+    .locator(".broker-detail:not([hidden]) pre")
+    .elementHandle();
+  await page.evaluate(() => {
+    const range = document.createRange();
+    range.selectNodeContents(
+      document.querySelector(".broker-detail:not([hidden]) pre"),
+    );
+    const selection = getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
+  const selected = await page.evaluate(() => getSelection().toString());
+  broker.messages.unshift({
+    ...broker.messages[0],
+    id: 3,
+    device: "new-device",
+  });
+  const refreshed = page.waitForResponse((r) =>
+    r.url().endsWith("/ui-api/broker"),
+  );
+  await page.evaluate(() => document.querySelector("#broker-refresh").click());
+  await refreshed;
+  await expect(page.locator(".broker-message")).toHaveCount(3);
+  expect(await original.evaluate((el) => el.isConnected)).toBeTruthy();
+  expect(await page.evaluate(() => getSelection().toString())).toBe(selected);
+  await expect(
+    page.locator('.broker-message button[aria-expanded="true"]'),
+  ).toHaveCount(1);
+  await expect(page.locator(".broker-message time").first()).toHaveText(
+    /\d{2}:\d{2}:\d{2}/,
+  );
+  await page.locator("#broker-search").fill("other");
+  await expect(page.locator(".broker-message")).toHaveCount(1);
+  await page.locator("#broker-status").selectOption("accepted");
+  await expect(page.locator(".broker-message")).toHaveCount(0);
+  await page.locator("#broker-search").fill("");
+  await expect(page.locator(".broker-message")).toHaveCount(2);
+  await page.locator("#broker-pause").click();
+  await expect(page.locator("#broker-pause")).toHaveText("Resume");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({
+    path: "/tmp/cajui-broker-tablet.png",
+    fullPage: true,
+  });
+  const audit = await new AxeBuilder({ page }).analyze();
+  expect(audit.violations).toEqual([]);
+});
+test("receiver wizard retrieves secrets explicitly and waits for new connections without typing an identifier", async ({
+  page,
+}) => {
+  let credentials = 0,
+    snapshots = 0;
+  await page.route("**/ui-api/broker", (r) =>
+    r.fulfill({ json: brokerFixture() }),
+  );
+  await page.route("**/ui-api/receiver-credentials", (r) => {
+    credentials++;
+    return r.fulfill({
+      json: { username: "receiver-1", password: "fixture-secret" },
+    });
+  });
+  const state = pairingSnapshot();
+  state.device_states.push({
+    ...state.device_states[0],
+    device_id: "000048ca433c7777",
+  });
+  state.device_states[0].availability = "offline";
+  state.device_states[0].received_at = "2020-01-01T00:00:00Z";
+  await page.route("**/ui-api/receiver-states", (r) => {
+    snapshots++;
+    return r.fulfill({
+      json: {
+        generated_at: state.generated_at,
+        device_states: state.device_states,
+      },
+    });
+  });
+  const html = await (await page.request.get("/receivers?lang=en-US")).text();
+  await page.route("**/receivers", (r) => {
+    return r.fulfill({
+      contentType: "text/html",
+      body: html.replace(
+        /(<script type="application\/json" id="initial-state">)[\s\S]*?(<\/script>)/,
+        () =>
+          '<script type="application/json" id="initial-state">' +
+          JSON.stringify(state) +
+          "</script>",
+      ),
+    });
+  });
+  await page.goto("/receivers");
+  await page.getByRole("button", { name: "Add receiver", exact: true }).click();
+  await expect(page.locator("#receiver-step-title")).toHaveText(
+    "Connect to receiver",
+  );
+  await expect(page.locator("#receiver-values")).toHaveCount(0);
+  await page.locator("#setup-next").click();
+  await expect(page.locator("#receiver-show")).toBeVisible();
+  await expect(page.locator("#receiver-values input")).toHaveCount(0);
+  expect(credentials).toBe(0);
+  expect(await page.content()).not.toContain("fixture-secret");
+  await page.locator("#receiver-show").click();
+  await expect(page.locator("#receiver-values")).toContainText(
+    "fixture-secret",
+  );
+  await page.locator("#receiver-show").click();
+  expect(await page.locator("#receiver-values").innerText()).not.toContain(
+    "fixture-secret",
+  );
+  const audit = await new AxeBuilder({ page }).analyze();
+  expect(audit.violations).toEqual([]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({
+    path: "/tmp/cajui-wizard-mobile.png",
+    fullPage: true,
+  });
+  await page.locator("#setup-back").click();
+  await expect(page.locator("#receiver-step-title")).toHaveText(
+    "Connect to receiver",
+  );
+  await page.locator("#setup-next").click();
+  expect(await page.locator("#receiver-values").innerText()).not.toContain(
+    "fixture-secret",
+  );
+  expect(credentials).toBe(1);
+  await expect(page.locator('[name="suffix"]')).toHaveCount(0);
+  await page.locator("#setup-next").click();
+  await expect.poll(() => snapshots).toBeGreaterThanOrEqual(3);
+  await expect(page.locator("#setup-result button")).toHaveCount(0);
+  state.device_states[0].availability = "online";
+  state.device_states[1].received_at = new Date(
+    Date.now() + 1000,
+  ).toISOString();
+  state.device_states[0].received_at = new Date(
+    Date.now() + 1000,
+  ).toISOString();
+  state.device_states[0].retained = true;
+  const previous = snapshots;
+  await expect.poll(() => snapshots).toBeGreaterThan(previous);
+  await expect(page.locator("#setup-result button")).toHaveCount(0);
+  state.device_states[0].retained = false;
+  await expect(page.locator("#setup-result button")).toBeVisible({
+    timeout: 10000,
+  });
+  const second = { ...state.device_states[0], device_id: "000048ca433c8888" };
+  state.device_states.push(second);
+  await expect(page.locator("#setup-result button")).toHaveCount(2);
+  await expect(page.locator("#setup-result")).toContainText(
+    "More than one receiver connected",
+  );
+  expect(await page.locator("#setup-result").innerText()).not.toContain("7777");
+  second.availability = "offline";
+  await expect(page.locator("#setup-result button")).toHaveCount(1);
+  await page.locator("#setup-result button").click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(await page.content()).not.toContain("fixture-secret");
+});
+
+test("receiver setup asks for a missing address only in the details step", async ({
+  page,
+}) => {
+  await page.route("**/ui-api/broker", (r) =>
+    r.fulfill({
+      json: {
+        ...brokerFixture(),
+        receiver_host: "",
+        credentials_available: false,
+      },
+    }),
+  );
+  await page.goto("/receivers?lang=pt-BR&setup=1");
+  await expect(page.locator("#receiver-step-title")).toHaveText(
+    "Conectar ao receptor",
+  );
+  await page.locator("#setup-next").click();
+  await expect(page.locator(".receiver-address")).toHaveAttribute("open", "");
+  await page.locator("#setup-next").click();
+  await expect(page.locator("#setup-error")).not.toBeEmpty();
+  await page.locator('[name="host"]').fill("localhost");
+  await page.locator('#receiver-address-form [type="submit"]').click();
+  await expect(page.locator("#receiver-step-title")).toHaveText(
+    "Dados de conexão",
+  );
+  await page.locator('[name="host"]').fill("192.168.1.20");
+  await page.locator('#receiver-address-form [type="submit"]').click();
+  await expect(page.locator("#receiver-values")).toContainText("192.168.1.20");
+  await expect(page.locator(".receiver-address")).not.toHaveAttribute(
+    "open",
+    "",
+  );
+  await page.locator("#setup-next").click();
+  await expect(page.locator("#receiver-step-title")).toHaveText(
+    "Encontrar receptor",
+  );
+});
+
+test("receiver setup consumes its URL trigger and prevents duplicate dialogs", async ({
+  page,
+}) => {
+  await page.route("**/ui-api/broker", (r) =>
+    r.fulfill({ json: brokerFixture() }),
+  );
+  await page.goto("/receivers?lang=en-US&setup=1");
+  await expect(page.locator("dialog.receiver-wizard")).toHaveCount(1);
+  expect(new URL(page.url()).searchParams.has("setup")).toBeFalsy();
+  await page.locator("#add-receiver").evaluate((el) => {
+    el.click();
+    el.click();
+  });
+  await expect(page.locator("dialog.receiver-wizard")).toHaveCount(1);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.reload();
+  await expect(page.locator("html.ready")).toBeVisible();
+  await expect(page.locator("dialog")).toHaveCount(0);
+});
+test("HTTP devices do not offer radio revocation", async ({ page }) => {
+  const state = pairingSnapshot();
+  state.workspace.devices = [
+    {
+      id: 1,
+      transport: "http",
+      source: "http",
+      device: "http-device",
+      name: "HTTP device",
+      location: "",
+      revision: 0,
+    },
+  ];
+  await liveDevices(page, state);
+  await expect(
+    page.getByRole("button", { name: /Revoke transmitter/ }),
+  ).toHaveCount(0);
+});
+
+for (const path of ["/receivers", "/"]) {
+  test(`connection status follows SSE without page refresh on ${path}`, async ({
+    page,
+  }) => {
+    const snapshot = pairingSnapshot();
+    snapshot.device_states[0].availability = "offline";
+    let pageLoads = 0;
+    const html = await (await page.request.get(`${path}?lang=en-US`)).text();
+    await page.route(`**${path}`, (route) => {
+      pageLoads++;
+      return route.fulfill({
+        contentType: "text/html",
+        body: html.replace(
+          /(<script type="application\/json" id="initial-state">)[\s\S]*?(<\/script>)/,
+          `$1${JSON.stringify(snapshot).replaceAll("<", "\\u003c")}$2`,
+        ),
+      });
+    });
+    await page.addInitScript(() => {
+      const realFetch = window.fetch;
+      window.fetch = (url, options) => {
+        if (url !== "/ui-api/device-states/events")
+          return realFetch(url, options);
+        window.stateStreamConnections =
+          (window.stateStreamConnections ?? 0) + 1;
+        return Promise.resolve(
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                window.pushState = (value) =>
+                  controller.enqueue(
+                    new TextEncoder().encode(
+                      `event: states\ndata: ${JSON.stringify(value)}\n\n`,
+                    ),
+                  );
+                window.breakStateStream = () =>
+                  controller.error(new Error("lost connection"));
+                options.signal.addEventListener("abort", () => {
+                  try {
+                    controller.close();
+                  } catch {}
+                });
+              },
+            }),
+            { headers: { "Content-Type": "text/event-stream" } },
+          ),
+        );
+      };
+    });
+    await page.goto(path);
+    const indicator = page
+      .locator(path === "/" ? ".receiver-status" : ".receiver-card")
+      .first();
+    await expect(indicator).toContainText("Offline");
+    await page.waitForFunction(() => typeof window.pushState === "function");
+    snapshot.device_states[0].availability = "online";
+    snapshot.generated_at = new Date(Date.now() + 1000).toISOString();
+    await page.evaluate((value) => window.pushState(value), snapshot);
+    await expect(indicator).toContainText("Online");
+    snapshot.device_states[0].availability = "offline";
+    snapshot.generated_at = new Date(Date.now() + 2000).toISOString();
+    await page.evaluate((value) => window.pushState(value), snapshot);
+    await expect(indicator).toContainText("Offline");
+    // The fallback reads only states, then the stream reconnects automatically.
+    snapshot.device_states[0].availability = "online";
+    snapshot.generated_at = new Date(Date.now() + 3000).toISOString();
+    await page.route("**/ui-api/device-states", (route) =>
+      route.fulfill({ json: snapshot }),
+    );
+    await page.evaluate(() => window.breakStateStream());
+    await expect(indicator).toContainText("Online");
+    await expect
+      .poll(() => page.evaluate(() => window.stateStreamConnections))
+      .toBe(2);
+    expect(pageLoads).toBe(1);
+  });
+}

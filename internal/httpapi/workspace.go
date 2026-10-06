@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/cajui/cajui-central/internal/workspace"
 )
@@ -125,6 +127,12 @@ func (s *server) editWorkspace(w http.ResponseWriter, r *http.Request) {
 // archiveDevice takes one device off the local pages; the same local-write checks as
 // edits apply, and the revision guards against a stale page.
 func (s *server) archiveDevice(w http.ResponseWriter, r *http.Request) {
+	s.archiveItem(w, r, s.repo.ArchiveDevice)
+}
+func (s *server) archiveSensor(w http.ResponseWriter, r *http.Request) {
+	s.archiveItem(w, r, s.repo.ArchiveSensor)
+}
+func (s *server) archiveItem(w http.ResponseWriter, r *http.Request, archive func(context.Context, int64, int64) error) {
 	if !s.trustedLocalWrite(r) {
 		http.Error(w, "reload the local page before editing", http.StatusForbidden)
 		return
@@ -148,7 +156,7 @@ func (s *server) archiveDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid workspace settings", 400)
 		return
 	}
-	err = s.repo.ArchiveDevice(r.Context(), id, *input.Revision)
+	err = archive(r.Context(), id, *input.Revision)
 	switch {
 	case errors.Is(err, workspace.ErrInvalid):
 		http.Error(w, "invalid workspace settings", 400)
@@ -156,6 +164,40 @@ func (s *server) archiveDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "observed item not found", 404)
 	case errors.Is(err, workspace.ErrConflict):
 		http.Error(w, "settings changed in another window; reload before saving", 409)
+	case err != nil:
+		s.fail(w, err)
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *server) archiveReceiver(w http.ResponseWriter, r *http.Request) {
+	if !s.trustedLocalWrite(r) {
+		http.Error(w, "reload the local page before editing", 403)
+		return
+	}
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "use application/json", 415)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1024)
+	var input struct {
+		ReceivedAt time.Time `json:"received_at"`
+	}
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if dec.Decode(&input) != nil || input.ReceivedAt.IsZero() || dec.Decode(new(any)) != io.EOF {
+		http.Error(w, "invalid receiver", 400)
+		return
+	}
+	err := s.repo.ArchiveReceiver(r.Context(), r.PathValue("source"), r.PathValue("device"), input.ReceivedAt)
+	switch {
+	case errors.Is(err, workspace.ErrInvalid):
+		http.Error(w, "invalid receiver", 400)
+	case errors.Is(err, workspace.ErrNotFound):
+		http.Error(w, "receiver not found", 404)
+	case errors.Is(err, workspace.ErrConflict):
+		http.Error(w, "receiver changed; reload before removing", 409)
 	case err != nil:
 		s.fail(w, err)
 	default:

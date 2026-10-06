@@ -1,3 +1,4 @@
+import { watchDeviceStates } from "./state-events.mjs";
 import { t, locale } from "./i18n.mjs";
 import {
   escapeHTML as e,
@@ -359,7 +360,13 @@ export function mountDashboard(root, { state = {}, notify }) {
     const button = root.querySelector("#refresh");
     button.disabled = true;
     try {
-      snapshot = await fetchSnapshot("/");
+      const fresh = await fetchSnapshot("/");
+      // An event can arrive while the full refresh is in flight.
+      if (Date.parse(fresh.generated_at) < Date.parse(snapshot.generated_at)) {
+        fresh.device_states = snapshot.device_states;
+        fresh.generated_at = snapshot.generated_at;
+      }
+      snapshot = fresh;
       root.querySelector("#fetch-error").classList.add("hidden");
       // Re-rendering replaces the card buttons; keep keyboard focus on the same one.
       const spot = focusSpot(document.activeElement);
@@ -437,6 +444,19 @@ export function mountDashboard(root, { state = {}, notify }) {
   // Refreshing never touches open dialogs or the history panel's focus target, so
   // an open chart or dialog must not pause live data. Only the measurement select is
   // rebuilt and would lose its options mid-choice.
+  watchDeviceStates(state, (next) => {
+    if (Date.parse(next.generated_at) < Date.parse(snapshot.generated_at))
+      return;
+    if (
+      JSON.stringify(next.device_states) ===
+      JSON.stringify(snapshot.device_states)
+    )
+      return;
+    snapshot = { ...snapshot, ...next };
+    const spot = focusSpot(document.activeElement);
+    render();
+    restoreFocus(spot, { preventScroll: true });
+  });
   const timer = setInterval(() => {
     if (
       !document.hidden &&

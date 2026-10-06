@@ -24,6 +24,7 @@ pt-BR:
     no_location: Sem localização
     waiting: Aguardando dados
   nav:
+    connections: Conexões
     workspace: Área de trabalho
     home: Página inicial do Cajuí Central
     open: Abrir navegação
@@ -300,6 +301,7 @@ pt-BR:
       other: '%{count} segundos'
       zero: '%{count} segundos'
   receivers:
+    archive_confirm: "Remover %{name} da lista? O histórico e o acesso ao broker continuam. Ele volta quando publicar um novo estado."
     heading: Receptores
     description: Conexão, fila e firmware de cada receptor.
     empty: Nenhum receptor ainda
@@ -365,6 +367,7 @@ pt-BR:
     search: Buscar transmissores
     stop: Parar busca
     add: Adicionar
+    revoke_unavailable: "Para revogar, é preciso identificar o receptor, que deve estar online e oferecer essa função."
     revoke: Revogar transmissor
     revoke_confirm: Revogar %{name}? Ele deixa de ser aceito até ser pareado de novo pelo botão.
     requests: Pedindo para entrar
@@ -394,3 +397,105 @@ pt-BR:
       send: Não foi possível enviar o comando. Tente de novo.
       offline: O Central não está conectado ao broker.
       status: Não foi possível conferir a resposta. Atualize a página.
+
+  broker:
+    "title": "Broker MQTT"
+    "description": "Conexão do Central, configurações e mensagens recebidas."
+    "load_error": "Não foi possível consultar o broker. Tente novamente."
+    "settings": "Configurações da conexão"
+    "settings_note": "Configurações desta instalação, somente para consulta. Para trocar o broker, atualize a configuração do servidor e reinicie o Central."
+    "messages": "Mensagens recebidas"
+    "scope": "Somente os tópicos que o Central acompanha. Não inclui todo o tráfego do broker."
+    "pause": "Pausar"
+    "resume": "Retomar"
+    "filter": "Filtrar por tópico, origem ou dispositivo"
+    "all": "Todos"
+    "connection": "Central → broker"
+    "disabled": "MQTT não configurado"
+    "connected": "Conectado"
+    "disconnected": "Desconectado"
+    "problem_connection": "A conexão falhou ou foi interrompida. Confira endereço, credenciais e rede."
+    "problem_subscription": "O broker não aceitou todas as assinaturas. Confira as permissões."
+    "received": "Mensagens observadas"
+    "since_start": "Desde que o Central iniciou."
+    "rejected": "Rejeitadas ou aguardando nova tentativa"
+    "rejected_note": "Mensagens inválidas ou falhas ao armazenar."
+    "address": "Endereço usado pelo Central"
+    "port": "Porta"
+    "enabled": "Ativado"
+    "off": "Desativado"
+    "central_user": "Usuário do Central"
+    "client": "ID do cliente"
+    "subscriptions": "Tópicos acompanhados"
+    "buffer": "Até %{count} mensagens recentes em memória. Reiniciar o Central limpa este visualizador, não as leituras armazenadas."
+    "status_accepted": "Reconhecida"
+    "status_ignored": "Ignorada / duplicada"
+    "status_rejected": "Rejeitada"
+    "status_retry": "Nova tentativa de armazenamento"
+    "retained": "Estado retido"
+    "payload_omitted": "Conteúdo omitido: apenas dados válidos e reconhecidos são exibidos."
+    "empty": "Nenhuma mensagem correspondente por enquanto."
+    "time": "Horário"
+    "device": "Dispositivo"
+    "kind": "Tipo"
+    "details": "Detalhes"
+    "expand": "Expandir"
+    "collapse": "Recolher"
+    "expand_message": "Expandir mensagem %{id}"
+    "collapse_message": "Recolher mensagem %{id}"
+    "source": "Origem"
+    "topic": "Tópico"
+    "size": "Tamanho"
+    "kind_samples": "Leitura"
+    "kind_state": "Estado"
+    "kind_availability": "Conexão"
+    "kind_results": "Resultado de comando"
+    "kind_deleted": "Remoção"
+  setup:
+    "add": "Adicionar receptor"
+    "loading": "Conferindo o broker…"
+    "credential_error": "Não foi possível ler a credencial do receptor. Confira a configuração da instalação."
+    "no_broker": "O MQTT não está configurado. Inicie o broker incluído com Docker Compose ou configure primeiro um broker externo."
+    "offline_broker": "O Central precisa estar conectado ao broker antes de adicionar um receptor."
+    "host": "Endereço do broker para o receptor"
+    "transport": "Transporte do broker: %{mode}. O firmware do receptor precisa oferecer esse transporte."
+    "user": "Usuário MQTT do receptor"
+    "password": "Senha MQTT do receptor"
+    "shared_credential": "A instalação incluída usa uma conta compartilhada para receptores, separada da conta do Central. Este assistente não cria nem revoga contas individuais por dispositivo."
+    "show": "Mostrar senha"
+    "hide": "Ocultar senha"
+    "copy_error": "Não foi possível copiar automaticamente. Selecione a senha e copie manualmente."
+    "external_credentials": "Use uma conta de produtor fornecida pelo administrador do broker. Não use a conta do Central."
+    "invalid_host": "Informe um endereço do broker acessível pelo receptor, sem protocolo de URL nem espaços."
+    "check_error": "Não foi possível conferir a conexão. Tentando novamente…"
+    "waiting": "Aguardando um receptor se conectar. Receptores que já estavam online ao abrir o assistente não entram nesta lista. Se o seu não aparecer, confira o Wi-Fi e os dados do broker."
+    "found_one": "Um receptor se conectou. Confirme que é o seu."
+    "found_many": "Mais de um receptor se conectou. Escolha o seu na lista."
+    "confirm": "Confirmar %{name}"
+    "progress": "Progresso da configuração"
+    "connect_title": "Conectar ao receptor"
+    "transfer_title": "Dados de conexão"
+    "find_title": "Encontrar receptor"
+    "back": "Voltar"
+    "wifi_ready": "Wi-Fi configurado — continuar"
+    "settings_ready": "Encontrar receptor"
+    "on_phone": "No celular, próximo ao receptor:"
+    "press": "Segure o botão PRG do receptor por três segundos."
+    "join": "Conecte o celular à rede Wi-Fi Cajui-XXXX."
+    "open_page": "Abra http://192.168.4.1 no navegador do celular."
+    "save_wifi": "Naquela página, escolha sua rede Wi-Fi e salve a senha."
+    "keep_open": "Mantenha este assistente aberto no computador. Na próxima etapa, você preencherá os dados de conexão na página do receptor."
+    "transfer_hint": "Na página do receptor, no celular, preencha estes dados de MQTT e salve."
+    "change_address": "Usar outro endereço"
+    "missing_address": "Informar endereço do broker"
+    "address_help": "Informe o endereço do broker na rede local, acessível ao receptor. Isso altera apenas os dados mostrados aqui, não a configuração do servidor."
+    "use_address": "Usar estes dados"
+    "help": "Ajuda para conectar"
+    "copy_devices": "Copiar funciona neste dispositivo. Se estiver configurando em outro celular, leia os valores e digite-os lá."
+    "find_hint": "Mantenha o receptor ligado. Novas conexões aparecem aqui automaticamente."
+    "not_found": "Meu receptor não apareceu"
+    "copied": "Copiado."
+    "copy_value": "Copiar"
+    "copy_field": "Copiar %{field}"
+    "secret_hidden": "Senha oculta"
+    "searching": "Procurando receptor…"

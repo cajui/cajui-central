@@ -40,12 +40,17 @@ type Config struct {
 	TLS                               *tls.Config
 }
 type Consumer struct {
-	config    Config
-	repo      Repository
-	logger    *slog.Logger
-	connected atomic.Bool
-	mu        sync.Mutex
-	live      mqtt.Client // Set while subscribed; commands go out on this connection.
+	config                    Config
+	repo                      Repository
+	logger                    *slog.Logger
+	connected                 atomic.Bool
+	mu                        sync.Mutex
+	live                      mqtt.Client // Set while subscribed; commands go out on this connection.
+	observationMu             sync.Mutex
+	messages                  [MessageLimit]ObservedMessage
+	messageHead, messageCount int
+	observed, rejected        uint64
+	problem                   string
 }
 
 func New(config Config, repo Repository, logger *slog.Logger) *Consumer {
@@ -54,13 +59,19 @@ func New(config Config, repo Repository, logger *slog.Logger) *Consumer {
 	}
 	return &Consumer{config: config, repo: repo, logger: logger}
 }
-func (c *Consumer) Connected() bool { return c.connected.Load() }
+func (c *Consumer) Configured() bool { return c.config.URL != "" }
+func (c *Consumer) Connected() bool  { return c.connected.Load() }
 
 // Handle rejects retained samples: an old retained sample is not a new arrival. Device
 // state and availability are retained by design and are always handled.
-func (c *Consumer) Handle(ctx context.Context, topic string, payload []byte, retained bool) (bool, error) {
+func (c *Consumer) Handle(ctx context.Context, topic string, payload []byte, retained bool) (accepted bool, err error) {
+	var normalized any
+	defer func() { c.observe(topic, payload, retained, accepted, err, normalized) }()
+	if len(payload) > telemetry.MaxSampleBytes {
+		return false, telemetry.ErrInvalid
+	}
 	if source, device, kind, ok := devicestate.ParseTopic(topic); ok {
-		return c.handleManaged(ctx, source, device, kind, payload, retained)
+		return c.handleManaged(ctx, source, device, kind, payload, retained, &normalized)
 	}
 	if retained {
 		return false, nil
@@ -72,10 +83,11 @@ func (c *Consumer) Handle(ctx context.Context, topic string, payload []byte, ret
 	if topic != "telemetry/v1/"+s.SourceID+"/"+s.DeviceID+"/samples" {
 		return false, telemetry.ErrInvalid
 	}
+	normalized = s
 	return c.repo.InsertSample(ctx, s, time.Now())
 }
 
-func (c *Consumer) handleManaged(ctx context.Context, source, device, kind string, payload []byte, retained bool) (bool, error) {
+func (c *Consumer) handleManaged(ctx context.Context, source, device, kind string, payload []byte, retained bool, normalized *any) (bool, error) {
 	switch {
 	case kind == "results":
 		// Answers are never retained by a well-behaved receiver; a retained one is stale.
@@ -86,6 +98,7 @@ func (c *Consumer) handleManaged(ctx context.Context, source, device, kind strin
 		if err != nil {
 			return false, telemetry.ErrInvalid
 		}
+		*normalized = result
 		return true, c.repo.SaveCommandResult(ctx, source, device, result, time.Now())
 	// An empty message clears a retained topic: the device is gone.
 	case len(payload) == 0 && kind == "availability":
@@ -97,12 +110,14 @@ func (c *Consumer) handleManaged(ctx context.Context, source, device, kind strin
 		if err != nil {
 			return false, telemetry.ErrInvalid
 		}
+		*normalized = value
 		return true, c.repo.SaveAvailability(ctx, source, device, value, time.Now(), retained)
 	}
 	state, err := devicestate.Decode(source, device, payload)
 	if err != nil {
 		return false, telemetry.ErrInvalid
 	}
+	*normalized = state
 	return true, c.repo.SaveDeviceState(ctx, state, time.Now(), retained)
 }
 
@@ -134,6 +149,7 @@ func (c *Consumer) Run(ctx context.Context) {
 	lost := make(chan struct{}, 1)
 	options.SetConnectionLostHandler(func(_ mqtt.Client, _ error) {
 		c.connected.Store(false)
+		c.connectionProblem("connection")
 		select {
 		case lost <- struct{}{}:
 		default:
@@ -142,6 +158,11 @@ func (c *Consumer) Run(ctx context.Context) {
 	handler := func(_ mqtt.Client, m mqtt.Message) {
 		_, _, _, managed := devicestate.ParseTopic(m.Topic())
 		if (m.Retained() && !managed) || len(m.Payload()) > telemetry.MaxSampleBytes {
+			var reason error
+			if len(m.Payload()) > telemetry.MaxSampleBytes {
+				reason = telemetry.ErrInvalid
+			}
+			c.observe(m.Topic(), m.Payload(), m.Retained(), false, reason, nil)
 			m.Ack() // Never ingested: acknowledge so the broker discards it.
 			return
 		}
@@ -161,6 +182,7 @@ func (c *Consumer) Run(ctx context.Context) {
 	retry := time.Second
 	for ctx.Err() == nil {
 		if err := wait(ctx, client.Connect()); err != nil {
+			c.connectionProblem("connection")
 			c.logger.Warn("MQTT connection unavailable")
 			if !pause(ctx, retry) {
 				return
@@ -179,6 +201,7 @@ func (c *Consumer) Run(ctx context.Context) {
 			}
 		}
 		if subscriptionError != nil {
+			c.connectionProblem("subscription")
 			client.Disconnect(250)
 			if !pause(ctx, retry) {
 				return
@@ -189,6 +212,7 @@ func (c *Consumer) Run(ctx context.Context) {
 		retry = time.Second
 		c.setLive(client)
 		c.connected.Store(true)
+		c.connectionProblem("")
 		c.logger.Info("MQTT subscription ready")
 	connected:
 		for {

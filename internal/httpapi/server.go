@@ -26,6 +26,8 @@ type Repository interface {
 	Catalog(context.Context) (workspace.Catalog, error)
 	SaveDevice(context.Context, int64, workspace.Settings) error
 	ArchiveDevice(context.Context, int64, int64) error
+	ArchiveSensor(context.Context, int64, int64) error
+	ArchiveReceiver(context.Context, string, string, time.Time) error
 	SaveSensor(context.Context, int64, workspace.Settings) error
 	SaveLayout(context.Context, workspace.Layout) error
 	Insert(context.Context, telemetry.Reading, time.Time) (bool, error)
@@ -47,7 +49,10 @@ type server struct {
 	token   [32]byte
 	logger  *slog.Logger
 	// Nil when MQTT is not configured: commands then answer 503.
-	publisher commands.Publisher
+	publisher     commands.Publisher
+	broker        BrokerObserver
+	receiverSetup ReceiverSetup
+	stateStreams  chan struct{}
 }
 
 func New(repo Repository, token string, logger *slog.Logger, options ...Option) (http.Handler, error) {
@@ -57,7 +62,7 @@ func New(repo Repository, token string, logger *slog.Logger, options ...Option) 
 	if logger == nil {
 		logger = slog.Default()
 	}
-	s := &server{repo: repo, token: sha256.Sum256([]byte(token)), logger: logger, uiToken: rand.Text()}
+	s := &server{repo: repo, token: sha256.Sum256([]byte(token)), logger: logger, uiToken: rand.Text(), stateStreams: make(chan struct{}, 16)}
 	for _, option := range options {
 		option(s)
 	}
@@ -67,8 +72,16 @@ func New(repo Repository, token string, logger *slog.Logger, options ...Option) 
 	mux.HandleFunc("GET /devices", s.localPage(s.index))
 	mux.HandleFunc("GET /sensors", s.localPage(s.index))
 	mux.HandleFunc("GET /receivers", s.localPage(s.index))
+	mux.HandleFunc("GET /broker", s.localPage(s.index))
+	mux.HandleFunc("GET /ui-api/broker", s.brokerStatus)
+	mux.HandleFunc("GET /ui-api/receiver-states", s.receiverStates)
+	mux.HandleFunc("GET /ui-api/device-states", s.localDeviceStates)
+	mux.HandleFunc("GET /ui-api/device-states/events", s.deviceStateEvents)
+	mux.HandleFunc("POST /ui-api/receiver-credentials", s.receiverCredentials)
 	mux.HandleFunc("PUT /ui-api/{kind}/{id}", s.editWorkspace)
 	mux.HandleFunc("POST /ui-api/devices/{id}/archive", s.archiveDevice)
+	mux.HandleFunc("POST /ui-api/sensors/{id}/archive", s.archiveSensor)
+	mux.HandleFunc("POST /ui-api/receivers/{source}/{device}/archive", s.archiveReceiver)
 	mux.HandleFunc("GET /ui/{path...}", serveUIAsset)
 	mux.HandleFunc("POST /ui-api/commands", s.localPage(s.sendCommand))
 	mux.HandleFunc("GET /ui-api/commands/{id}", s.localPage(s.commandStatus))
@@ -154,6 +167,9 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Vary", "Accept-Language")
 	w.Header().Add("Vary", "Cookie")
 	title := "common.dashboard"
+	if r.URL.Path == "/broker" {
+		title = "broker.title"
+	}
 	if r.URL.Path == "/devices" {
 		title = "common.devices"
 	}

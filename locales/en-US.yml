@@ -24,6 +24,7 @@ en-US:
     no_location: No location
     waiting: Waiting for data
   nav:
+    connections: Connections
     workspace: Workspace
     home: Cajuí Central home
     open: Open navigation
@@ -298,6 +299,7 @@ en-US:
       other: '%{count} seconds'
       zero: '%{count} seconds'
   receivers:
+    archive_confirm: "Remove %{name} from the list? History and broker access remain unchanged. It returns when it publishes a new state."
     heading: Receivers
     description: Connection, queue and firmware of each receiver.
     empty: No receivers yet
@@ -363,6 +365,7 @@ en-US:
     search: Search for transmitters
     stop: Stop searching
     add: Add
+    revoke_unavailable: "Revocation requires an identified receiver that is online and supports it."
     revoke: Revoke transmitter
     revoke_confirm: Revoke %{name}? It stops being accepted until it is paired again with its button.
     requests: Asking to join
@@ -392,3 +395,105 @@ en-US:
       send: Could not send the command. Try again.
       offline: Central is not connected to the broker.
       status: Could not check the answer. Refresh the page.
+
+  broker:
+    "title": "MQTT broker"
+    "description": "Central connection, settings and received messages."
+    "load_error": "Could not load broker information. Try again."
+    "settings": "Connection settings"
+    "settings_note": "Read-only settings for this installation. Changing the broker requires updating the server configuration and restarting Central."
+    "messages": "Received messages"
+    "scope": "Only topics Central subscribes to. This is not a view of all broker traffic."
+    "pause": "Pause"
+    "resume": "Resume"
+    "filter": "Filter by topic, source or device"
+    "all": "All"
+    "connection": "Central → broker"
+    "disabled": "MQTT not configured"
+    "connected": "Connected"
+    "disconnected": "Disconnected"
+    "problem_connection": "Connection failed or was interrupted. Check address, credentials and network."
+    "problem_subscription": "The broker did not accept all subscriptions. Check permissions."
+    "received": "Messages observed"
+    "since_start": "Since Central started."
+    "rejected": "Rejected or pending retry"
+    "rejected_note": "Invalid messages or storage failures."
+    "address": "Address used by Central"
+    "port": "Port"
+    "enabled": "Enabled"
+    "off": "Disabled"
+    "central_user": "Central account"
+    "client": "Client ID"
+    "subscriptions": "Subscribed topics"
+    "buffer": "Up to %{count} recent messages in memory. Restarting Central clears this viewer, not stored readings."
+    "status_accepted": "Recognized"
+    "status_ignored": "Ignored / duplicate"
+    "status_rejected": "Rejected"
+    "status_retry": "Storage retry"
+    "retained": "Retained snapshot"
+    "payload_omitted": "Content omitted: only recognized, valid data is shown."
+    "empty": "No matching messages yet."
+    "time": "Time"
+    "device": "Device"
+    "kind": "Type"
+    "details": "Details"
+    "expand": "Expand"
+    "collapse": "Collapse"
+    "expand_message": "Expand message %{id}"
+    "collapse_message": "Collapse message %{id}"
+    "source": "Source"
+    "topic": "Topic"
+    "size": "Size"
+    "kind_samples": "Reading"
+    "kind_state": "State"
+    "kind_availability": "Connection"
+    "kind_results": "Command result"
+    "kind_deleted": "Removal"
+  setup:
+    "add": "Add receiver"
+    "loading": "Checking the broker…"
+    "credential_error": "Could not read the receiver credential. Check the installation configuration."
+    "no_broker": "MQTT is not configured. Start the included broker with Docker Compose or configure an external broker first."
+    "offline_broker": "Central must be connected to the broker before adding a receiver."
+    "host": "Broker address for the receiver"
+    "transport": "Broker transport: %{mode}. The receiver firmware must support this transport."
+    "user": "Receiver MQTT username"
+    "password": "Receiver MQTT password"
+    "shared_credential": "The included installation uses a shared receiver account. It is separate from the Central account; this wizard does not create or revoke per-device accounts."
+    "show": "Show password"
+    "hide": "Hide password"
+    "copy_error": "Could not copy automatically. Select the password and copy it manually."
+    "external_credentials": "Use a producer account supplied by your broker administrator. Do not use the Central account."
+    "invalid_host": "Enter a broker address reachable from the receiver, without a URL scheme or spaces."
+    "check_error": "Could not check the connection. Retrying…"
+    "waiting": "Waiting for a receiver to connect. Receivers already online when this wizard opened are not listed. Check Wi-Fi and broker settings if yours does not appear."
+    "found_one": "A receiver connected. Confirm that it is yours."
+    "found_many": "More than one receiver connected. Choose yours from the list."
+    "confirm": "Confirm %{name}"
+    "progress": "Setup progress"
+    "connect_title": "Connect to receiver"
+    "transfer_title": "Connection details"
+    "find_title": "Find receiver"
+    "back": "Back"
+    "wifi_ready": "Wi-Fi configured — continue"
+    "settings_ready": "Find receiver"
+    "on_phone": "On your phone, next to the receiver:"
+    "press": "Hold the receiver PRG button for three seconds."
+    "join": "Connect your phone to the Cajui-XXXX Wi-Fi network."
+    "open_page": "Open http://192.168.4.1 in the phone browser."
+    "save_wifi": "Choose your home Wi-Fi network and save its password on that page."
+    "keep_open": "Keep this assistant open on your computer. Next, you will enter the connection details on the receiver page."
+    "transfer_hint": "On the receiver page on your phone, enter these MQTT details and save."
+    "change_address": "Use another address"
+    "missing_address": "Enter the broker address"
+    "address_help": "Enter the broker LAN address reachable by the receiver. This only changes the details shown here, not the server configuration."
+    "use_address": "Use these details"
+    "help": "Connection help"
+    "copy_devices": "Copy works on this device. If you are configuring on another phone, read and enter the values there."
+    "find_hint": "Keep the receiver powered on. New connections appear here automatically."
+    "not_found": "My receiver has not appeared"
+    "copied": "Copied."
+    "copy_value": "Copy"
+    "copy_field": "Copy %{field}"
+    "secret_hidden": "Password hidden"
+    "searching": "Looking for a receiver…"

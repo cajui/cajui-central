@@ -3,6 +3,7 @@ import "./components.mjs";
 import { icon, mark } from "./icons.mjs";
 import { mountDashboard } from "./dashboard.mjs";
 import { mountRegistry } from "./registry.mjs";
+import { mountBroker } from "./broker.mjs";
 import { mountReceivers } from "./receivers.mjs";
 const state = JSON.parse(document.querySelector("#initial-state").textContent);
 setLocale(state.locale ?? document.documentElement.lang);
@@ -12,6 +13,7 @@ const title =
   {
     "/devices": t("common.devices"),
     "/receivers": t("common.receivers"),
+    "/broker": t("broker.title"),
     "/sensors": t("common.sensors"),
   }[route] ?? t("common.dashboard");
 
@@ -30,12 +32,21 @@ const sidebar = document.querySelector("#sidebar");
 sidebar.innerHTML = `<a class="wordmark" href="/" aria-label="${t("nav.home")}">${mark()}<span>Cajuí<small>Central</small></span></a><p class="eyebrow sidebar-label">${t("nav.workspace")}</p><nav class="nav" aria-label="${t("nav.workspace")}">${[
   ["/", t("common.dashboard"), "overview"],
   ["/devices", t("common.devices"), "device"],
-  ["/receivers", t("common.receivers"), "signal"],
   ["/sensors", t("common.sensors"), "temperature"],
 ]
   .map(
     ([href, name, glyph]) =>
       `<a href="${href}" ${route === href ? 'aria-current="page"' : ""}>${icon(glyph)}${name}</a>`,
+  )
+  .join(
+    "",
+  )}</nav><p class="eyebrow sidebar-label">${t("nav.connections")}</p><nav class="nav" aria-label="${t("nav.connections")}">${[
+  ["/receivers", t("common.receivers")],
+  ["/broker", t("broker.title")],
+]
+  .map(
+    ([href, name]) =>
+      `<a href="${href}" ${route === href ? 'aria-current="page"' : ""}>${icon("signal")}${name}</a>`,
   )
   .join("")}</nav>`;
 document.querySelector("#topbar").innerHTML =
@@ -121,6 +132,7 @@ function notify(text) {
 const root = document.querySelector("#app");
 if (route === "/devices" || route === "/sensors")
   mountRegistry(root, { state, kind: route.slice(1), notify });
-else if (route === "/receivers") mountReceivers(root, { state });
+else if (route === "/broker") mountBroker(root, { state });
+else if (route === "/receivers") mountReceivers(root, { state, notify });
 else mountDashboard(root, { state, notify });
 document.documentElement.classList.add("ready");

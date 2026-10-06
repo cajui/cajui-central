@@ -375,6 +375,9 @@ and new telemetry commit together; duplicate retries never refresh inventory tim
 Known sensors remain listed when absent from the most recent 100 samples/readings.
 Schema version 6 adds `workspace_devices.archived`: an archived device and its sensors
 leave the catalog, their telemetry stays, and the next observation brings them back.
+Schema version 7 adds removal flags for sensors and receiver states. Removing an item
+keeps its history and names. Fresh telemetry restores a sensor; a fresh, non-retained
+state restores a receiver. Removal does not revoke radio or MQTT credentials.
 An older binary refuses a database migrated to a newer schema.
 Back up before upgrading; an older binary cannot open a version 3 database. To roll
 back, restore a pre-upgrade backup together with the older binary.
@@ -498,3 +501,92 @@ accessibility checks in both themes. The automatic
 accessibility audit covers selected WCAG A/AA rules, not a complete conformance review.
 The Go suite checks asset routing, CSP, escaped snapshot data and API compatibility.
 These tests run in CI. Prettier is a development formatter, not a compilation step.
+
+Devices and sensors offer **Remove from list** next to **Edit**; receivers offer it on
+their cards. Transmitter revocation is shown for MQTT devices only and requires an online
+receiver advertising that capability. Receiver and sensor removal preserves history.
+`POST /ui-api/sensors/{id}/archive` takes `{"revision":n}`;
+`POST /ui-api/receivers/{source}/{device}/archive` takes the displayed `received_at`
+timestamp. Both require the same local origin and UI capability as workspace edits.
+Stale revisions or receiver timestamps return 409. Archiving a receiver hides only
+that source/device pair. An older, unarchived origin for the same device may become
+visible, keeping its original timestamp, availability and retained status.
+
+### Receiver setup and MQTT diagnostics
+
+**Connections → Receivers → Add receiver** guides the first connection in three steps:
+connect to the receiver and save Wi-Fi, transfer MQTT connection details, then find
+and confirm the receiver. Known values are selectable text with copy actions; the
+password is retrieved only when Show password is selected. An optional address editor
+changes only the values shown by the assistant, not server configuration. Missing
+addresses require entry before discovery. Back navigation preserves the details and
+hides the password again. Configure
+Wi-Fi on the receiver first, then enter the broker's LAN address, port and producer
+credentials. The wizard lists receivers that become online after it opens, excluding those already
+online at the start and retained snapshots. Confirm the receiver that appears, or
+choose yours if several connect. No identifier needs to be typed. It does not enroll transmitters or configure
+Wi-Fi remotely. Its two-second search polls `GET /ui-api/receiver-states`, a local
+UI-capability-protected endpoint that reads only device states and returns
+`generated_at` and receiver-only `device_states`, without loading telemetry or HTML.
+
+The bundled broker creates a dedicated `receiver-1` producer account. Compose lets
+Central read only that producer's password file, in addition to its own credentials.
+The wizard retrieves the receiver password only after an explicit local action;
+it is absent from page snapshots, diagnostics and browser storage. Multiple receivers
+can share this account initially; this does not provide per-receiver credential revocation.
+For an external broker, create a producer account with the appropriate topic ACLs.
+Never give receivers Central's account. Username validation also applies when no
+password file is configured. Passwords must contain 1–64 printable non-space ASCII
+bytes, matching the receiver firmware. Credential read failures return a generic
+503; server logs identify the failure category without recording passwords or paths.
+
+Optional server settings:
+
+| Variable | Purpose |
+| --- | --- |
+| `CAJUI_RECEIVER_USERNAME` | Dedicated producer username shown in setup |
+| `CAJUI_RECEIVER_PASSWORD_FILE` | Operator-configured producer password file |
+| `CAJUI_RECEIVER_HOST` | Explicit broker address reachable from receivers; if unset, setup requires manual entry |
+| `CAJUI_RECEIVER_PORT` | Externally reachable broker port |
+
+Central does not infer the receiver address from its own broker connection URL:
+an address reachable inside a container may not resolve on the receiver's network.
+
+**Connections → MQTT broker** shows connection status, subscriptions and read-only
+connection settings. It keeps the last 100 inbound observations in memory, newest
+first, with filters, pause and normalized JSON for accepted messages. Only topics
+subscribed to by Central are visible. Invalid payloads are omitted. Counters and
+this diagnostic buffer reset on restart; stored measurements remain intact. The
+buffer uses a fixed-size ring and reuses validated values from ingestion, avoiding
+a second payload decode.
+This is a diagnostic view, not a broker administration console or durable audit log.
+Broker settings still come from environment variables and secret files.
+
+MQTT diagnostics use a compact table with local receipt time (including seconds),
+device, message type and result. Expand a row for the full timestamp/time zone,
+identifiers, topic, size and normalized JSON. Expanded rows stay open during refresh
+and filtering while the message remains in the buffer. Unchanged rows keep their
+DOM nodes during polling, preserving text selection when new messages arrive. Narrow screens move type and
+result into the details.
+
+
+### Live connection status
+
+The receiver list and dashboard subscribe to `GET /ui-api/device-states/events`
+using SSE over streaming fetch. SQLite state/availability commits and receiver
+archival invalidate the current snapshot; idle streams send only a 15-second
+heartbeat. Events carry current device states, not telemetry history or credentials.
+The stream itself does not poll the database; the existing thirty-second page
+refresh remains for other page data.
+
+Both this endpoint and the recovery `GET /ui-api/device-states` require a local host
+and the page capability in the `X-Cajui-Workspace` header. No token is placed in the
+URL. Up to 16 streams are allowed, writes have a five-second timeout, and slow
+subscribers coalesce changes rather than building an unbounded event queue.
+
+Hidden pages pause streaming; visible pages reconnect with a fresh snapshot.
+If streaming fails, the client fetches a lightweight state snapshot and retries
+after two seconds. A stalled connection times out after 35 seconds. Server restarts
+refresh the local capability from the page without reloading the browser. Regular
+telemetry refresh remains separate. Live UI updates do not shorten MQTT's keepalive
+interval or the broker's time to detect a receiver that loses power abruptly.
