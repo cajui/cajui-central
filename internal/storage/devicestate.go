@@ -33,20 +33,30 @@ func (s *Store) SaveDeviceState(ctx context.Context, state devicestate.State, at
 	if err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx, `INSERT INTO device_states(source_id,device_id,role,state,received_at,retained) VALUES(?,?,?,?,?,?)
+	result, err := s.db.ExecContext(ctx, `INSERT INTO device_states(source_id,device_id,role,state,received_at,retained) VALUES(?,?,?,?,?,?)
  ON CONFLICT(source_id,device_id) DO UPDATE SET role=excluded.role,state=excluded.state,received_at=excluded.received_at,retained=excluded.retained,archived=CASE WHEN excluded.retained=0 THEN 0 ELSE device_states.archived END
  WHERE NOT (excluded.retained=1 AND device_states.state=excluded.state)`,
 		state.SourceID, state.DeviceID, state.Role, string(payload), at.UTC().Format(time.RFC3339Nano), retained)
+	if err == nil {
+		if n, _ := result.RowsAffected(); n > 0 {
+			s.notifyDeviceStates()
+		}
+	}
 	return err
 }
 
 // SaveAvailability records a receiver's online/offline, with the same rule for
 // repeated retained snapshots.
 func (s *Store) SaveAvailability(ctx context.Context, source, device, value string, at time.Time, retained bool) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO device_availability(source_id,device_id,availability,received_at,retained) VALUES(?,?,?,?,?)
+	result, err := s.db.ExecContext(ctx, `INSERT INTO device_availability(source_id,device_id,availability,received_at,retained) VALUES(?,?,?,?,?)
  ON CONFLICT(source_id,device_id) DO UPDATE SET availability=excluded.availability,received_at=excluded.received_at,retained=excluded.retained
  WHERE NOT (excluded.retained=1 AND device_availability.availability=excluded.availability)`,
 		source, device, value, at.UTC().Format(time.RFC3339Nano), retained)
+	if err == nil {
+		if n, _ := result.RowsAffected(); n > 0 {
+			s.notifyDeviceStates()
+		}
+	}
 	return err
 }
 
@@ -54,11 +64,21 @@ func (s *Store) SaveAvailability(ctx context.Context, source, device, value stri
 // a publisher or the broker operator clears a device (a revoked transmitter, a receiver
 // that moved to another source). The broker delivers it once, live.
 func (s *Store) DeleteDeviceState(ctx context.Context, source, device string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM device_states WHERE source_id=? AND device_id=?`, source, device)
+	result, err := s.db.ExecContext(ctx, `DELETE FROM device_states WHERE source_id=? AND device_id=?`, source, device)
+	if err == nil {
+		if n, _ := result.RowsAffected(); n > 0 {
+			s.notifyDeviceStates()
+		}
+	}
 	return err
 }
 func (s *Store) DeleteAvailability(ctx context.Context, source, device string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM device_availability WHERE source_id=? AND device_id=?`, source, device)
+	result, err := s.db.ExecContext(ctx, `DELETE FROM device_availability WHERE source_id=? AND device_id=?`, source, device)
+	if err == nil {
+		if n, _ := result.RowsAffected(); n > 0 {
+			s.notifyDeviceStates()
+		}
+	}
 	return err
 }
 
@@ -145,5 +165,8 @@ func (s *Store) ArchiveReceiver(ctx context.Context, source, device string, seen
 	if _, err = tx.ExecContext(ctx, `UPDATE device_states SET archived=1 WHERE source_id=? AND device_id=?`, source, device); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err = tx.Commit(); err == nil {
+		s.notifyDeviceStates()
+	}
+	return err
 }

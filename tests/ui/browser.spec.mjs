@@ -2,6 +2,23 @@ import AxeBuilder from "@axe-core/playwright";
 import { test, expect } from "@playwright/test";
 const referenceURL = "http://127.0.0.1:8092";
 
+// Existing page fixtures own their states; keep the live transport isolated from
+// the disposable server's inventory. Dedicated tests below drive actual SSE frames.
+test.beforeEach(async ({ page }) => {
+  await page.route("**/ui-api/device-states/events", (route) => route.abort());
+  await page.route("**/ui-api/device-states", async (route) => {
+    const snapshot = await page.evaluate(() =>
+      JSON.parse(document.querySelector("#initial-state").textContent),
+    );
+    await route.fulfill({
+      json: {
+        generated_at: snapshot.generated_at,
+        device_states: snapshot.device_states ?? [],
+      },
+    });
+  });
+});
+
 for (const viewport of [
   { width: 1440, height: 1000 },
   { width: 390, height: 844 },
@@ -1668,3 +1685,81 @@ test("HTTP devices do not offer radio revocation", async ({ page }) => {
     page.getByRole("button", { name: /Revoke transmitter/ }),
   ).toHaveCount(0);
 });
+
+for (const path of ["/receivers", "/"]) {
+  test(`connection status follows SSE without page refresh on ${path}`, async ({
+    page,
+  }) => {
+    const snapshot = pairingSnapshot();
+    snapshot.device_states[0].availability = "offline";
+    let pageLoads = 0;
+    const html = await (await page.request.get(`${path}?lang=en-US`)).text();
+    await page.route(`**${path}`, (route) => {
+      pageLoads++;
+      return route.fulfill({
+        contentType: "text/html",
+        body: html.replace(
+          /(<script type="application\/json" id="initial-state">)[\s\S]*?(<\/script>)/,
+          `$1${JSON.stringify(snapshot).replaceAll("<", "\\u003c")}$2`,
+        ),
+      });
+    });
+    await page.addInitScript(() => {
+      const realFetch = window.fetch;
+      window.fetch = (url, options) => {
+        if (url !== "/ui-api/device-states/events")
+          return realFetch(url, options);
+        window.stateStreamConnections =
+          (window.stateStreamConnections ?? 0) + 1;
+        return Promise.resolve(
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                window.pushState = (value) =>
+                  controller.enqueue(
+                    new TextEncoder().encode(
+                      `event: states\ndata: ${JSON.stringify(value)}\n\n`,
+                    ),
+                  );
+                window.breakStateStream = () =>
+                  controller.error(new Error("lost connection"));
+                options.signal.addEventListener("abort", () => {
+                  try {
+                    controller.close();
+                  } catch {}
+                });
+              },
+            }),
+            { headers: { "Content-Type": "text/event-stream" } },
+          ),
+        );
+      };
+    });
+    await page.goto(path);
+    const indicator = page
+      .locator(path === "/" ? ".receiver-status" : ".receiver-card")
+      .first();
+    await expect(indicator).toContainText("Offline");
+    await page.waitForFunction(() => typeof window.pushState === "function");
+    snapshot.device_states[0].availability = "online";
+    snapshot.generated_at = new Date(Date.now() + 1000).toISOString();
+    await page.evaluate((value) => window.pushState(value), snapshot);
+    await expect(indicator).toContainText("Online");
+    snapshot.device_states[0].availability = "offline";
+    snapshot.generated_at = new Date(Date.now() + 2000).toISOString();
+    await page.evaluate((value) => window.pushState(value), snapshot);
+    await expect(indicator).toContainText("Offline");
+    // The fallback reads only states, then the stream reconnects automatically.
+    snapshot.device_states[0].availability = "online";
+    snapshot.generated_at = new Date(Date.now() + 3000).toISOString();
+    await page.route("**/ui-api/device-states", (route) =>
+      route.fulfill({ json: snapshot }),
+    );
+    await page.evaluate(() => window.breakStateStream());
+    await expect(indicator).toContainText("Online");
+    await expect
+      .poll(() => page.evaluate(() => window.stateStreamConnections))
+      .toBe(2);
+    expect(pageLoads).toBe(1);
+  });
+}

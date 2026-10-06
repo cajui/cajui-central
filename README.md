@@ -568,3 +568,25 @@ identifiers, topic, size and normalized JSON. Expanded rows stay open during ref
 and filtering while the message remains in the buffer. Unchanged rows keep their
 DOM nodes during polling, preserving text selection when new messages arrive. Narrow screens move type and
 result into the details.
+
+
+### Live connection status
+
+The receiver list and dashboard subscribe to `GET /ui-api/device-states/events`
+using SSE over streaming fetch. SQLite state/availability commits and receiver
+archival invalidate the current snapshot; idle streams send only a 15-second
+heartbeat. Events carry current device states, not telemetry history or credentials.
+The stream itself does not poll the database; the existing thirty-second page
+refresh remains for other page data.
+
+Both this endpoint and the recovery `GET /ui-api/device-states` require a local host
+and the page capability in the `X-Cajui-Workspace` header. No token is placed in the
+URL. Up to 16 streams are allowed, writes have a five-second timeout, and slow
+subscribers coalesce changes rather than building an unbounded event queue.
+
+Hidden pages pause streaming; visible pages reconnect with a fresh snapshot.
+If streaming fails, the client fetches a lightweight state snapshot and retries
+after two seconds. A stalled connection times out after 35 seconds. Server restarts
+refresh the local capability from the page without reloading the browser. Regular
+telemetry refresh remains separate. Live UI updates do not shorten MQTT's keepalive
+interval or the broker's time to detect a receiver that loses power abruptly.

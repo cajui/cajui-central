@@ -52,6 +52,7 @@ type server struct {
 	publisher     commands.Publisher
 	broker        BrokerObserver
 	receiverSetup ReceiverSetup
+	stateStreams  chan struct{}
 }
 
 func New(repo Repository, token string, logger *slog.Logger, options ...Option) (http.Handler, error) {
@@ -61,7 +62,7 @@ func New(repo Repository, token string, logger *slog.Logger, options ...Option) 
 	if logger == nil {
 		logger = slog.Default()
 	}
-	s := &server{repo: repo, token: sha256.Sum256([]byte(token)), logger: logger, uiToken: rand.Text()}
+	s := &server{repo: repo, token: sha256.Sum256([]byte(token)), logger: logger, uiToken: rand.Text(), stateStreams: make(chan struct{}, 16)}
 	for _, option := range options {
 		option(s)
 	}
@@ -74,6 +75,8 @@ func New(repo Repository, token string, logger *slog.Logger, options ...Option) 
 	mux.HandleFunc("GET /broker", s.localPage(s.index))
 	mux.HandleFunc("GET /ui-api/broker", s.brokerStatus)
 	mux.HandleFunc("GET /ui-api/receiver-states", s.receiverStates)
+	mux.HandleFunc("GET /ui-api/device-states", s.localDeviceStates)
+	mux.HandleFunc("GET /ui-api/device-states/events", s.deviceStateEvents)
 	mux.HandleFunc("POST /ui-api/receiver-credentials", s.receiverCredentials)
 	mux.HandleFunc("PUT /ui-api/{kind}/{id}", s.editWorkspace)
 	mux.HandleFunc("POST /ui-api/devices/{id}/archive", s.archiveDevice)

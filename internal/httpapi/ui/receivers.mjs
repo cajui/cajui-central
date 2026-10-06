@@ -1,3 +1,4 @@
+import { watchDeviceStates } from "./state-events.mjs";
 import { openReceiverSetup } from "./receiver-setup.mjs";
 import { t } from "./i18n.mjs";
 import {
@@ -153,7 +154,13 @@ export function mountReceivers(root, { state, notify }) {
     const button = root.querySelector("#refresh");
     button.disabled = true;
     try {
-      snapshot = await fetchSnapshot("/receivers");
+      const fresh = await fetchSnapshot("/receivers");
+      // An event can arrive while the full refresh is in flight.
+      if (Date.parse(fresh.generated_at) < Date.parse(snapshot.generated_at)) {
+        fresh.device_states = snapshot.device_states;
+        fresh.generated_at = snapshot.generated_at;
+      }
+      snapshot = fresh;
       root.querySelector("#fetch-error").classList.add("hidden");
       render();
     } catch {
@@ -179,6 +186,17 @@ export function mountReceivers(root, { state, notify }) {
     history.replaceState(history.state, "", url);
     openReceiverSetup(root, snapshot, refresh);
   }
+  watchDeviceStates(state, (next) => {
+    if (Date.parse(next.generated_at) < Date.parse(snapshot.generated_at))
+      return;
+    if (
+      JSON.stringify(next.device_states) ===
+      JSON.stringify(snapshot.device_states)
+    )
+      return;
+    snapshot = { ...snapshot, ...next };
+    render();
+  });
   const timer = setInterval(() => {
     if (!document.hidden) refresh();
   }, 30000);

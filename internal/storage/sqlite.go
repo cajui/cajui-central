@@ -7,13 +7,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/cajui/cajui-central/internal/telemetry"
 	_ "modernc.org/sqlite"
 )
 
-type Store struct{ db *sql.DB }
+type Store struct {
+	db           *sql.DB
+	stateMu      sync.Mutex
+	stateChanged chan struct{}
+}
 
 // Open migrates the database transactionally. A single connection serializes writes.
 func Open(path string) (*Store, error) {
