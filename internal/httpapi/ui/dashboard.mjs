@@ -26,6 +26,11 @@ import { openLayoutEditor } from "./layout-editor.mjs";
 import { attentionItems, placeKey, placeSeverity } from "./overview-model.mjs";
 import { fetchSnapshot } from "./snapshot-api.mjs";
 
+// The page holds only the latest 100 samples (about 1 h 40 min each for five devices
+// reporting every 5 min), so a longer trend would be mostly empty until history queries
+// exist (ADR 0002). One window for every row keeps their trends comparable.
+const TREND_HOURS = 3;
+
 // A value the firmware reported that this version has no text for.
 function known(key, fallback) {
   const text = t(key);
@@ -46,7 +51,7 @@ export function mountDashboard(root, { state = {}, notify }) {
   root.innerHTML = `<header class="page-heading overview-heading"><div><h1>${t("common.dashboard")}</h1><p class="live-line"><span class="live-dot" aria-hidden="true"></span><span id="snapshot-time"></span></p></div><div class="top-actions"><button class="button" id="organize">${t("dashboard.organize")}</button><button class="button" id="export">${icon("download")}${t("dashboard.export")}</button><button class="button" id="refresh">${icon("refresh")}${t("common.refresh")}</button></div></header>
     <div id="fetch-error" class="notice hidden" role="status"></div>
     <section id="summary" class="overview-summary" aria-label="${t("dashboard.summary")}"></section>
-    <section id="attention" class="panel attention-panel" aria-labelledby="attention-heading" hidden><h2 id="attention-heading">${t("overview.attention_heading")}<span>${t("overview.attention_order")}</span></h2><ul class="attention-list"></ul></section>
+    <section id="attention" class="panel attention-panel" aria-labelledby="attention-heading" hidden><h2 id="attention-heading">${t("overview.attention_heading")} <span>${t("overview.attention_order")}</span></h2><ul class="attention-list"></ul></section>
     <div class="toolbar" id="toolbar"><div class="segmented" aria-label="${t("dashboard.filter")}"><button data-filter="all" aria-pressed="true">${t("dashboard.all")}</button><button data-filter="attention" aria-pressed="false">${t("dashboard.attention")}</button></div><label class="search">${icon("search")}<span class="sr-only">${t("dashboard.search_label")}</span><input id="search" type="search" placeholder="${t("dashboard.search")}" autocomplete="off"></label></div>
     <section id="devices" class="device-groups" aria-label="${t("dashboard.items")}"></section>
     <dialog class="history-dialog" id="history-panel" aria-labelledby="history-heading history-accessible" aria-describedby="history-context"><div class="dialog-head"><div><h2 id="history-heading" tabindex="-1">${t("common.history")}</h2><p id="history-context"></p><span class="sr-only" id="history-accessible"></span></div><button class="icon-button" id="close-history" aria-label="${t("dashboard.close_history")}">${icon("close")}</button></div><div class="history-summary"><div><span class="small muted">${t("dashboard.latest_reading")}</span><p class="measurement" id="history-value"></p><cj-badge id="history-state"></cj-badge></div><p class="small muted" id="history-time"></p></div><div class="history-controls"><label for="metric-select">${t("common.measurement")}<select id="metric-select" class="input"></select></label><label for="period">${t("dashboard.period")}<select id="period" class="input"><option value="24">${t("dashboard.hours24")}</option><option value="6">${t("dashboard.hours6")}</option><option value="1">${t("dashboard.hour")}</option><option value="0">${t("dashboard.all_data")}</option></select></label></div><cj-chart id="history"></cj-chart><div class="plot-footer"><div><span id="history-limit"></span></div><span id="plot-count"></span></div></dialog>
@@ -227,7 +232,11 @@ export function mountDashboard(root, { state = {}, notify }) {
         );
       list.append(place);
     }
-    target.append(list);
+    const section = document.createElement("div");
+    section.className = "places-section";
+    section.innerHTML = `<h2 class="places-heading">${t("overview.places_heading")} <span>${e(t("overview.trend_window", { hours: TREND_HOURS }))}</span></h2>`;
+    section.append(list);
+    target.append(section);
   }
   function placeRow(c, g, sensorName) {
     const button = readingButton(c, g);
@@ -235,11 +244,13 @@ export function mountDashboard(root, { state = {}, notify }) {
     const value = ["ok", "recorded", "stale"].includes(c.state)
       ? c.value
       : null;
+    const now = Date.parse(snapshot.generated_at);
     const spark = plotGeometry(
       c.points,
       96,
       24,
       c.interval ? c.interval * 3000 : Infinity,
+      [now - TREND_HOURS * 3600000, now],
     );
     // A silent place says so once in its note; its rows do not repeat it.
     const quiet =

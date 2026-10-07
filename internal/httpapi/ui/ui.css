@@ -2839,6 +2839,20 @@ dialog.history-dialog {
 }
 /* Columns rather than a grid: places differ in height, and rows of a grid would leave
    gaps under the shorter ones. */
+.places-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-6) 0 var(--space-3);
+  font-size: var(--text-body);
+}
+.places-heading span {
+  color: var(--muted);
+  font-size: var(--text-detail);
+  font-weight: 500;
+}
 .places {
   columns: 320px;
   column-gap: var(--space-3);

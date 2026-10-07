@@ -198,6 +198,8 @@ pt-BR:
       zero: '%{count} problemas'
     attention_heading: Precisa de atenção
     attention_order: mais grave primeiro
+    places_heading: Lugares
+    trend_window: 'tendência das últimas %{hours} h'
     since: 'desde %{time}'
     since_yesterday: 'desde ontem %{time}'
     receiver_offline: '%{receiver} sem conexão'

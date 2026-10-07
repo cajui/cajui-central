@@ -474,6 +474,9 @@ for (const width of [390, 820, 1440]) {
     await liveWorkspace(page);
     // One place per transmitter, its readings as rows, and nothing to report.
     await expect(page.locator(".place")).toHaveCount(1);
+    await expect(
+      page.getByRole("heading", { name: "Places trend of the last 3 h" }),
+    ).toBeVisible();
     await expect(page.locator(".reading-button")).toHaveCount(2);
     await expect(page.locator("#summary")).toContainText("All clear");
     await expect(page.locator("#summary")).toContainText("1 device");

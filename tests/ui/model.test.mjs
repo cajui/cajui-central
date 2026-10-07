@@ -95,6 +95,21 @@ test("charts preserve gaps, actual time spacing, negative and constant readings"
   assert.ok(plot.min < -5);
   assert.ok(plot.max > 10);
   assert.equal(plotGeometry([{ time: 1, value: null }]), null);
+  // A fixed span leaves out older readings and keeps its own time axis.
+  const recent = plotGeometry(
+    [
+      { time: 0, value: 1 },
+      { time: 50, value: 2 },
+      { time: 100, value: 3 },
+    ],
+    100,
+    10,
+    Infinity,
+    [40, 140],
+  );
+  assert.equal(recent.points.length, 2);
+  assert.equal(recent.x(140), 100);
+  assert.match(recent.path, /^M10\.00,/);
   const constant = plotGeometry([
     { time: 1, value: 0 },
     { time: 2, value: 0 },

@@ -198,6 +198,8 @@ en-US:
       zero: '%{count} problems'
     attention_heading: Needs attention
     attention_order: most severe first
+    places_heading: Places
+    trend_window: 'trend of the last %{hours} h'
     since: 'since %{time}'
     since_yesterday: 'since yesterday %{time}'
     receiver_offline: '%{receiver} offline'
