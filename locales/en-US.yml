@@ -62,6 +62,7 @@ en-US:
     rssi: RSSI
     snr: SNR
   dashboard:
+    history_title: '%{measurement} history'
     history_accessible: '%{measurement} history · Device %{device} · Source %{source}'
     received_time: Received at Central
     latest_reading: Latest reading
