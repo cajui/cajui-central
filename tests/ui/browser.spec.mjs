@@ -481,6 +481,8 @@ for (const width of [390, 820, 1440]) {
       "trend of the last 3 h",
     );
     await expect(page.locator(".reading-button")).toHaveCount(2);
+    // A known measurement keeps its decimals: 24 °C reads "24.0", like "47.4 %".
+    await expect(page.locator(".row-value").first()).toContainText("24.0");
     await expect(page.locator("#summary")).toContainText("All clear");
     await expect(page.locator("#summary")).toContainText("1 device");
     await expect(page.locator("#attention")).toBeHidden();
@@ -502,7 +504,9 @@ for (const width of [390, 820, 1440]) {
       .getByRole("button", { name: "Details for Device 1", exact: true })
       .click();
     await expect(page.locator(".diagnostic-button")).toHaveCount(2);
-    await page.getByRole("button", { name: /Inspect RSSI history/ }).click();
+    await page
+      .getByRole("button", { name: /Inspect Signal strength \(RSSI\) history/ })
+      .click();
     await expect(page.locator("#metric-select option:checked")).toContainText(
       "RSSI",
     );
@@ -1936,7 +1940,11 @@ test("history dialogs isolate sensor and device diagnostics and restore focus", 
   await expect(dialog).toBeVisible();
   await expect(page.locator("#history-context")).toContainText("Device 1");
   const labels = await page.locator("#metric-select option").allTextContents();
-  expect(labels.sort()).toEqual(["Battery · V", "RSSI · dBm", "SNR · dB"]);
+  expect(labels.sort()).toEqual([
+    "Battery · V",
+    "Signal strength (RSSI) · dBm",
+    "Signal-to-noise ratio (SNR) · dB",
+  ]);
   await page
     .getByRole("button", { name: "Close history", exact: true })
     .click();

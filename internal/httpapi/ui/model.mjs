@@ -46,13 +46,32 @@ export const escapeHTML = (value) =>
 export function numeric(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
-export function formatValue(value, digits = 1) {
+export function formatValue(value, digits = 1, minimum = 0) {
   return numeric(value) === null
     ? "—"
     : new Intl.NumberFormat(locale(), {
+        minimumFractionDigits: minimum,
         maximumFractionDigits: digits,
         notation: Math.abs(value) >= 1e7 ? "scientific" : "standard",
       }).format(value);
+}
+// Decimals of each measurement cajui-firmware sends; any other metric stays generic. A
+// fixed count keeps 25.0 °C from reading "25 °C" next to "47.4 %".
+const measurementDecimals = {
+  temperature: 1,
+  humidity: 1,
+  voltage: 2,
+  rssi: 0,
+  snr: 1,
+};
+export function formatMeasurement(value, metric) {
+  return Object.hasOwn(measurementDecimals, metric)
+    ? formatValue(
+        value,
+        measurementDecimals[metric],
+        measurementDecimals[metric],
+      )
+    : formatValue(value);
 }
 export function formatUnit(unit) {
   const known = { degC: "°C", degF: "°F" };
@@ -412,8 +431,8 @@ export function linkText(frame) {
     snr = numeric(frame.snr_db);
   if (rssi === null && snr === null) return t("common.unknown");
   return [
-    rssi === null ? null : `${formatValue(rssi, 0)} dBm`,
-    snr === null ? null : `${formatValue(snr, 1)} dB`,
+    rssi === null ? null : `${formatMeasurement(rssi, "rssi")} dBm`,
+    snr === null ? null : `${formatMeasurement(snr, "snr")} dB`,
   ]
     .filter(Boolean)
     .join(" · ");

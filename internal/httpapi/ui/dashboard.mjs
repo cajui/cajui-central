@@ -1,10 +1,10 @@
 import { watchDeviceStates } from "./state-events.mjs";
-import { t, locale } from "./i18n.mjs";
+import { t, locale, metricLabel } from "./i18n.mjs";
 import {
   escapeHTML as e,
   isLinkDiagnostic,
   age,
-  formatValue,
+  formatMeasurement,
   formatUnit,
   plotGeometry,
   csvRows,
@@ -94,7 +94,7 @@ export function mountDashboard(root, { state = {}, notify }) {
         c.title =
           c.sensor === "battery"
             ? t("metrics.battery")
-            : c.metric.toUpperCase();
+            : metricLabel(c.metric, c.metric.toUpperCase());
     }
     if (!channels.some((c) => c.key === selected)) selected = "";
   }
@@ -255,7 +255,7 @@ export function mountDashboard(root, { state = {}, notify }) {
       c.state === "ok" ||
       c.state === "recorded" ||
       (g.stale && c.state === "stale");
-    button.innerHTML = `<span class="row-label"><span class="row-title">${e(c.title)}</span>${sensorName ? `<span class="row-sub">${e(sensorName)}</span>` : ""}${quiet ? "" : `<cj-badge state="${e(c.state)}"></cj-badge>`}</span><span class="row-value" data-state="${e(c.state)}">${formatValue(value)}<span class="unit">${e(formatUnit(c.unit))}</span></span><span class="row-trend">${spark ? `<svg class="spark" viewBox="0 0 96 28" preserveAspectRatio="none" aria-hidden="true"><path d="${spark.path}" transform="translate(0 2)"/></svg>` : ""}</span>`;
+    button.innerHTML = `<span class="row-label"><span class="row-title">${e(c.title)}</span>${sensorName ? `<span class="row-sub">${e(sensorName)}</span>` : ""}${quiet ? "" : `<cj-badge state="${e(c.state)}"></cj-badge>`}</span><span class="row-value" data-state="${e(c.state)}">${formatMeasurement(value, c.metric)}<span class="unit">${e(formatUnit(c.unit))}</span></span><span class="row-trend">${spark ? `<svg class="spark" viewBox="0 0 96 28" preserveAspectRatio="none" aria-hidden="true"><path d="${spark.path}" transform="translate(0 2)"/></svg>` : ""}</span>`;
     return button;
   }
   function renderAttention() {
@@ -297,8 +297,9 @@ export function mountDashboard(root, { state = {}, notify }) {
       "aria-label",
       t("dashboard.inspect", {
         measurement: c.title,
-        value: formatValue(
+        value: formatMeasurement(
           ["ok", "recorded", "stale"].includes(c.state) ? c.value : null,
+          c.metric,
         ),
         unit: formatUnit(c.unit),
         status: states[c.state],
@@ -401,7 +402,7 @@ export function mountDashboard(root, { state = {}, notify }) {
     root.querySelector("#history-state").setAttribute("state", c.state);
     const latest = c.points.at(-1);
     root.querySelector("#history-value").innerHTML =
-      `${formatValue(latest?.value)}<span class="unit">${e(formatUnit(c.unit))}</span>`;
+      `${formatMeasurement(latest?.value, c.metric)}<span class="unit">${e(formatUnit(c.unit))}</span>`;
     root.querySelector("#history-time").textContent = latest
       ? new Date(latest.time).toLocaleString(locale())
       : t("common.waiting");
@@ -449,7 +450,7 @@ export function mountDashboard(root, { state = {}, notify }) {
         : []),
       ...g.diagnostics.map((c) => [
         c.title,
-        `${formatValue(["ok", "recorded", "stale"].includes(c.state) ? c.value : null)} ${formatUnit(c.unit)} · ${states[c.state]}`,
+        `${formatMeasurement(["ok", "recorded", "stale"].includes(c.state) ? c.value : null, c.metric)} ${formatUnit(c.unit)} · ${states[c.state]}`,
       ]),
     ];
     root.querySelector("#device-detail").innerHTML =

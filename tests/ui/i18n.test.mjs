@@ -12,6 +12,7 @@ import {
   age,
   states,
   formatValue,
+  formatMeasurement,
   measurementLabel,
   buildChannels,
   csvRows,
@@ -94,12 +95,32 @@ test("supported locales, fallback, CLDR plurals and literal interpolation", () =
 
 test("values, age, states and known metrics follow the chosen language", () => {
   const now = Date.parse("2026-01-02T12:00:00Z");
-  for (const [lang, value, minute, state, metric] of [
-    ["en-US", "1,234.5", "1 min ago", "Reading error", "Temperature"],
-    ["pt-BR", "1.234,5", "Há 1 min", "Erro de leitura", "Temperatura"],
+  for (const [lang, value, minute, state, metric, celsius, volts] of [
+    [
+      "en-US",
+      "1,234.5",
+      "1 min ago",
+      "Reading error",
+      "Temperature",
+      "25.0",
+      "3.40",
+    ],
+    [
+      "pt-BR",
+      "1.234,5",
+      "Há 1 min",
+      "Erro de leitura",
+      "Temperatura",
+      "25,0",
+      "3,40",
+    ],
   ]) {
     setLocale(lang);
     assert.equal(formatValue(1234.5), value);
+    // Known measurements keep their decimals; anything else stays generic.
+    assert.equal(formatMeasurement(25, "temperature"), celsius);
+    assert.equal(formatMeasurement(3.4, "voltage"), volts);
+    assert.equal(formatMeasurement(25, "custom_quantity"), "25");
     assert.equal(formatValue(null), "—");
     assert.equal(age(new Date(now - 60000).toISOString(), now), minute);
     assert.equal(age("invalid", now), t("age.unknown"));
@@ -107,7 +128,7 @@ test("values, age, states and known metrics follow the chosen language", () => {
     assert.equal(measurementLabel("temperature"), metric);
     assert.equal(measurementLabel("custom_quantity"), "Custom quantity");
     assert.equal(measurementLabel("constructor"), "Constructor");
-    assert.equal(measurementLabel("rssi"), "RSSI");
+    assert.equal(measurementLabel("rssi"), t("metrics.rssi"));
   }
 });
 

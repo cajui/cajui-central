@@ -1,6 +1,7 @@
 import { t, locale } from "./i18n.mjs";
 import {
   formatValue,
+  formatMeasurement,
   numeric,
   receiverLabel,
   receiverSummary,
@@ -214,7 +215,7 @@ export function attentionItems(groups, receivers, now) {
     const volts = batteryOf(g);
     if (volts !== null && volts < BATTERY_LOW_V) {
       const critical = volts < BATTERY_CRITICAL_V;
-      const value = `${formatValue(volts, 2)} V`;
+      const value = `${formatMeasurement(volts, "voltage")} V`;
       items.push({
         severity: critical ? "critical" : "warning",
         key: `battery/${placeKey(g)}`,
