@@ -120,7 +120,7 @@ test("brand contrast audit updates with theme and navigation works", async ({
   page,
 }) => {
   await page.goto(referenceURL + "/design/brand");
-  await expect(page.locator("#contrast-audit tr")).toHaveCount(11);
+  await expect(page.locator("#contrast-audit tr")).toHaveCount(14);
   await expect(page.locator("#contrast-audit")).not.toContainText(
     "Below target",
   );
