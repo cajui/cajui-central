@@ -3163,3 +3163,21 @@ dialog.history-dialog {
   display: grid;
   gap: var(--space-1);
 }
+
+/* The server fallback remains available without JavaScript or after startup fails. */
+.startup-status {
+  display: none;
+}
+html {
+  background: var(--canvas);
+}
+html.starting .shell {
+  visibility: hidden;
+}
+html.starting .startup-status {
+  display: block;
+  position: fixed;
+  inset: 40% 0 auto;
+  text-align: center;
+  color: var(--muted);
+}

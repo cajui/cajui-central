@@ -182,3 +182,5 @@ else if (route === "/broker") mountBroker(root, { state });
 else if (route === "/receivers") mountReceivers(root, { state, notify });
 else mountDashboard(root, { state, notify });
 document.documentElement.classList.add("ready");
+
+document.dispatchEvent(new Event("cajui-ready"));

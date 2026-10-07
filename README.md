@@ -341,6 +341,11 @@ repository.
 
 ## Interface
 
+A small same-origin startup script applies the saved or system theme before styles
+paint. The interactive shell is revealed after mounting, avoiding a flash of the
+server fallback during navigation. If the module fails to load, a bounded startup
+timeout reveals the server content; it also remains available without JavaScript.
+
 The menu starts with **Overview**, then two areas: **Equipment** (**Devices**,
 **Receivers** and **Sensors**) and **System** (**MQTT broker**). On screens up to 1000 px
 wide it sits at the bottom: each area opens a sheet with its pages, and **More** holds
