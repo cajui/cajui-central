@@ -4,7 +4,7 @@ import {
   age,
   measurementLabel,
   states,
-  formatValue,
+  formatMeasurement,
   formatUnit,
   isLinkDiagnostic,
   deviceStateFor,
@@ -93,16 +93,21 @@ export function mountRegistry(root, { state, kind, notify }) {
     return [
       [
         t("metrics.battery"),
-        e(shown(battery, (c) => `${formatValue(c.value, 2)} V`)),
+        e(
+          shown(
+            battery,
+            (c) => `${formatMeasurement(c.value, c.metric, c.unit)} V`,
+          ),
+        ),
       ],
       [
         t("registry.signal"),
         e(
           shown(rssi, (c) =>
             [
-              `${formatValue(c.value, 0)} dBm`,
+              `${formatMeasurement(c.value, c.metric, c.unit)} dBm`,
               snr && ["ok", "recorded", "stale"].includes(snr.state)
-                ? `SNR ${formatValue(snr.value, 1)} dB`
+                ? `SNR ${formatMeasurement(snr.value, snr.metric, snr.unit)} dB`
                 : "",
             ]
               .filter(Boolean)
@@ -162,7 +167,7 @@ export function mountRegistry(root, { state, kind, notify }) {
               .filter((m) => !isLinkDiagnostic({ sensor: entry.sensor, ...m }))
               .map(
                 (m) =>
-                  `${measurementLabel(m.metric)}: ${m.status === "ok" ? formatValue(m.value) + " " + formatUnit(m.unit) : (states[m.status] ?? m.status)}`,
+                  `${measurementLabel(m.metric)}: ${m.status === "ok" ? formatMeasurement(m.value, m.metric, m.unit) + " " + formatUnit(m.unit) : (states[m.status] ?? m.status)}`,
               )
               .join(" · ")
           : age(device.received_at, Date.parse(snapshot.generated_at));

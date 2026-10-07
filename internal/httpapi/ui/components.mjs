@@ -4,6 +4,7 @@ import {
   states,
   numeric,
   formatValue,
+  formatMeasurement,
   formatUnit,
   plotGeometry,
 } from "./model.mjs";
@@ -66,7 +67,7 @@ class Sensor extends Component {
     const kind = metricIcon(d.metric ?? this.getAttribute("metric"));
     this.innerHTML = `<article class="card sensor-card" data-kind="${kind}" data-state="${e(state)}">
       <div class="sensor-heading"><span class="metric-icon">${icon(kind)}</span><div><h3 class="card-title">${e(d.title ?? this.getAttribute("label") ?? t("common.measurement"))}</h3><p class="card-context">${e(d.context ?? this.getAttribute("context") ?? t("components.no_sensor"))}</p></div></div>
-      <p class="measurement">${formatValue(value)}<span class="unit">${e(formatUnit(d.unit ?? this.getAttribute("unit")))}</span></p>
+      <p class="measurement">${formatMeasurement(value, d.metric ?? this.getAttribute("metric"), d.unit ?? this.getAttribute("unit"))}<span class="unit">${e(formatUnit(d.unit ?? this.getAttribute("unit")))}</span></p>
       ${spark ? `<svg class="spark" viewBox="0 0 180 32" preserveAspectRatio="none" aria-hidden="true"><path d="${spark.path}" transform="translate(0 2)"/></svg>` : ""}
       <div class="sensor-status">${quiet(state) ? "" : `<cj-badge state="${e(state)}"></cj-badge>`}<span class="reading-age">${e(d.updated ?? this.getAttribute("updated") ?? t("age.unknown"))}</span></div>
       ${state === "ok" ? "" : `<p class="reading-note">${e(iconText(state))}</p>`}
@@ -101,7 +102,7 @@ class Reading extends Component {
     const kind = metricIcon(d.metric);
     this.innerHTML = `<div class="reading-tile" data-kind="${kind}" data-state="${state}">
       <div class="reading-heading"><span class="metric-icon">${icon(kind)}</span><span class="reading-title">${e(d.title ?? t("common.measurement"))}</span></div>
-      <p class="measurement">${formatValue(value)}<span class="unit">${e(formatUnit(d.unit))}</span></p>
+      <p class="measurement">${formatMeasurement(value, d.metric, d.unit)}<span class="unit">${e(formatUnit(d.unit))}</span></p>
       <div class="reading-quality">${quiet(state) ? "" : `<cj-badge state="${state}"></cj-badge>`}<span class="reading-age">${e(d.updated ?? t("age.unknown"))}</span></div>
       ${["ok", "recorded"].includes(state) ? "" : `<p class="reading-note">${e(iconText(state))}</p>`}
       <span class="reading-history" aria-hidden="true">${t("common.history")} ${icon("arrow")}</span></div>`;
@@ -119,7 +120,7 @@ class Signal extends Component {
   static observedAttributes = ["value"];
   render() {
     const n = attributeNumber(this, "value");
-    this.innerHTML = `<span class="signal">${icon("signal")}<span>${numeric(n) === null ? t("common.unknown") : `${formatValue(n, 0)} dBm`}</span><span class="sr-only"> ${t("components.signal")}</span></span>`;
+    this.innerHTML = `<span class="signal">${icon("signal")}<span>${numeric(n) === null ? t("common.unknown") : `${formatMeasurement(n, "rssi", "dBm")} dBm`}</span><span class="sr-only"> ${t("components.signal")}</span></span>`;
   }
 }
 class Level extends Component {
@@ -186,6 +187,7 @@ class Chart extends Component {
     const {
       points = [],
       unit = "",
+      metric = "",
       label = t("common.history"),
       interval = 0,
       timeLabel = t("chart.time"),
@@ -236,7 +238,7 @@ class Chart extends Component {
       .reverse()
       .map(
         (p) =>
-          `<tr><td>${e(new Date(p.time).toLocaleString(locale()))}</td><td>${numeric(p.value) === null ? t("chart.no_reading") : formatValue(p.value)}</td></tr>`,
+          `<tr><td>${e(new Date(p.time).toLocaleString(locale()))}</td><td>${numeric(p.value) === null ? t("chart.no_reading") : formatMeasurement(p.value, metric, unit)}</td></tr>`,
       )
       .join("")}</tbody></table></div></details>`;
     if (tableFocused)
@@ -250,7 +252,7 @@ class Chart extends Component {
     if (saved >= 0) slider.value = saved;
     const inspect = () => {
       const p = g.points[Number(slider.value)];
-      output.textContent = `${time(p.time)} · ${formatValue(p.value)} ${formatUnit(unit)}`;
+      output.textContent = `${time(p.time)} · ${formatMeasurement(p.value, metric, unit)} ${formatUnit(unit)}`;
       selection.textContent = output.textContent;
       marker.setAttribute("cx", g.x(p.time));
       marker.setAttribute("cy", numeric(p.value) === null ? 0 : g.y(p.value));

@@ -563,7 +563,7 @@ test("receiver state keeps unknown values unknown and names actionable notices",
   assert.equal(linkText(null), "Unknown");
   assert.equal(linkText({ rssi_dbm: null }), "Unknown");
   assert.equal(linkText({ rssi_dbm: -82, snr_db: 9.5 }), "-82 dBm · 9.5 dB");
-  assert.equal(linkText({ snr_db: -2 }), "-2 dB");
+  assert.equal(linkText({ snr_db: -2 }), "-2.0 dB");
   setLocale("pt-BR");
   assert.equal(receiverLabel("0000aa000000a001"), "Receptor A001");
   assert.match(
@@ -836,7 +836,7 @@ test("attention lists problems with a reason, most severe first", async () => {
   assert.deepEqual(offline.places, ["mqtt/site/d"]);
   // A silent place behind an offline receiver is explained by the receiver, once.
   assert.equal(items.filter((i) => i.key === "silent/mqtt/site/d").length, 0);
-  assert.match(items[0].detail, /Below 3\.2 V the device stops transmitting/);
+  assert.match(items[0].detail, /Below 3\.20 V the device stops transmitting/);
   assert.equal(placeSeverity(placeKey(groups[1]), items), "critical");
   assert.equal(placeSeverity(placeKey(groups[4]), items), "normal");
   assert.equal(attentionItems([group("e", "Station")], [], now).length, 0);

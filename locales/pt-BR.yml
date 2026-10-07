@@ -61,8 +61,8 @@ pt-BR:
     soil_moisture: Umidade do solo
     illuminance: Iluminância
     level: Nível
-    rssi: RSSI
-    snr: SNR
+    rssi: Intensidade do sinal (RSSI)
+    snr: Relação sinal-ruído (SNR)
   dashboard:
     history_title: Histórico de %{measurement}
     history_accessible: 'Histórico de %{measurement} · Transmissor %{device} · Origem %{source}'
