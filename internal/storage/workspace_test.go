@@ -354,17 +354,59 @@ func TestArchiveMigrationKeepsDevices(t *testing.T) {
 	if _, err := s.Insert(ctx, sample(), time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`ALTER TABLE workspace_devices DROP COLUMN archived; PRAGMA user_version=5;`); err != nil {
+	if _, err := s.db.Exec(`ALTER TABLE workspace_devices DROP COLUMN archived; ALTER TABLE workspace_sensors DROP COLUMN archived; ALTER TABLE device_states DROP COLUMN archived; PRAGMA user_version=5;`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.migrate(); err != nil {
 		t.Fatal(err)
 	}
 	var version int
-	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 6 {
+	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 7 {
 		t.Fatal(version, err)
 	}
 	if c := catalog(t, s); len(c.Devices) != 1 {
 		t.Fatal("device lost in migration", c)
+	}
+}
+
+func TestArchiveSensorKeepsHistoryAndRestoresOnFreshReading(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	at := time.Now().UTC()
+	r := sample()
+	if _, err := s.Insert(ctx, r, at); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveDevice(ctx, catalog(t, s).Devices[0].ID, workspace.Settings{Name: "Node"}); err != nil {
+		t.Fatal(err)
+	}
+	item := catalog(t, s).Sensors[0]
+	if err := s.SaveSensor(ctx, item.ID, workspace.Settings{Name: "Orchard"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ArchiveSensor(ctx, item.ID, 0); !errors.Is(err, workspace.ErrConflict) {
+		t.Fatal(err)
+	}
+	if err := s.ArchiveSensor(ctx, item.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	if c := catalog(t, s); len(c.Sensors) != 0 || len(c.Devices) != 1 {
+		t.Fatal(c)
+	}
+	if _, err := s.Insert(ctx, r, at.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if len(catalog(t, s).Sensors) != 0 {
+		t.Fatal("duplicate restored sensor")
+	}
+	if rows, err := s.Recent(ctx, 10); err != nil || len(rows) != 1 {
+		t.Fatal("history lost", err)
+	}
+	r.Sequence++
+	if _, err := s.Insert(ctx, r, at.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if c := catalog(t, s); len(c.Sensors) != 1 || c.Sensors[0].Name != "Orchard" {
+		t.Fatal(c)
 	}
 }

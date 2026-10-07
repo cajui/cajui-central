@@ -1,3 +1,5 @@
+import { watchDeviceStates } from "./state-events.mjs";
+import { openReceiverSetup } from "./receiver-setup.mjs";
 import { t } from "./i18n.mjs";
 import {
   escapeHTML as e,
@@ -9,6 +11,7 @@ import {
   receiverSummary,
 } from "./model.mjs";
 import { icon } from "./icons.mjs";
+import { saveWorkspace } from "./workspace-api.mjs";
 import { fetchSnapshot } from "./snapshot-api.mjs";
 
 // A value the firmware reported that this version has no text for.
@@ -80,37 +83,54 @@ export function receiverCard(r, snapshot) {
         : t("common.unknown"),
     ],
   ];
-  const badge = { online: "ok", offline: "error", unknown: "empty" }[
+  const badge = { online: "ok", offline: "network", unknown: "empty" }[
     summary.status
   ];
   const card = document.createElement("article");
   card.className = "panel receiver-card";
   card.dataset.status = summary.status;
-  card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("signal")}</span><div><h2>${e(receiverLabel(r.device_id))}</h2><p class="muted">${e(t("receivers.transmitters", { count: transmitters }))}</p></div><span class="badge" data-state="${badge}">${e(t(`receivers.${summary.status}`))}</span></div>${summary.notices.length ? `<ul class="receiver-notices">${summary.notices.map((n) => `<li data-level="${n.level}">${n.level === "info" ? "" : icon("alert")}<span>${e(n.text)}</span></li>`).join("")}</ul>` : ""}<dl class="detail-list receiver-details">${rows.map(([k, v]) => `<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join("")}</dl>`;
+  card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("signal")}</span><div><h2>${e(receiverLabel(r.device_id))}</h2><p class="muted">${e(t("receivers.transmitters", { count: transmitters }))}</p></div><span class="badge" data-state="${badge}">${e(t(`receivers.${summary.status}`))}</span></div>${summary.notices.length ? `<ul class="receiver-notices">${summary.notices.map((n) => `<li data-level="${n.level}">${n.level === "info" ? `<span>${e(n.text)}</span>` : `<span class="badge" data-state="${n.level === "error" ? "network" : "warning"}">${e(n.text)}</span>`}</li>`).join("")}</ul>` : ""}<dl class="detail-list receiver-details">${rows.map(([k, v]) => `<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join("")}</dl>`;
   return card;
 }
-// One line per receiver on the dashboard; problems carry their first notice.
-export function receiverStatusLine(r) {
-  const summary = receiverSummary(r);
-  const badge = { online: "ok", offline: "error", unknown: "empty" }[
-    summary.status
-  ];
-  const problem = summary.notices.find((n) => n.level !== "info");
-  const link = document.createElement("a");
-  link.className = "receiver-status";
-  link.href = "/receivers";
-  link.dataset.status = problem ? problem.level : summary.status;
-  link.innerHTML = `${icon("signal")}<strong>${e(receiverLabel(r.device_id))}</strong><span class="badge" data-state="${badge}">${e(t(`receivers.${summary.status}`))}</span>${problem ? `<span class="receiver-status-note">${e(problem.text)}</span>` : ""}`;
-  return link;
-}
-export function mountReceivers(root, { state }) {
+export function mountReceivers(root, { state, notify }) {
   let snapshot = state,
     pending = false;
-  root.innerHTML = `<header class="page-heading"><div><h1>${t("receivers.heading")}</h1><p>${t("receivers.description")}</p></div><div class="top-actions"><button class="button" id="refresh">${icon("refresh")}${t("common.refresh")}</button></div></header><div id="fetch-error" class="notice hidden" role="status"></div><div id="receiver-list" class="receiver-items"></div>`;
+  root.innerHTML = `<header class="page-heading"><div><h1>${t("receivers.heading")}</h1><p>${t("receivers.description")}</p></div><div class="top-actions"><button class="button primary" id="add-receiver">${t("setup.add")}</button><button class="button" id="refresh">${icon("refresh")}${t("common.refresh")}</button></div></header><div id="fetch-error" class="notice hidden" role="status"></div><div id="receiver-list" class="receiver-items"></div>`;
   function render() {
     const list = root.querySelector("#receiver-list");
     const receivers = receiversOf(snapshot);
-    list.replaceChildren(...receivers.map((r) => receiverCard(r, snapshot)));
+    list.replaceChildren(
+      ...receivers.map((r) => {
+        const card = receiverCard(r, snapshot);
+        const button = document.createElement("button");
+        button.className = "button danger-text";
+        button.textContent = t("registry.archive");
+        button.setAttribute(
+          "aria-label",
+          t("registry.archive_name", { name: receiverLabel(r.device_id) }),
+        );
+        button.addEventListener("click", async () => {
+          const name = receiverLabel(r.device_id);
+          if (!window.confirm(t("receivers.archive_confirm", { name }))) return;
+          button.disabled = true;
+          try {
+            await saveWorkspace(
+              snapshot,
+              `receivers/${encodeURIComponent(r.source_id)}/${encodeURIComponent(r.device_id)}/archive`,
+              { received_at: r.received_at },
+              "POST",
+            );
+            notify(t("registry.archived", { name }));
+            await refresh();
+          } catch (error) {
+            notify(error.message);
+            button.disabled = false;
+          }
+        });
+        card.append(button);
+        return card;
+      }),
+    );
     if (!receivers.length)
       list.innerHTML = `<div class="empty">${icon("signal")}<h2>${t("receivers.empty")}</h2><p>${t("receivers.empty_hint")}</p></div>`;
   }
@@ -120,7 +140,13 @@ export function mountReceivers(root, { state }) {
     const button = root.querySelector("#refresh");
     button.disabled = true;
     try {
-      snapshot = await fetchSnapshot("/receivers");
+      const fresh = await fetchSnapshot("/receivers");
+      // An event can arrive while the full refresh is in flight.
+      if (Date.parse(fresh.generated_at) < Date.parse(snapshot.generated_at)) {
+        fresh.device_states = snapshot.device_states;
+        fresh.generated_at = snapshot.generated_at;
+      }
+      snapshot = fresh;
       root.querySelector("#fetch-error").classList.add("hidden");
       render();
     } catch {
@@ -134,7 +160,29 @@ export function mountReceivers(root, { state }) {
     }
   }
   root.querySelector("#refresh").addEventListener("click", refresh);
+  root
+    .querySelector("#add-receiver")
+    .addEventListener("click", () =>
+      openReceiverSetup(root, snapshot, refresh),
+    );
   render();
+  const url = new URL(location.href);
+  if (url.searchParams.get("setup") === "1") {
+    url.searchParams.delete("setup");
+    history.replaceState(history.state, "", url);
+    openReceiverSetup(root, snapshot, refresh);
+  }
+  watchDeviceStates(state, (next) => {
+    if (Date.parse(next.generated_at) < Date.parse(snapshot.generated_at))
+      return;
+    if (
+      JSON.stringify(next.device_states) ===
+      JSON.stringify(snapshot.device_states)
+    )
+      return;
+    snapshot = { ...snapshot, ...next };
+    render();
+  });
   const timer = setInterval(() => {
     if (!document.hidden) refresh();
   }, 30000);

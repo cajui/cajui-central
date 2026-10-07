@@ -13,6 +13,8 @@
   --ink: #20342e;
   --muted: #58685f;
   --line: #dce3db;
+  /* Field outlines: at least 3:1 on surface and canvas (WCAG 1.4.11). */
+  --field-line: #7d8a81;
   --brand: #265d48;
   --brand-hover: #194531;
   --brand-soft: #e4efe4;
@@ -68,6 +70,7 @@
   --ink: #ecf3e9;
   --muted: #b4c2b6;
   --line: #3b4d40;
+  --field-line: #71857a;
   --brand: #aed5b6;
   --brand-hover: #cee8d0;
   --brand-soft: #2a4234;
@@ -106,6 +109,7 @@
     --ink: #ecf3e9;
     --muted: #b4c2b6;
     --line: #3b4d40;
+    --field-line: #71857a;
     --brand: #aed5b6;
     --brand-hover: #cee8d0;
     --brand-soft: #2a4234;

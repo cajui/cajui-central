@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -42,7 +43,7 @@ func run(ctx context.Context) error {
 	var options []httpapi.Option
 	if c.MQTT.URL != "" {
 		consumer := mqttingest.New(c.MQTT, db, slog.Default())
-		options = append(options, httpapi.WithCommands(consumer))
+		options = append(options, httpapi.WithCommands(consumer), httpapi.WithBroker(consumer, httpapi.ReceiverSetup{Username: c.ReceiverUsername, PasswordFile: c.ReceiverPasswordFile, Host: c.ReceiverHost, Port: c.ReceiverPort}))
 		mqttContext, stop := context.WithCancel(ctx)
 		done := make(chan struct{})
 		go func() { defer close(done); consumer.Run(mqttContext) }()
@@ -52,7 +53,7 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	server := &http.Server{Addr: c.Address, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	server := &http.Server{BaseContext: func(net.Listener) context.Context { return ctx }, Addr: c.Address, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 	result := make(chan error, 1)
 	go func() { result <- server.ListenAndServe() }()
 	slog.Info("cajui starting", "address", c.Address)

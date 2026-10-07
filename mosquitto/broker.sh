@@ -22,6 +22,11 @@ valid_producer() {
   [ "${#1}" -le 64 ]
 }
 generate() {
+  # Only the dedicated receiver account is readable by Central's local setup wizard.
+  if [ -f "$secrets/producers/receiver-1" ]; then
+    chown "$central_uid" "$secrets/producers/receiver-1"
+    chmod 0400 "$secrets/producers/receiver-1"
+  fi
   mkdir -p "$auth"
   cp /cajui/acl "$auth/acl.tmp"
   : > "$auth/passwords.tmp"
@@ -57,8 +62,9 @@ fingerprint() {
 }
 
 mkdir -p "$secrets/producers"
-for name in api-token central homeassistant demo-source; do ensure "$name"; done
-# Central reads only its API token and broker password.
+for name in api-token central homeassistant demo-source producers/receiver-1; do ensure "$name"; done
+chmod 0711 "$secrets/producers"
+# Central reads its API token, broker password and dedicated setup credential.
 chown "$central_uid" "$secrets/api-token" "$secrets/central"
 chmod 0400 "$secrets/api-token" "$secrets/central"
 generate

@@ -234,3 +234,20 @@ func (brokenRepo) SaveSensor(context.Context, int64, workspace.Settings) error {
 func (brokenRepo) SaveLayout(context.Context, workspace.Layout) error {
 	return errors.New("private database failure")
 }
+
+func (brokenRepo) ArchiveSensor(context.Context, int64, int64) error {
+	return errors.New("private database failure")
+}
+func (brokenRepo) ArchiveReceiver(context.Context, string, string, time.Time) error {
+	return errors.New("private database failure")
+}
+
+func TestConnectionsSSRMarksCurrentPage(t *testing.T) {
+	h := testHandler(t)
+	for _, path := range []string{"/receivers", "/broker"} {
+		w := request(h, "GET", path, "", "", "")
+		if w.Code != 200 || !strings.Contains(w.Body.String(), `href="`+path+`" aria-current="page"`) {
+			t.Fatal("missing SSR current page", path)
+		}
+	}
+}

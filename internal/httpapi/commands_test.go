@@ -121,3 +121,38 @@ func TestCommandRoutes(t *testing.T) {
 		t.Fatal(w.Code)
 	}
 }
+
+func TestArchiveReceiverEndpoint(t *testing.T) {
+	db, err := storage.Open(filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	state, err := devicestate.Decode("r", "00000000000000d1", []byte(`{"version":1,"source_id":"r","device_id":"00000000000000d1","role":"receiver"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now().UTC()
+	if err = db.SaveDeviceState(context.Background(), state, at, false); err != nil {
+		t.Fatal(err)
+	}
+	h, err := New(db, token, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cap := workspaceSnapshot(t, h, "/receivers").UIToken
+	body := `{"received_at":"` + at.Format(time.RFC3339Nano) + `"}`
+	path := "/ui-api/receivers/r/00000000000000d1/archive"
+	for _, tc := range []struct {
+		body, cap string
+		want      int
+	}{{body, token, 403}, {`{}`, cap, 400}, {`{"received_at":"2020-01-01T00:00:00Z"}`, cap, 409}, {body, cap, 204}, {body, cap, 404}} {
+		w := workspaceEdit(h, path, tc.body, tc.cap, func(r *http.Request) { r.Method = "POST" })
+		if w.Code != tc.want {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+	if rows, err := db.DeviceStates(context.Background()); err != nil || len(rows) != 0 {
+		t.Fatal(rows, err)
+	}
+}

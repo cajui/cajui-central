@@ -2,7 +2,7 @@ import { t } from "./i18n.mjs";
 import { icon } from "./icons.mjs";
 import {
   escapeHTML as e,
-  formatValue,
+  formatMeasurement,
   receiverLabel,
   receiverSummary,
 } from "./model.mjs";
@@ -120,7 +120,9 @@ export function pairingSection(snapshot, act, progress = new Map()) {
   receivers.forEach((r, index) => {
     const headingID = index ? `pairing-heading-${index}` : "pairing-heading";
     const status = receiverSummary(r).status;
-    const badge = { online: "ok", offline: "error", unknown: "empty" }[status];
+    const badge = { online: "ok", offline: "network", unknown: "empty" }[
+      status
+    ];
     section.insertAdjacentHTML(
       "beforeend",
       `<p class="pairing-via">${e(t("registry.pairing.via", { receiver: receiverLabel(r.device_id) }))}<span class="badge" data-state="${badge}">${e(t(`receivers.${status}`))}</span></p>`,
@@ -194,7 +196,7 @@ export function pairingSection(snapshot, act, progress = new Map()) {
         t("registry.pairing.id", { id: shortID(request.node_id) }),
         typeof request.rssi_dbm === "number"
           ? t("registry.pairing.signal", {
-              value: formatValue(request.rssi_dbm, 0),
+              value: formatMeasurement(request.rssi_dbm, "rssi", "dBm"),
             })
           : "",
       ]

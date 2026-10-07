@@ -28,9 +28,24 @@ export function t(key, values = {}) {
     return message(key);
   };
   const message = lookup(activeLocale) ?? lookup("en-US") ?? key;
+  // A count is a quantity: it gets the locale's digit grouping ("18.322 leituras").
   return message.replace(/%\{([a-z_]+)\}/g, (match, name) =>
-    Object.hasOwn(values, name) ? String(values[name]) : match,
+    !Object.hasOwn(values, name)
+      ? match
+      : name === "count" && typeof values.count === "number"
+        ? new Intl.NumberFormat(activeLocale).format(values.count)
+        : String(values[name]),
   );
+}
+
+// For callers that fetch directly: a request that never reaches Central rejects with a
+// TypeError ("Failed to fetch") or, past its time limit, a TimeoutError, both worded by
+// the browser. Messages already translated by the API helpers pass through unchanged.
+export function errorMessage(error) {
+  return error instanceof TypeError ||
+    ["TimeoutError", "AbortError"].includes(error?.name)
+    ? t("common.network_error")
+    : error.message;
 }
 
 export function metricLabel(metric, fallback) {

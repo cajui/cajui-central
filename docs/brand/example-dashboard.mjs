@@ -2,7 +2,7 @@ import {
   escapeHTML as e,
   buildChannels,
   age,
-  formatValue,
+  formatMeasurement,
   formatUnit,
   csvRows,
   states,
@@ -56,7 +56,7 @@ export function mountDashboard(root, { demo = false, state = {}, notify }) {
       button.className = "sensor-link sensor-button";
       button.setAttribute(
         "aria-label",
-        `Inspect ${c.title}: ${formatValue(["ok", "stale", "recorded"].includes(c.state) ? c.value : null)} ${formatUnit(c.unit)}, ${states[c.state]}, from ${c.context}`,
+        `Inspect ${c.title}: ${formatMeasurement(["ok", "stale", "recorded"].includes(c.state) ? c.value : null, c.metric, c.unit)} ${formatUnit(c.unit)}, ${states[c.state]}, from ${c.context}`,
       );
       button.setAttribute("aria-pressed", String(c.key === selected));
       const card = document.createElement("cj-sensor");
@@ -135,7 +135,7 @@ export function mountDashboard(root, { demo = false, state = {}, notify }) {
       ],
     ];
     root.querySelector("#device-detail").innerHTML =
-      `<h3>${e(d.name ?? d.device_id)}</h3><dl class="detail-list">${details.map(([k, v]) => `<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join("")}${readings.map((c) => `<div><dt>${e(c.title)}</dt><dd>${["ok", "stale", "recorded"].includes(c.state) ? formatValue(c.value) + " " + e(formatUnit(c.unit)) : e(states[c.state])}</dd></div>`).join("")}</dl><p class="dialog-note">${demo ? "These are simulated device details." : "Arrival status is based on new samples. It does not prove that the device is currently online. Battery and signal remain unknown unless reported."}</p>`;
+      `<h3>${e(d.name ?? d.device_id)}</h3><dl class="detail-list">${details.map(([k, v]) => `<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join("")}${readings.map((c) => `<div><dt>${e(c.title)}</dt><dd>${["ok", "stale", "recorded"].includes(c.state) ? formatMeasurement(c.value, c.metric, c.unit) + " " + e(formatUnit(c.unit)) : e(states[c.state])}</dd></div>`).join("")}</dl><p class="dialog-note">${demo ? "These are simulated device details." : "Arrival status is based on new samples. It does not prove that the device is currently online. Battery and signal remain unknown unless reported."}</p>`;
     root.querySelector("#device-dialog").showModal();
   }
   function renderAlerts() {
@@ -161,7 +161,7 @@ export function mountDashboard(root, { demo = false, state = {}, notify }) {
       items
         .map(
           (item, i) =>
-            `<div class="alert-item" data-state="${item.kind}">${icon(item.kind === "stale" ? "clock" : "alert")}<div><p>${e(item.title)}</p><small>${e(item.body)}</small><button class="text-button" data-alert="${i}">View device details →</button></div></div>`,
+            `<div class="alert-item" data-state="${item.kind}">${icon("alert")}<div><p>${e(item.title)}</p><small>${e(item.body)}</small><button class="text-button" data-alert="${i}">View device details →</button></div></div>`,
         )
         .join("") ||
       `<div class="alert-empty">${icon("check")}<h3>No reported issues</h3><p class="small">${devices.length ? "No silence or reading errors in the latest reports." : "Device reports will appear here."}</p></div>`;

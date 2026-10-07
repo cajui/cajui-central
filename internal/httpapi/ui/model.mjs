@@ -28,6 +28,12 @@ export const states = Object.freeze({
   get info() {
     return t("states.info");
   },
+  get network() {
+    return t("states.network");
+  },
+  get critical() {
+    return t("states.critical");
+  },
 });
 export const escapeHTML = (value) =>
   String(value ?? "").replace(
@@ -40,13 +46,32 @@ export const escapeHTML = (value) =>
 export function numeric(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
-export function formatValue(value, digits = 1) {
+export function formatValue(value, digits = 1, minimum = 0) {
   return numeric(value) === null
     ? "—"
     : new Intl.NumberFormat(locale(), {
+        minimumFractionDigits: Math.min(minimum, digits),
         maximumFractionDigits: digits,
         notation: Math.abs(value) >= 1e7 ? "scientific" : "standard",
       }).format(value);
+}
+// Decimals of each measurement cajui-firmware sends, by metric and unit, since units are
+// free text in the contract: a voltage in mV is not the battery's volts. Anything else
+// stays generic. A fixed count keeps 25.0 °C from reading "25 °C" next to "47.4 %".
+const measurementDecimals = {
+  temperature: { degC: 1 },
+  humidity: { "%": 1 },
+  voltage: { V: 2 },
+  rssi: { dBm: 0 },
+  snr: { dB: 1 },
+};
+export function formatMeasurement(value, metric, unit) {
+  const units = Object.hasOwn(measurementDecimals, metric)
+    ? measurementDecimals[metric]
+    : {};
+  return Object.hasOwn(units, unit)
+    ? formatValue(value, units[unit], units[unit])
+    : formatValue(value);
 }
 export function formatUnit(unit) {
   const known = { degC: "°C", degF: "°F" };
@@ -145,9 +170,14 @@ export function plotGeometry(
   width = 620,
   height = 170,
   gap = Infinity,
+  span = null,
 ) {
   const valid = points
-    .filter((p) => Number.isFinite(p.time))
+    .filter(
+      (p) =>
+        Number.isFinite(p.time) &&
+        (!span || (p.time >= span[0] && p.time <= span[1])),
+    )
     .sort((a, b) => a.time - b.time);
   const values = valid.map((p) => numeric(p.value)).filter((v) => v !== null);
   if (!values.length) return null;
@@ -165,8 +195,9 @@ export function plotGeometry(
     top = high + pad;
   min = Math.max(-Number.MAX_VALUE, bottom * scale);
   max = Math.min(Number.MAX_VALUE, top * scale);
-  const start = valid[0].time,
-    end = valid.at(-1).time;
+  // A fixed span puts several plots on one time axis; otherwise the readings set it.
+  const start = span ? span[0] : valid[0].time,
+    end = span ? span[1] : valid.at(-1).time;
   const x = (t) => ((t - start) / (end - start || 1)) * width;
   const y = (v) => height - ((v / scale - bottom) / (top - bottom)) * height;
   let path = "",
@@ -368,12 +399,14 @@ export function receiverSummary(state) {
   if (online && depth)
     notices.push({
       level: "warning",
+      kind: "queue",
       text: t("receivers.queue_notice", { count: depth }),
     });
   const dropped = numeric(state.queue?.dropped);
   if (dropped)
     notices.push({
       level: "warning",
+      kind: "dropped",
       text: t("receivers.dropped_notice", { count: dropped }),
     });
   if (state.pairing?.open)
@@ -398,8 +431,8 @@ export function linkText(frame) {
     snr = numeric(frame.snr_db);
   if (rssi === null && snr === null) return t("common.unknown");
   return [
-    rssi === null ? null : `${formatValue(rssi, 0)} dBm`,
-    snr === null ? null : `${formatValue(snr, 1)} dB`,
+    rssi === null ? null : `${formatMeasurement(rssi, "rssi", "dBm")} dBm`,
+    snr === null ? null : `${formatMeasurement(snr, "snr", "dB")} dB`,
   ]
     .filter(Boolean)
     .join(" · ");

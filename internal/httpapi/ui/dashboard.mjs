@@ -1,9 +1,10 @@
+import { watchDeviceStates } from "./state-events.mjs";
 import { t, locale } from "./i18n.mjs";
 import {
   escapeHTML as e,
   isLinkDiagnostic,
   age,
-  formatValue,
+  formatMeasurement,
   formatUnit,
   csvRows,
   states,
@@ -21,8 +22,20 @@ import {
   resolveItem,
 } from "./workspace-model.mjs";
 import { openLayoutEditor } from "./layout-editor.mjs";
+import {
+  attentionItems,
+  placeKey,
+  placeSeverity,
+  sensorLabel,
+} from "./overview-model.mjs";
 import { fetchSnapshot } from "./snapshot-api.mjs";
-import { receiverStatusLine } from "./receivers.mjs";
+import {
+  attentionItemHTML,
+  placeHTML,
+  placeRowHTML,
+  placesHeadingHTML,
+  summaryHTML,
+} from "./overview-view.mjs";
 
 // A value the firmware reported that this version has no text for.
 function known(key, fallback) {
@@ -38,15 +51,18 @@ export function mountDashboard(root, { state = {}, notify }) {
     selected = "",
     hours = 24,
     pending = false,
-    dialogOpener = null;
-  root.innerHTML = `<header class="page-heading"><div><h1>${t("common.dashboard")}</h1><p>${t("dashboard.description")}</p></div><div class="top-actions"><button class="button" id="organize">${t("dashboard.organize")}</button><button class="button" id="export">${icon("download")}${t("dashboard.export")}</button><button class="button primary" id="refresh">${icon("refresh")}${t("common.refresh")}</button></div></header>
+    dialogOpener = null,
+    attention = [],
+    shownAttention = "",
+    historyOpener = null;
+  root.innerHTML = `<header class="page-heading overview-heading"><div><h1>${t("common.dashboard")}</h1><p class="live-line"><span class="live-dot" aria-hidden="true"></span><span id="snapshot-time"></span></p></div><div class="top-actions"><button class="button" id="organize">${t("dashboard.organize")}</button><button class="button" id="export">${icon("download")}${t("dashboard.export")}</button><button class="button" id="refresh">${icon("refresh")}${t("common.refresh")}</button></div></header>
     <div id="fetch-error" class="notice hidden" role="status"></div>
-    <section id="summary" class="device-summary" aria-label="${t("dashboard.summary")}"></section>
-    <nav id="receivers" class="receiver-status-list" aria-label="${t("receivers.heading")}" hidden></nav>
-    <div class="toolbar"><div class="segmented" aria-label="${t("dashboard.filter")}"><button data-filter="all" aria-pressed="true">${t("dashboard.all")}</button><button data-filter="attention" aria-pressed="false">${t("dashboard.attention")}</button></div><label class="search">${icon("search")}<span class="sr-only">${t("dashboard.search_label")}</span><input id="search" type="search" placeholder="${t("dashboard.search")}" autocomplete="off"></label></div>
+    <section id="summary" class="overview-summary" aria-label="${t("dashboard.summary")}"></section>
+    <section id="attention" class="panel attention-panel" aria-labelledby="attention-heading" hidden><div class="attention-head"><h2 id="attention-heading">${t("overview.attention_heading")}</h2><span>${t("overview.attention_order")}</span></div><ul class="attention-list"></ul></section>
+    <div class="toolbar" id="toolbar"><div class="segmented" aria-label="${t("dashboard.filter")}"><button data-filter="all" aria-pressed="true">${t("dashboard.all")}</button><button data-filter="attention" aria-pressed="false">${t("dashboard.attention")}</button></div><label class="search">${icon("search")}<span class="sr-only">${t("dashboard.search_label")}</span><input id="search" type="search" placeholder="${t("dashboard.search")}" autocomplete="off"></label></div>
     <section id="devices" class="device-groups" aria-label="${t("dashboard.items")}"></section>
-    <section class="panel history-panel" id="history-panel" hidden><div class="panel-heading"><div><h2 id="history-heading" tabindex="-1">${t("common.history")}</h2><p id="history-context"></p></div><label><span class="sr-only">${t("dashboard.period")}</span><select id="period" class="input"><option value="24">${t("dashboard.hours24")}</option><option value="6">${t("dashboard.hours6")}</option><option value="1">${t("dashboard.hour")}</option><option value="0">${t("dashboard.all_data")}</option></select></label></div><label for="metric-select">${t("common.measurement")}</label><select id="metric-select" class="input"></select><cj-chart id="history"></cj-chart><div class="plot-footer"><span class="legend" id="chart-legend"></span><span id="plot-count"></span></div></section>
-    <footer class="footer"><span id="snapshot-time"></span><span>${t("dashboard.retention")}</span></footer>
+    <dialog class="history-dialog" id="history-panel" aria-labelledby="history-heading history-accessible" aria-describedby="history-context"><div class="dialog-head"><div><h2 id="history-heading" tabindex="-1">${t("common.history")}</h2><p id="history-context"></p><span class="sr-only" id="history-accessible"></span></div><button class="icon-button" id="close-history" aria-label="${t("dashboard.close_history")}">${icon("close")}</button></div><div class="history-summary"><div><span class="small muted">${t("dashboard.latest_reading")}</span><p class="measurement" id="history-value"></p><cj-badge id="history-state"></cj-badge></div><p class="small muted" id="history-time"></p></div><div class="history-controls"><label for="metric-select">${t("common.measurement")}<select id="metric-select" class="input"></select></label><label for="period">${t("dashboard.period")}<select id="period" class="input"><option value="24">${t("dashboard.hours24")}</option><option value="6">${t("dashboard.hours6")}</option><option value="1">${t("dashboard.hour")}</option><option value="0">${t("dashboard.all_data")}</option></select></label></div><cj-chart id="history"></cj-chart><div class="plot-footer"><div><span id="history-limit"></span></div><span id="plot-count"></span></div></dialog>
+    <footer class="footer"><span>${t("dashboard.retention")}</span></footer>
     <dialog id="device-dialog" aria-labelledby="device-dialog-title"><div class="dialog-head"><h2 id="device-dialog-title">${t("dashboard.details")}</h2><button class="icon-button" id="close-dialog" aria-label="${t("dashboard.close_details")}">${icon("close")}</button></div><div id="device-detail"></div></dialog>`;
 
   function rebuild() {
@@ -75,11 +91,9 @@ export function mountDashboard(root, { state = {}, notify }) {
     for (const c of channels) {
       c.updated = age(c.at, now);
       if (c.metric === "co2") c.title = t("metrics.co2");
-      if (isLinkDiagnostic(c))
-        c.title =
-          c.sensor === "battery"
-            ? t("metrics.battery")
-            : c.metric.toUpperCase();
+      // The battery reports a voltage, but it is read as the battery.
+      if (isLinkDiagnostic(c) && c.sensor === "battery")
+        c.title = t("metrics.battery");
     }
     if (!channels.some((c) => c.key === selected)) selected = "";
   }
@@ -105,17 +119,13 @@ export function mountDashboard(root, { state = {}, notify }) {
   function receivers() {
     return (snapshot.device_states ?? []).filter((s) => s.role === "receiver");
   }
-  function renderReceivers() {
-    const target = root.querySelector("#receivers");
-    const list = receivers();
-    target.hidden = !list.length;
-    target.replaceChildren(...list.map(receiverStatusLine));
-  }
   function matchingGroups() {
     const search = query.trim().toLowerCase();
     return groups.filter(
       (g) =>
-        (filter !== "attention" || g.attention) &&
+        (filter !== "attention" ||
+          g.attention ||
+          placeSeverity(placeKey(g), attention) !== "normal") &&
         [
           g.name,
           g.device,
@@ -146,6 +156,10 @@ export function mountDashboard(root, { state = {}, notify }) {
     renderSections(target);
   }
   function renderSections(target) {
+    if (!snapshot.workspace.layout.sections && groups.length) {
+      renderPlaces(target);
+      return;
+    }
     const sections =
       snapshot.workspace.layout.sections ??
       automaticSections(withoutRevoked(snapshot));
@@ -164,7 +178,7 @@ export function mountDashboard(root, { state = {}, notify }) {
         card.className = "panel dashboard-item";
         if (item.kind === "device") {
           card.classList.add("transmitter-card");
-          card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("device")}</span><div><h3>${e(g.name)}</h3><p class="muted">${e(t("counts.registered", { count: g.sensors.length }))}${g.location ? ` · ${e(g.location)}` : ""}</p></div></div><p class="device-last-report">${e(t("dashboard.last_report", { age: age(g.at, Date.parse(snapshot.generated_at)) }))}</p>${g.receiverOffline ? `<p class="device-alert">${icon("alert")}<span>${e(t("receivers.receiver_offline"))}</span></p>` : ""}<div class="transmitter-footer"><cj-badge state="${deviceStatus(g)}"></cj-badge><button class="text-button" data-details="${e(`${g.source}/${g.device}`)}" aria-label="${e(t("dashboard.details_for", { name: g.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></div>`;
+          card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("device")}</span><div><h3>${e(g.name)}</h3><p class="muted">${e(t("counts.registered", { count: g.sensors.length }))}${g.location ? ` · ${e(g.location)}` : ""}</p></div></div><p class="device-last-report">${e(t("dashboard.last_report", { age: age(g.at, Date.parse(snapshot.generated_at)) }))}</p>${g.receiverOffline ? `<p class="device-alert"><span class="badge" data-state="network">${e(t("receivers.receiver_offline"))}</span></p>` : ""}<div class="transmitter-footer">${["ok", "recorded"].includes(deviceStatus(g)) ? "<span></span>" : `<cj-badge state="${deviceStatus(g)}"></cj-badge>`}<button class="text-button" data-details="${e(`${g.source}/${g.device}`)}" aria-label="${e(t("dashboard.details_for", { name: g.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></div>`;
           card
             .querySelector("[data-details]")
             .addEventListener("click", (event) =>
@@ -190,6 +204,63 @@ export function mountDashboard(root, { state = {}, notify }) {
       target.innerHTML = `<div class="empty">${icon("overview")}<h2>${t("dashboard.make_yours")}</h2><p>${available ? t("counts.detected", { count: available }) + " " : ""}${t("dashboard.get_started")}</p><div class="top-actions"><a class="button primary" href="/devices">${t("dashboard.manage_devices")}</a><a class="button" href="/sensors">${t("dashboard.manage_sensors")}</a></div></div>`;
     }
   }
+  // One block per place (a transmitter, until places exist as records): its readings as
+  // compact rows, and any problem of its own underneath.
+  function renderPlaces(target) {
+    const now = Date.parse(snapshot.generated_at);
+    const list = document.createElement("div");
+    list.className = "places";
+    for (const g of groups) {
+      const key = placeKey(g);
+      const severity = placeSeverity(key, attention);
+      const place = document.createElement("article");
+      place.className = "panel place";
+      place.dataset.severity = severity;
+      const notes = attention.filter((item) => item.places.includes(key));
+      place.innerHTML = placeHTML(g, notes, now);
+      const rows = place.querySelector(".place-rows");
+      for (const sensor of g.sensors)
+        for (const c of sensor.channels)
+          rows.append(placeRow(c, g, sensorLabel(g, sensor, c)));
+      place
+        .querySelector("[data-details]")
+        .addEventListener("click", (event) =>
+          showDevice(g, event.currentTarget),
+        );
+      list.append(place);
+    }
+    const section = document.createElement("div");
+    section.className = "places-section";
+    section.innerHTML = placesHeadingHTML();
+    section.append(list);
+    target.append(section);
+  }
+  function placeRow(c, g, sensorName) {
+    const button = readingButton(c, g);
+    button.classList.add("place-row");
+    button.innerHTML = placeRowHTML(
+      c,
+      g,
+      sensorName,
+      Date.parse(snapshot.generated_at),
+    );
+    return button;
+  }
+  function renderAttention() {
+    const panel = root.querySelector("#attention");
+    panel.hidden = !attention.length;
+    const html = attention.map(attentionItemHTML).join("");
+    // Rewriting an unchanged list on every refresh would drop focus from its links.
+    if (html === shownAttention) return;
+    panel.querySelector(".attention-list").innerHTML = html;
+    shownAttention = html;
+  }
+  function renderSummary() {
+    root.querySelector("#summary").innerHTML = summaryHTML(
+      attention,
+      groups.length,
+    );
+  }
   function readingButton(c, g) {
     const button = document.createElement("button");
     button.className = "reading-button";
@@ -198,8 +269,10 @@ export function mountDashboard(root, { state = {}, notify }) {
       "aria-label",
       t("dashboard.inspect", {
         measurement: c.title,
-        value: formatValue(
+        value: formatMeasurement(
           ["ok", "recorded", "stale"].includes(c.state) ? c.value : null,
+          c.metric,
+          c.unit,
         ),
         unit: formatUnit(c.unit),
         status: states[c.state],
@@ -211,47 +284,104 @@ export function mountDashboard(root, { state = {}, notify }) {
     const reading = document.createElement("cj-reading");
     reading.data = c;
     button.append(reading);
-    button.addEventListener("click", () => selectHistory(c.key));
+    button.addEventListener("click", () =>
+      selectHistory(c.key, focusSpot(button)),
+    );
     return button;
   }
-  function selectHistory(key) {
+  function historyChannels(channel) {
+    if (!channel) return [];
+    const group = groups.find(
+      (g) =>
+        g.transport === channel.transport &&
+        g.source === channel.source &&
+        g.device === channel.device,
+    );
+    if (!group) return [];
+    return isLinkDiagnostic(channel)
+      ? group.diagnostics
+      : (group.sensors.find((sensor) => sensor.id === channel.sensor)
+          ?.channels ?? []);
+  }
+
+  function selectHistory(key, opener) {
+    const c = channels.find((channel) => channel.key === key);
+    if (!c) return;
+    const dialog = root.querySelector("#history-panel");
+    const opening = !dialog.open;
+    if (opening) {
+      historyOpener = opener ?? null;
+      root.querySelector("#history").resetInspection();
+      dialog.showModal();
+    }
     selected = key;
-    root.querySelector("#metric-select").value = key;
     renderChart();
     for (const button of root.querySelectorAll(".reading-button"))
       button.setAttribute(
         "aria-pressed",
         String(button.dataset.channelKey === key),
       );
-    root.querySelector("#history-heading").focus({ preventScroll: true });
-    root.querySelector("#history-panel").scrollIntoView({ block: "start" });
+    if (opening) {
+      dialog.scrollTop = 0;
+      root.querySelector("#history-heading").focus({ preventScroll: true });
+    }
   }
   function renderChart() {
     const c = channels.find((c) => c.key === selected);
-    root.querySelector("#history-panel").hidden = !c;
-    if (!c) return;
+    const dialog = root.querySelector("#history-panel");
+    if (!c) {
+      if (dialog.open) dialog.close();
+      return;
+    }
+    const select = root.querySelector("#metric-select");
+    const choices = historyChannels(c);
+    const options = choices
+      .map(
+        (channel) =>
+          `<option value="${e(channel.key)}">${e(channel.title)} · ${e(formatUnit(channel.unit))}</option>`,
+      )
+      .join("");
+    // Preserve the native selector during live state updates when its choices did not change.
+    if (select.dataset.options !== options) {
+      select.innerHTML = options;
+      select.dataset.options = options;
+    }
+    select.value = selected;
     const points = c.points.filter(
       (p) =>
         !hours || p.time >= Date.parse(snapshot.generated_at) - hours * 3600000,
     );
-    root.querySelector("#history").data = { ...c, label: c.title, points };
+    root.querySelector("#history").data = {
+      ...c,
+      label: c.title,
+      points,
+      plotHeight: 240,
+      timeLabel: t("dashboard.received_time"),
+    };
     root.querySelector("#history-panel").dataset.kind = metricIcon(c.metric);
-    root.querySelector("#history-heading").textContent = t(
-      "dashboard.history_title",
-      { measurement: c.title },
-    );
-    root.querySelector("#history-context").textContent = t(
-      "dashboard.history_context",
+    root.querySelector("#history-heading").textContent = isLinkDiagnostic(c)
+      ? t("dashboard.device_diagnostics")
+      : (c.sensorName ?? c.sensor);
+    root.querySelector("#history-context").textContent =
+      c.deviceName ?? c.device;
+    root.querySelector("#history-accessible").textContent = t(
+      "dashboard.history_accessible",
       {
+        measurement: c.title,
         device: c.deviceName ?? c.device,
-        sensor: isLinkDiagnostic(c)
-          ? t("dashboard.radio")
-          : t("dashboard.sensor_context", { sensor: c.sensorName ?? c.sensor }),
         source: c.source,
       },
     );
-    root.querySelector("#chart-legend").textContent =
-      `${c.title} · ${formatUnit(c.unit)}`;
+    root.querySelector("#history-state").setAttribute("state", c.state);
+    const latest = c.points.at(-1);
+    root.querySelector("#history-value").innerHTML =
+      `${formatMeasurement(latest?.value, c.metric, c.unit)}<span class="unit">${e(formatUnit(c.unit))}</span>`;
+    root.querySelector("#history-time").textContent = latest
+      ? new Date(latest.time).toLocaleString(locale())
+      : t("common.waiting");
+    root.querySelector("#history-limit").textContent = t(
+      "dashboard.history_limit",
+    );
     root.querySelector("#plot-count").textContent = t("counts.observations", {
       count: points.length,
     });
@@ -293,7 +423,7 @@ export function mountDashboard(root, { state = {}, notify }) {
         : []),
       ...g.diagnostics.map((c) => [
         c.title,
-        `${formatValue(["ok", "recorded", "stale"].includes(c.state) ? c.value : null)} ${formatUnit(c.unit)} · ${states[c.state]}`,
+        `${formatMeasurement(["ok", "recorded", "stale"].includes(c.state) ? c.value : null, c.metric, c.unit)} ${formatUnit(c.unit)} · ${states[c.state]}`,
       ]),
     ];
     root.querySelector("#device-detail").innerHTML =
@@ -315,7 +445,7 @@ export function mountDashboard(root, { state = {}, notify }) {
       });
       button.addEventListener("click", () => {
         root.querySelector("#device-dialog").close();
-        selectHistory(c.key);
+        selectHistory(c.key, dialogOpener);
       });
       diagnostics.append(button);
     }
@@ -326,24 +456,15 @@ export function mountDashboard(root, { state = {}, notify }) {
   }
   function render() {
     rebuild();
-    const sensorCount = groups.reduce((n, g) => n + g.sensors.length, 0);
-    const measurements = groups.reduce(
-      (n, g) => n + g.sensors.reduce((sum, s) => sum + s.channels.length, 0),
-      0,
+    attention = attentionItems(
+      groups,
+      receivers(),
+      Date.parse(snapshot.generated_at),
     );
-    const issues =
-      groups.filter((g) => g.attention).length +
-      receivers().filter((r) => r.availability === "offline").length;
-    root.querySelector("#summary").innerHTML =
-      `<p>${t("counts.devices", { count: groups.length })}<span aria-hidden="true"> / </span>${t("counts.sensors", { count: sensorCount })}<span aria-hidden="true"> / </span>${t("counts.measurements", { count: measurements })}</p>${issues ? `<span class="workspace-attention">${icon("alert")}${t("counts.issues", { count: issues })}</span>` : `<span class="muted">${groups.length ? t("dashboard.no_issues") : t("common.waiting")}</span>`}`;
-    root.querySelector("#metric-select").innerHTML = channels
-      .map(
-        (c) =>
-          `<option value="${e(c.key)}">${e(c.title)} · ${e(c.deviceName ?? c.device)} · ${e(c.sensorName ?? c.sensor)} · ${e(formatUnit(c.unit))} · ${e(c.source)}</option>`,
-      )
-      .join("");
-    root.querySelector("#metric-select").value = selected;
-    renderReceivers();
+    renderSummary();
+    renderAttention();
+    root.querySelector("#toolbar").hidden =
+      !snapshot.workspace?.layout.sections;
     renderGroups();
     renderChart();
     root.querySelector("#snapshot-time").textContent = t("dashboard.updated", {
@@ -359,8 +480,15 @@ export function mountDashboard(root, { state = {}, notify }) {
     const button = root.querySelector("#refresh");
     button.disabled = true;
     try {
-      snapshot = await fetchSnapshot("/");
+      const fresh = await fetchSnapshot("/");
+      // An event can arrive while the full refresh is in flight.
+      if (Date.parse(fresh.generated_at) < Date.parse(snapshot.generated_at)) {
+        fresh.device_states = snapshot.device_states;
+        fresh.generated_at = snapshot.generated_at;
+      }
+      snapshot = fresh;
       root.querySelector("#fetch-error").classList.add("hidden");
+      delete root.querySelector(".live-line").dataset.state;
       // Re-rendering replaces the card buttons; keep keyboard focus on the same one.
       const spot = focusSpot(document.activeElement);
       render();
@@ -370,6 +498,8 @@ export function mountDashboard(root, { state = {}, notify }) {
         "dashboard.refresh_error",
       );
       root.querySelector("#fetch-error").classList.remove("hidden");
+      // The page shows the last snapshot it has; it is no longer live.
+      root.querySelector(".live-line").dataset.state = "error";
     } finally {
       pending = false;
       button.disabled = false;
@@ -407,6 +537,7 @@ export function mountDashboard(root, { state = {}, notify }) {
   // A refresh may have replaced the button that opened the dialog; focus then stays
   // on the closed dialog's own button or falls back to the body.
   root.querySelector("#device-dialog").addEventListener("close", (event) => {
+    if (root.querySelector("#history-panel").open) return;
     const focus = document.activeElement;
     if (!focus || focus === document.body || event.target.contains(focus))
       restoreFocus(dialogOpener);
@@ -416,6 +547,18 @@ export function mountDashboard(root, { state = {}, notify }) {
     .addEventListener("click", () =>
       root.querySelector("#device-dialog").close(),
     );
+  root
+    .querySelector("#close-history")
+    .addEventListener("click", () =>
+      root.querySelector("#history-panel").close(),
+    );
+  root.querySelector("#history-panel").addEventListener("close", () => {
+    if (root.querySelector("#history-panel").open) return;
+    selected = "";
+    for (const button of root.querySelectorAll(".reading-button"))
+      button.setAttribute("aria-pressed", "false");
+    restoreFocus(historyOpener, { preventScroll: true });
+  });
   root.querySelector("#export").addEventListener("click", () => {
     const keys = new Set(
       [...root.querySelectorAll(".reading-button")].map(
@@ -434,15 +577,22 @@ export function mountDashboard(root, { state = {}, notify }) {
     notify(t("dashboard.exported"));
   });
   render();
-  // Refreshing never touches open dialogs or the history panel's focus target, so
-  // an open chart or dialog must not pause live data. Only the measurement select is
-  // rebuilt and would lose its options mid-choice.
-  const timer = setInterval(() => {
+  // Dialog controls retain their identity while new readings arrive.
+  watchDeviceStates(state, (next) => {
+    if (Date.parse(next.generated_at) < Date.parse(snapshot.generated_at))
+      return;
     if (
-      !document.hidden &&
-      document.activeElement !== root.querySelector("#metric-select")
+      JSON.stringify(next.device_states) ===
+      JSON.stringify(snapshot.device_states)
     )
-      refresh();
+      return;
+    snapshot = { ...snapshot, ...next };
+    const spot = focusSpot(document.activeElement);
+    render();
+    restoreFocus(spot, { preventScroll: true });
+  });
+  const timer = setInterval(() => {
+    if (!document.hidden) refresh();
   }, 30000);
   window.addEventListener(
     "pagehide",

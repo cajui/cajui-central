@@ -31,6 +31,10 @@ services:
       CAJUI_MQTT_ALLOW_PLAINTEXT: "1"
       CAJUI_MQTT_USERNAME: central
       CAJUI_MQTT_PASSWORD_FILE: /secrets/central
+      CAJUI_RECEIVER_USERNAME: receiver-1
+      CAJUI_RECEIVER_PASSWORD_FILE: /secrets/producers/receiver-1
+      CAJUI_RECEIVER_HOST: "${CAJUI_RECEIVER_HOST:-}"
+      CAJUI_RECEIVER_PORT: "${CAJUI_MQTT_PORT:-1883}"
     volumes:
       - secrets:/secrets:ro
       - data:/data

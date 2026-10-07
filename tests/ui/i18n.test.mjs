@@ -6,12 +6,14 @@ import {
   setLocale,
   locale,
   supportedLocales,
+  errorMessage,
 } from "../../internal/httpapi/ui/i18n.mjs";
 import catalogs from "../../internal/httpapi/ui/catalogs.mjs";
 import {
   age,
   states,
   formatValue,
+  formatMeasurement,
   measurementLabel,
   buildChannels,
   csvRows,
@@ -92,14 +94,73 @@ test("supported locales, fallback, CLDR plurals and literal interpolation", () =
   assert.equal(t("counts.devices", { count: 1 }), "1 device");
 });
 
+test("counts are grouped and unreachable requests are explained in each language", () => {
+  for (const [lang, devices, offline] of [
+    ["en-US", "18,322 devices", "Could not reach Central"],
+    ["pt-BR", "18.322 transmissores", "Não foi possível falar com o Central"],
+  ]) {
+    setLocale(lang);
+    assert.equal(t("counts.devices", { count: 18322 }), devices);
+    // A failed fetch is worded by the browser; Central's own messages pass through.
+    assert.match(
+      errorMessage(new TypeError("Failed to fetch")),
+      new RegExp(`^${offline}`),
+    );
+    assert.equal(
+      errorMessage(new Error("Name already used")),
+      "Name already used",
+    );
+    assert.match(
+      errorMessage(new DOMException("signal timed out", "TimeoutError")),
+      new RegExp(`^${offline}`),
+    );
+  }
+});
+
 test("values, age, states and known metrics follow the chosen language", () => {
   const now = Date.parse("2026-01-02T12:00:00Z");
-  for (const [lang, value, minute, state, metric] of [
-    ["en-US", "1,234.5", "1 min ago", "Reading error", "Temperature"],
-    ["pt-BR", "1.234,5", "Há 1 min", "Erro de leitura", "Temperatura"],
+  for (const [
+    lang,
+    value,
+    minute,
+    state,
+    metric,
+    celsius,
+    volts,
+    millivolts,
+    signal,
+  ] of [
+    [
+      "en-US",
+      "1,234.5",
+      "1 min ago",
+      "Reading error",
+      "Temperature",
+      "25.0",
+      "3.40",
+      "3,300",
+      "Signal strength (RSSI)",
+    ],
+    [
+      "pt-BR",
+      "1.234,5",
+      "Há 1 min",
+      "Erro de leitura",
+      "Temperatura",
+      "25,0",
+      "3,40",
+      "3.300",
+      "Intensidade do sinal (RSSI)",
+    ],
   ]) {
     setLocale(lang);
     assert.equal(formatValue(1234.5), value);
+    // Known measurements keep their decimals; anything else stays generic.
+    assert.equal(formatMeasurement(25, "temperature", "degC"), celsius);
+    assert.equal(formatMeasurement(3.4, "voltage", "V"), volts);
+    // A known metric in another unit is not the battery's volts: it stays generic.
+    assert.equal(formatMeasurement(3300, "voltage", "mV"), millivolts);
+    assert.equal(formatMeasurement(25, "custom_quantity", "x"), "25");
     assert.equal(formatValue(null), "—");
     assert.equal(age(new Date(now - 60000).toISOString(), now), minute);
     assert.equal(age("invalid", now), t("age.unknown"));
@@ -107,7 +168,7 @@ test("values, age, states and known metrics follow the chosen language", () => {
     assert.equal(measurementLabel("temperature"), metric);
     assert.equal(measurementLabel("custom_quantity"), "Custom quantity");
     assert.equal(measurementLabel("constructor"), "Constructor");
-    assert.equal(measurementLabel("rssi"), "RSSI");
+    assert.equal(measurementLabel("rssi"), signal);
   }
 });
 

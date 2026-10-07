@@ -72,6 +72,7 @@ export function workspaceGroups(state, now = Date.parse(state.generated_at)) {
       stale:
         d.interval > 0 && now - Date.parse(d.received_at) >= d.interval * 3000,
     });
+    for (const c of g.diagnostics) c.deviceName = g.name;
     for (const s of g.sensors) {
       const record = catalog.sensors.find(
         (s2) => s2.device_id === d.id && s2.sensor === s.id,
@@ -87,6 +88,8 @@ export function workspaceGroups(state, now = Date.parse(state.generated_at)) {
               defaultSensorName(record))
             : label(s.id)),
         location: record?.location || "",
+        // Only a name someone typed is worth repeating next to each measurement.
+        named: Boolean(record?.name),
       });
       for (const c of s.channels) {
         c.deviceName = g.name;

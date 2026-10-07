@@ -46,7 +46,7 @@ func observe(ctx context.Context, tx *sql.Tx, transport, source, device string, 
 	}
 	for _, r := range readings {
 		var sensorID int64
-		err = tx.QueryRowContext(ctx, `INSERT INTO workspace_sensors(device_id,sensor) VALUES(?,?) ON CONFLICT(device_id,sensor) DO UPDATE SET sensor=excluded.sensor RETURNING id`, deviceID, r.SensorID).Scan(&sensorID)
+		err = tx.QueryRowContext(ctx, `INSERT INTO workspace_sensors(device_id,sensor) VALUES(?,?) ON CONFLICT(device_id,sensor) DO UPDATE SET sensor=excluded.sensor,archived=0 RETURNING id`, deviceID, r.SensorID).Scan(&sensorID)
 		if err != nil {
 			return err
 		}
@@ -137,7 +137,7 @@ func (s *Store) Catalog(ctx context.Context) (workspace.Catalog, error) {
 	if err != nil {
 		return c, err
 	}
-	rows, err = tx.QueryContext(ctx, `SELECT s.id,s.device_id,s.sensor,s.name,s.location,s.revision FROM workspace_sensors s JOIN workspace_devices d ON d.id=s.device_id WHERE d.archived=0 ORDER BY s.id`)
+	rows, err = tx.QueryContext(ctx, `SELECT s.id,s.device_id,s.sensor,s.name,s.location,s.revision FROM workspace_sensors s JOIN workspace_devices d ON d.id=s.device_id WHERE d.archived=0 AND s.archived=0 ORDER BY s.id`)
 	if err != nil {
 		return c, err
 	}
@@ -157,7 +157,7 @@ func (s *Store) Catalog(ctx context.Context) (workspace.Catalog, error) {
 	if err != nil {
 		return c, err
 	}
-	rows, err = tx.QueryContext(ctx, `SELECT m.sensor_id,m.metric,m.unit,m.value,m.status,m.received_at,m.interval FROM workspace_measurements m JOIN workspace_sensors s ON s.id=m.sensor_id JOIN workspace_devices d ON d.id=s.device_id WHERE d.archived=0 ORDER BY m.sensor_id,m.metric,m.unit`)
+	rows, err = tx.QueryContext(ctx, `SELECT m.sensor_id,m.metric,m.unit,m.value,m.status,m.received_at,m.interval FROM workspace_measurements m JOIN workspace_sensors s ON s.id=m.sensor_id JOIN workspace_devices d ON d.id=s.device_id WHERE d.archived=0 AND s.archived=0 ORDER BY m.sensor_id,m.metric,m.unit`)
 	if err != nil {
 		return c, err
 	}
@@ -193,6 +193,16 @@ func (s *Store) SaveDevice(ctx context.Context, id int64, settings workspace.Set
 // ArchiveDevice removes a device from the catalog until it reports again. Its readings,
 // samples and names are kept.
 func (s *Store) ArchiveDevice(ctx context.Context, id, revision int64) error {
+	return s.archiveItem(ctx, "workspace_devices", id, revision)
+}
+
+// ArchiveSensor hides a sensor until a new measurement arrives, preserving history.
+func (s *Store) ArchiveSensor(ctx context.Context, id, revision int64) error {
+	return s.archiveItem(ctx, "workspace_sensors", id, revision)
+}
+
+// table is a constant supplied only by the two wrappers above.
+func (s *Store) archiveItem(ctx context.Context, table string, id, revision int64) error {
 	if id <= 0 {
 		return workspace.ErrInvalid
 	}
@@ -202,7 +212,7 @@ func (s *Store) ArchiveDevice(ctx context.Context, id, revision int64) error {
 	}
 	defer tx.Rollback()
 	var current int64
-	err = tx.QueryRowContext(ctx, `SELECT revision FROM workspace_devices WHERE id=? AND archived=0`, id).Scan(&current)
+	err = tx.QueryRowContext(ctx, `SELECT revision FROM `+table+` WHERE id=? AND archived=0`, id).Scan(&current)
 	if errors.Is(err, sql.ErrNoRows) {
 		return workspace.ErrNotFound
 	}
@@ -212,7 +222,7 @@ func (s *Store) ArchiveDevice(ctx context.Context, id, revision int64) error {
 	if current != revision {
 		return workspace.ErrConflict
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE workspace_devices SET archived=1,revision=revision+1 WHERE id=?`, id); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE `+table+` SET archived=1,revision=revision+1 WHERE id=?`, id); err != nil {
 		return err
 	}
 	return tx.Commit()

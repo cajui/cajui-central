@@ -243,3 +243,24 @@ func TestArchiveDeviceEndpoint(t *testing.T) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 }
+
+func TestArchiveSensorEndpoint(t *testing.T) {
+	h := testHandler(t)
+	if w := request(h, "POST", "/api/v1/readings", payload, "Bearer "+token, "application/json"); w.Code != 201 {
+		t.Fatal(w.Code)
+	}
+	state := workspaceSnapshot(t, h, "/sensors")
+	path := fmt.Sprintf("/ui-api/sensors/%d/archive", state.Workspace.Sensors[0].ID)
+	for _, tc := range []struct {
+		cap  string
+		want int
+	}{{token, 403}, {state.UIToken, 204}, {state.UIToken, 404}} {
+		w := workspaceEdit(h, path, `{"revision":0}`, tc.cap, func(r *http.Request) { r.Method = "POST" })
+		if w.Code != tc.want {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+	if after := workspaceSnapshot(t, h, "/sensors"); len(after.Workspace.Sensors) != 0 || len(after.Workspace.Devices) != 1 {
+		t.Fatal(after.Workspace)
+	}
+}
