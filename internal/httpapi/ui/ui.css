@@ -486,40 +486,62 @@ pre {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* Status vocabulary (ADR 0002): normal is quiet text; attention, network and critical
+   each pair a colour with a shape and a word, so colour is never the only signal. */
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: var(--text-detail);
-  font-weight: 650;
-  padding: 3px 8px;
-  border-radius: 30px;
+  font-weight: 600;
   white-space: normal;
   line-height: 1.5;
-  background: var(--surface-alt);
   color: var(--muted);
 }
-.badge svg {
-  width: 18px;
-  height: 18px;
-  stroke-width: 2;
+.badge::before {
+  flex: none;
 }
-.badge[data-state="ok"] {
-  color: var(--good);
-  background: var(--good-soft);
-}
-.badge[data-state="stale"],
-.badge[data-state="warning"] {
+.badge:is(
+  [data-state="stale"],
+  [data-state="warning"],
+  [data-state="error"],
+  [data-state="skipped"]
+) {
   color: var(--warning);
-  background: var(--warning-soft);
 }
-.badge[data-state="error"] {
-  color: var(--danger);
-  background: var(--danger-soft);
+.badge:is(
+    [data-state="stale"],
+    [data-state="warning"],
+    [data-state="error"],
+    [data-state="skipped"]
+  )::before {
+  content: "";
+  width: 0.8em;
+  height: 0.7em;
+  background: currentColor;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
-.badge[data-state="info"] {
+.badge[data-state="network"] {
   color: var(--info);
-  background: var(--info-soft);
+}
+.badge[data-state="network"]::before {
+  content: "";
+  box-sizing: border-box;
+  width: 0.72em;
+  height: 0.72em;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+.badge[data-state="critical"] {
+  color: var(--danger);
+}
+.badge[data-state="critical"]::before {
+  content: "";
+  width: 0.55em;
+  height: 0.55em;
+  margin-inline: 0.1em;
+  background: currentColor;
+  transform: rotate(45deg);
 }
 .main-grid {
   display: grid;
@@ -2086,9 +2108,9 @@ cj-reading {
 .receiver-status[data-status="error"],
 .receiver-status[data-status="offline"] {
   flex-basis: 100%;
-  background: var(--danger-soft);
-  border-color: var(--danger);
-  color: var(--danger);
+  background: var(--info-soft);
+  border-color: var(--info);
+  color: var(--info);
 }
 .receiver-status[data-status="warning"] {
   flex-basis: 100%;
@@ -2141,10 +2163,11 @@ cj-reading {
   font-size: var(--text-body);
   overflow-wrap: anywhere;
 }
+/* A receiver without a connection is a network state, not a critical value. */
 .receiver-notices li[data-level="error"],
 .device-alert {
-  background: var(--danger-soft);
-  color: var(--danger);
+  background: var(--info-soft);
+  color: var(--info);
 }
 .receiver-notices li[data-level="warning"] {
   background: var(--warning-soft);

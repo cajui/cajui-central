@@ -35,7 +35,8 @@ class Badge extends Component {
     const state = Object.hasOwn(states, this.getAttribute("state"))
       ? this.getAttribute("state")
       : "empty";
-    this.innerHTML = `<span class="badge" data-state="${state}">${icon(state === "error" ? "alert" : state === "stale" || state === "warning" ? "clock" : state === "ok" ? "check" : "device")}${e(this.getAttribute("label") ?? states[state])}</span>`;
+    // Normal states are quiet; abnormal ones get their shape from CSS (ADR 0002).
+    this.innerHTML = `<span class="badge" data-state="${state}">${e(this.getAttribute("label") ?? states[state])}</span>`;
   }
 }
 class Sensor extends Component {
@@ -67,11 +68,15 @@ class Sensor extends Component {
       <div class="sensor-heading"><span class="metric-icon">${icon(kind)}</span><div><h3 class="card-title">${e(d.title ?? this.getAttribute("label") ?? t("common.measurement"))}</h3><p class="card-context">${e(d.context ?? this.getAttribute("context") ?? t("components.no_sensor"))}</p></div></div>
       <p class="measurement">${formatValue(value)}<span class="unit">${e(formatUnit(d.unit ?? this.getAttribute("unit")))}</span></p>
       ${spark ? `<svg class="spark" viewBox="0 0 180 32" preserveAspectRatio="none" aria-hidden="true"><path d="${spark.path}" transform="translate(0 2)"/></svg>` : ""}
-      <div class="sensor-status"><cj-badge state="${e(state)}"></cj-badge><span class="reading-age">${e(d.updated ?? this.getAttribute("updated") ?? t("age.unknown"))}</span></div>
+      <div class="sensor-status">${quiet(state) ? "" : `<cj-badge state="${e(state)}"></cj-badge>`}<span class="reading-age">${e(d.updated ?? this.getAttribute("updated") ?? t("age.unknown"))}</span></div>
       ${state === "ok" ? "" : `<p class="reading-note">${e(iconText(state))}</p>`}
       <span class="sensor-action" aria-hidden="true">${t("components.view_history")} ${icon("arrow")}</span>
     </article>`;
   }
+}
+// A fresh reading says nothing beyond its age; only a problem earns a status mark.
+function quiet(state) {
+  return state === "ok" || state === "recorded";
 }
 function iconText(state) {
   return (
@@ -97,7 +102,7 @@ class Reading extends Component {
     this.innerHTML = `<div class="reading-tile" data-kind="${kind}" data-state="${state}">
       <div class="reading-heading"><span class="metric-icon">${icon(kind)}</span><span class="reading-title">${e(d.title ?? t("common.measurement"))}</span></div>
       <p class="measurement">${formatValue(value)}<span class="unit">${e(formatUnit(d.unit))}</span></p>
-      <div class="reading-quality"><cj-badge state="${state}"></cj-badge><span class="reading-age">${e(d.updated ?? t("age.unknown"))}</span></div>
+      <div class="reading-quality">${quiet(state) ? "" : `<cj-badge state="${state}"></cj-badge>`}<span class="reading-age">${e(d.updated ?? t("age.unknown"))}</span></div>
       ${["ok", "recorded"].includes(state) ? "" : `<p class="reading-note">${e(iconText(state))}</p>`}
       <span class="reading-history" aria-hidden="true">${t("common.history")} ${icon("arrow")}</span></div>`;
   }

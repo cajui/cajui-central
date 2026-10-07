@@ -273,7 +273,12 @@ test("measurement identity survives failures and unknown metric names stay neutr
       .evaluate((el) => getComputedStyle(el).color),
   ).toBe(before);
   await expect(card.locator(".reading-note")).toHaveText("Value unavailable");
-  await expect(card.locator(".badge svg")).toHaveCount(1);
+  // An abnormal state carries a shape besides colour and text (ADR 0002).
+  const shape = (state) =>
+    card
+      .locator(`.badge[data-state="${state}"]`)
+      .evaluate((el) => getComputedStyle(el, "::before").content);
+  expect(await shape("error")).not.toBe("none");
   for (const metric of [
     "custom_metric",
     "__proto__",
