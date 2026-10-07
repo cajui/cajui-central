@@ -543,6 +543,18 @@ pre {
   background: currentColor;
   transform: rotate(45deg);
 }
+/* Forced colours replace author backgrounds, which erased the filled shapes. */
+@media (forced-colors: active) {
+  .badge:is(
+      [data-state="stale"],
+      [data-state="warning"],
+      [data-state="error"],
+      [data-state="skipped"],
+      [data-state="critical"]
+    )::before {
+    background: CanvasText;
+  }
+}
 .main-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.85fr) minmax(280px, 1fr);
@@ -1306,7 +1318,6 @@ dialog::backdrop {
 }
 .sensor-status .badge {
   font-size: var(--text-body);
-  padding: 5px 10px;
 }
 .reading-age {
   font-size: var(--text-body);
@@ -1318,7 +1329,7 @@ dialog::backdrop {
   color: var(--muted);
 }
 .sensor-card[data-state="error"] .reading-note {
-  color: var(--danger);
+  color: var(--warning);
   font-weight: 700;
 }
 .sensor-card[data-state="stale"] .reading-note {
@@ -1685,7 +1696,7 @@ cj-reading {
   margin-top: 20px;
 }
 .reading-tile[data-state="error"] .reading-note {
-  color: var(--danger);
+  color: var(--warning);
   font-weight: 700;
 }
 .diagnostic-readings {
@@ -2160,28 +2171,26 @@ cj-reading {
   align-items: flex-start;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: var(--info-soft);
-  color: var(--info);
+  color: var(--muted);
   font-size: var(--text-body);
   overflow-wrap: anywhere;
 }
-/* A receiver without a connection is a network state, not a critical value. */
+/* Information stays neutral. A problem is tinted and its badge carries the shape: a
+   receiver without a connection is a network state, not a critical value. */
 .receiver-notices li[data-level="error"],
 .device-alert {
+  border-color: transparent;
   background: var(--info-soft);
-  color: var(--info);
 }
 .receiver-notices li[data-level="warning"] {
+  border-color: transparent;
   background: var(--warning-soft);
-  color: var(--warning);
 }
-.receiver-notices svg,
-.device-alert svg {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  margin-top: 2px;
+.receiver-notices .badge,
+.device-alert .badge {
+  font-size: inherit;
 }
 
 /* Adding a device: radio pairing first, then naming, both in one dialog. */

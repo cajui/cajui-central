@@ -279,6 +279,20 @@ test("measurement identity survives failures and unknown metric names stay neutr
       .locator(`.badge[data-state="${state}"]`)
       .evaluate((el) => getComputedStyle(el, "::before").content);
   expect(await shape("error")).not.toBe("none");
+  // Forced colours replace author backgrounds; the shape must still be drawn.
+  await page.emulateMedia({ forcedColors: "active" });
+  const [fill, canvas] = await card
+    .locator('.badge[data-state="error"]')
+    .evaluate((el) => {
+      const probe = document.createElement("div");
+      probe.style.background = "Canvas";
+      document.body.append(probe);
+      const ground = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return [getComputedStyle(el, "::before").backgroundColor, ground];
+    });
+  expect(fill).not.toBe(canvas);
+  await page.emulateMedia({ forcedColors: "none" });
   for (const metric of [
     "custom_metric",
     "__proto__",
@@ -2025,11 +2039,23 @@ test("normal readings stay quiet and an offline receiver is counted apart", asyn
       availability: "offline",
       received_at: snapshot.generated_at,
     },
+    {
+      source_id: "receiver",
+      device_id: "device-1",
+      role: "transmitter",
+      receiver_id: "000048ca433c5e10",
+      binding: "active",
+      received_at: snapshot.generated_at,
+    },
   ];
   await serve(snapshot);
   await page.goto("/");
+  // The transmitter behind it is the receiver's problem, counted once.
   const summary = page.locator("#summary");
   await expect(summary).toContainText("1 receiver offline");
-  await expect(summary).not.toContainText("need attention");
   await expect(summary.locator('.badge[data-state="network"]')).toHaveCount(1);
+  await expect(summary.locator('.badge[data-state="warning"]')).toHaveCount(0);
+  await expect(
+    page.locator('.device-alert .badge[data-state="network"]'),
+  ).toHaveCount(1);
 });
