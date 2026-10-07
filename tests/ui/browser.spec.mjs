@@ -2433,3 +2433,72 @@ test("normal readings stay quiet and an offline receiver is counted apart", asyn
     page.locator('.place-notes .badge[data-state="network"]'),
   ).toHaveCount(1);
 });
+
+test("startup applies the saved theme before modules and hides the fallback during navigation", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ colorScheme: "light" });
+  try {
+    await context.addInitScript(() =>
+      localStorage.setItem("cajui-theme", "dark"),
+    );
+    const page = await context.newPage();
+    for (const path of ["/", "/devices"]) {
+      let release;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const handler = async (route) => {
+        await gate;
+        await route.continue();
+      };
+      await page.route("**/ui/app.mjs", handler);
+      try {
+        await page.goto(path, { waitUntil: "commit" });
+        await expect(page.locator("html")).toHaveAttribute(
+          "data-theme",
+          "dark",
+        );
+        await expect(page.locator(".startup-status")).toBeVisible();
+        await expect(page.locator("#app")).not.toBeVisible();
+      } finally {
+        release();
+      }
+      await page.locator("html.ready").waitFor();
+      await expect(page.locator(".startup-status")).not.toBeVisible();
+      await expect(page.locator("#app")).toBeVisible();
+      await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+      await page.unroute("**/ui/app.mjs", handler);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test("startup restores server content after a module failure and works without JavaScript", async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await page.clock.install();
+    await page.route("**/ui/app.mjs", (route) => route.abort());
+    await page.goto("/");
+    await expect(page.locator("#app")).not.toBeVisible();
+    await page.clock.fastForward(4100);
+    await expect(page.locator("#app")).toBeVisible();
+    await expect(page.locator(".startup-status")).not.toBeVisible();
+    await expect(page.locator('.sidebar a[href="/devices"]')).toBeVisible();
+  } finally {
+    await context.close();
+  }
+  const noJS = await browser.newContext({ javaScriptEnabled: false });
+  try {
+    const page = await noJS.newPage();
+    await page.goto("/");
+    await expect(page.locator("#app")).toBeVisible();
+    await expect(page.locator(".startup-status")).not.toBeVisible();
+  } finally {
+    await noJS.close();
+  }
+});

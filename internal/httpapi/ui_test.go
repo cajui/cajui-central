@@ -37,7 +37,7 @@ func TestProductAssetsExcludeDesignDocumentation(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	for path, kind := range map[string]string{"/ui/app.mjs": "text/javascript", "/ui/ui.css": "text/css", "/ui/assets/cajui-mark.svg": "image/svg+xml", "/ui/assets/fonts/manrope-variable.ttf": "font/ttf", "/ui/assets/fonts/OFL-Manrope.txt": "text/plain"} {
+	for path, kind := range map[string]string{"/ui/app.mjs": "text/javascript", "/ui/startup.mjs": "text/javascript", "/ui/ui.css": "text/css", "/ui/assets/cajui-mark.svg": "image/svg+xml", "/ui/assets/fonts/manrope-variable.ttf": "font/ttf", "/ui/assets/fonts/OFL-Manrope.txt": "text/plain"} {
 		response := request(handler, "GET", path, "", "", "")
 		if response.Code != 200 || !strings.HasPrefix(response.Header().Get("Content-Type"), kind) || response.Body.Len() == 0 {
 			t.Fatal(path, response.Code, response.Header())

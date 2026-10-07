@@ -4,10 +4,13 @@
 <meta name="color-scheme" content="light dark"><meta name="theme-color" content="#265d48">
 <title>{{.Title}} · Cajuí Central</title>
 <link rel="icon" href="/ui/assets/cajui-mark.svg" type="image/svg+xml">
+<script src="/ui/startup.mjs"></script>
 <link rel="stylesheet" href="/ui/ui.css">
+<link rel="preload" href="/ui/assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
 <script type="module" src="/ui/app.mjs"></script>
 </head>
 <body data-page="live">
+<div class="startup-status" role="status">{{$.Text "states.loading"}}</div>
 <a href="#main" class="skip-link">{{$.Text "nav.skip"}}</a>
 <div class="shell product-shell"><aside class="sidebar" id="sidebar"><a class="wordmark" href="/">Cajuí Central</a><nav class="nav" aria-label="{{$.Text "nav.main"}}"><a href="/" {{if eq .Route "/"}}aria-current="page"{{end}}>{{$.Text "common.dashboard"}}</a><p class="eyebrow sidebar-label">{{$.Text "nav.equipment"}}</p><a href="/devices" {{if eq .Route "/devices"}}aria-current="page"{{end}}>{{$.Text "common.devices"}}</a><a href="/receivers" {{if eq .Route "/receivers"}}aria-current="page"{{end}}>{{$.Text "common.receivers"}}</a><a href="/sensors" {{if eq .Route "/sensors"}}aria-current="page"{{end}}>{{$.Text "common.sensors"}}</a><p class="eyebrow sidebar-label">{{$.Text "nav.system"}}</p><a href="/broker" {{if eq .Route "/broker"}}aria-current="page"{{end}}>{{$.Text "broker.title"}}</a></nav></aside><div class="workspace"><header class="topbar" id="topbar">{{.Title}}</header>
 
