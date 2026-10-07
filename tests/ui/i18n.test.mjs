@@ -110,6 +110,10 @@ test("counts are grouped and unreachable requests are explained in each language
       errorMessage(new Error("Name already used")),
       "Name already used",
     );
+    assert.match(
+      errorMessage(new DOMException("signal timed out", "TimeoutError")),
+      new RegExp(`^${offline}`),
+    );
   }
 });
 

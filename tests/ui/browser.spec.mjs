@@ -1678,22 +1678,41 @@ test("a revoked transmitter says so instead of offering Revoke", async ({
     .click();
   await expect(page.getByRole("dialog")).toContainText("Pair a transmitter");
   await page.keyboard.press("Escape");
+  // A revoked device's values are history: none of them is marked as a problem.
+  await expect(
+    page.getByRole("row").filter({ hasText: "Coop" }).locator(".badge"),
+  ).toHaveCount(0);
   let archived = null;
+  let attempts = 0;
   await page.route("**/ui-api/devices/7/archive", (route) => {
+    attempts += 1;
     archived = JSON.parse(route.request().postData());
-    return route.fulfill({ status: 204 });
+    return attempts === 1
+      ? route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "revision conflict" }),
+        })
+      : route.fulfill({ status: 204 });
   });
-  page.once("dialog", (d) => d.accept());
+  page.on("dialog", (d) => d.accept());
   const gone = structuredClone(state);
   gone.workspace.devices = [];
-  await serve(gone);
   await page.getByRole("button", { name: "Edit Coop", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Remove Coop from the list", exact: true })
-    .click();
+  const remove = page.getByRole("button", {
+    name: "Remove Coop from the list",
+    exact: true,
+  });
+  // A failed removal keeps the dialog, says why in it and keeps focus on the action.
+  await remove.click();
+  await expect(page.getByRole("dialog").getByRole("alert")).not.toBeEmpty();
+  await expect(remove).toBeFocused();
+  await serve(gone);
+  await remove.click();
   await expect(page.locator("#toast")).toHaveText(
     "Coop removed from the list.",
   );
+  await expect(page.getByRole("searchbox")).toBeFocused();
   expect(archived).toEqual({ revision: 1 });
   await expect(page.getByRole("region", { name: "Revoked" })).toHaveCount(0);
 });

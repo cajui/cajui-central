@@ -38,10 +38,14 @@ export function t(key, values = {}) {
   );
 }
 
-// fetch rejects with a TypeError, worded by the browser in its own language ("Failed to
-// fetch"), when the request never reaches Central; anything else is Central's message.
+// For callers that fetch directly: a request that never reaches Central rejects with a
+// TypeError ("Failed to fetch") or, past its time limit, a TimeoutError, both worded by
+// the browser. Messages already translated by the API helpers pass through unchanged.
 export function errorMessage(error) {
-  return error instanceof TypeError ? t("common.network_error") : error.message;
+  return error instanceof TypeError ||
+    ["TimeoutError", "AbortError"].includes(error?.name)
+    ? t("common.network_error")
+    : error.message;
 }
 
 export function metricLabel(metric, fallback) {

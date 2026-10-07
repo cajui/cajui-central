@@ -2,7 +2,12 @@ import { escapeHTML as e, contrast } from "/ui/model.mjs";
 import { mark, icon } from "/ui/icons.mjs";
 import { buildChannels } from "/ui/model.mjs";
 import { demoData } from "./demo.mjs";
-import { attentionItems, placeKey, sensorLabel } from "/ui/overview-model.mjs";
+import {
+  attentionItems,
+  placeKey,
+  placeSeverity,
+  sensorLabel,
+} from "/ui/overview-model.mjs";
 import {
   attentionItemHTML,
   placeHTML,
@@ -377,14 +382,7 @@ function renderOverviewReference(root, notify) {
     const notes = items.filter((item) => item.places.includes(key));
     const article = document.createElement("article");
     article.className = "panel place";
-    article.dataset.severity = notes.reduce(
-      (worst, item) =>
-        ["critical", "warning", "network"].indexOf(item.severity) <
-        ["critical", "warning", "network", "normal"].indexOf(worst)
-          ? item.severity
-          : worst,
-      "normal",
-    );
+    article.dataset.severity = placeSeverity(key, items);
     article.innerHTML = placeHTML(group, notes, now, 4);
     const rows = article.querySelector(".place-rows");
     for (const sensor of group.sensors)
