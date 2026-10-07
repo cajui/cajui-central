@@ -644,8 +644,9 @@ test("pairing window time and transmitters still waiting for a first reading", a
 });
 
 test("revoked transmitters and their sensors leave the dashboard catalog", async () => {
-  const { withoutRevoked } =
-    await import("../../internal/httpapi/ui/workspace-model.mjs");
+  const { withoutRevoked } = await import(
+    "../../internal/httpapi/ui/workspace-model.mjs"
+  );
   const state = {
     workspace: {
       devices: [
@@ -689,8 +690,9 @@ test("revoked transmitters and their sensors leave the dashboard catalog", async
 });
 
 test("an unnamed sensor of an added device is shown with a name from its readings", async () => {
-  const { defaultSensorName, shownSensors } =
-    await import("../../internal/httpapi/ui/workspace-model.mjs");
+  const { defaultSensorName, shownSensors } = await import(
+    "../../internal/httpapi/ui/workspace-model.mjs"
+  );
   setLocale("pt-BR");
   const climate = {
     id: 1,
@@ -739,8 +741,9 @@ test("an unnamed sensor of an added device is shown with a name from its reading
 });
 
 test("attention lists problems with a reason, most severe first", async () => {
-  const { attentionItems, placeSeverity, placeKey, sinceText } =
-    await import("../../internal/httpapi/ui/overview-model.mjs");
+  const { attentionItems, placeSeverity, placeKey, sinceText } = await import(
+    "../../internal/httpapi/ui/overview-model.mjs"
+  );
   setLocale("en-US");
   const now = Date.parse("2026-10-07T12:00:00Z");
   const iso = (minutesAgo) => new Date(now - minutesAgo * 60000).toISOString();
@@ -847,8 +850,9 @@ test("attention lists problems with a reason, most severe first", async () => {
 });
 
 test("attention says which measurement, since when and why", async () => {
-  const { attentionItems, placeKey, sensorLabel, sinceText } =
-    await import("../../internal/httpapi/ui/overview-model.mjs");
+  const { attentionItems, placeKey, sensorLabel, sinceText } = await import(
+    "../../internal/httpapi/ui/overview-model.mjs"
+  );
   setLocale("en-US");
   const now = Date.parse("2026-10-07T12:00:00Z");
   const at = (minutesAgo) => now - minutesAgo * 60000;
