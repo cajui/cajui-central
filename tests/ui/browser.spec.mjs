@@ -140,7 +140,7 @@ test("live view refresh preserves data after a network failure", async ({
 }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Dashboard", exact: true }),
+    page.getByRole("heading", { name: "Overview", exact: true }),
   ).toBeVisible();
   await page.route("**/", (route) => route.abort());
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
@@ -665,7 +665,7 @@ test("persistent registration, independent dashboard composition and safe edits"
   await other.close();
   await page.goto("/");
   await page
-    .getByRole("button", { name: "Organize dashboard", exact: true })
+    .getByRole("button", { name: "Organize overview", exact: true })
     .click();
   // Start with a deliberately empty composition, preserving all registrations.
   while (
@@ -700,7 +700,7 @@ test("persistent registration, independent dashboard composition and safe edits"
     .getByRole("button", { name: "Move section 2 up", exact: true })
     .click();
   await page
-    .getByRole("button", { name: "Save dashboard", exact: true })
+    .getByRole("button", { name: "Save overview", exact: true })
     .click();
   await expect(page.locator(".dashboard-section > h2")).toHaveText([
     "Equipment",
@@ -738,7 +738,7 @@ test("persistent registration, independent dashboard composition and safe edits"
     ).toEqual([]);
   }
   await page
-    .getByRole("button", { name: "Organize dashboard", exact: true })
+    .getByRole("button", { name: "Organize overview", exact: true })
     .click();
   // Select a single measurement independently of its physical sensor.
   const climate = page.getByRole("group", { name: "Section 2", exact: true });
@@ -754,19 +754,19 @@ test("persistent registration, independent dashboard composition and safe edits"
     .analyze();
   expect(editorAudit.violations.map((v) => v.id)).toEqual([]);
   await page
-    .getByRole("button", { name: "Save dashboard", exact: true })
+    .getByRole("button", { name: "Save overview", exact: true })
     .click();
   await expect(page.locator("cj-reading")).toHaveCount(1);
   await expect(page.locator("cj-reading")).toContainText("Temperature");
   await page
-    .getByRole("button", { name: "Organize dashboard", exact: true })
+    .getByRole("button", { name: "Organize overview", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Remove section", exact: true })
     .last()
     .click();
   await page
-    .getByRole("button", { name: "Save dashboard", exact: true })
+    .getByRole("button", { name: "Save overview", exact: true })
     .click();
   await expect(page.locator("cj-reading")).toHaveCount(0);
   await page.goto("/sensors");
@@ -800,15 +800,21 @@ test("language selection persists across navigation and server-rendered pages", 
     .selectOption("pt-BR");
   await expect(page.locator("html")).toHaveAttribute("lang", "pt-BR");
   await expect(
-    page.getByRole("heading", { name: "Painel", exact: true }),
+    page.getByRole("heading", { name: "Visão geral", exact: true }),
   ).toBeVisible();
+  // Equipment is one entry; its pages are tabs, the transmitters first.
   await page
-    .getByRole("navigation")
-    .getByRole("link", { name: "Transmissores", exact: true })
+    .getByRole("navigation", { name: "Navegação principal" })
+    .getByRole("link", { name: "Equipamentos", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "Transmissores", exact: true }),
   ).toBeVisible();
+  await expect(
+    page
+      .getByRole("navigation", { name: "Equipamentos" })
+      .getByRole("link", { name: "Transmissores", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
   await page
     .getByRole("button", { name: "Adicionar transmissor", exact: true })
     .click();
@@ -874,7 +880,7 @@ for (const language of ["pt-BR", "en-US"]) {
       .click();
     await page
       .getByRole("button", {
-        name: pt ? "Organizar painel" : "Organize dashboard",
+        name: pt ? "Organizar visão geral" : "Organize overview",
         exact: true,
       })
       .click();

@@ -9,6 +9,8 @@ const state = JSON.parse(document.querySelector("#initial-state").textContent);
 setLocale(state.locale ?? document.documentElement.lang);
 document.documentElement.lang = locale();
 const route = location.pathname;
+// Transmitters, receivers and the broker are one task: keeping the equipment working.
+const equipment = ["/devices", "/receivers", "/broker"];
 const title =
   {
     "/devices": t("common.devices"),
@@ -29,26 +31,36 @@ const systemDark = matchMedia("(prefers-color-scheme: dark)");
 document.documentElement.dataset.theme =
   chosenTheme ?? (systemDark.matches ? "dark" : "light");
 const sidebar = document.querySelector("#sidebar");
-sidebar.innerHTML = `<a class="wordmark" href="/" aria-label="${t("nav.home")}">${mark()}<span>Cajuí<small>Central</small></span></a><p class="eyebrow sidebar-label">${t("nav.workspace")}</p><nav class="nav" aria-label="${t("nav.workspace")}">${[
-  ["/", t("common.dashboard"), "overview"],
-  ["/devices", t("common.devices"), "device"],
-  ["/sensors", t("common.sensors"), "temperature"],
-]
+// Navigation by task (ADR 0002): follow, maintain the equipment, name the sensors.
+// Places and events join when their data exists.
+const sections = [
+  ["/", t("common.dashboard"), "overview", route === "/"],
+  ["/devices", t("nav.equipment"), "device", equipment.includes(route)],
+  ["/sensors", t("common.sensors"), "temperature", route === "/sensors"],
+];
+const links = sections
   .map(
-    ([href, name, glyph]) =>
-      `<a href="${href}" ${route === href ? 'aria-current="page"' : ""}>${icon(glyph)}${name}</a>`,
+    ([href, name, glyph, current]) =>
+      `<a href="${href}" ${current ? `aria-current="${href === route ? "page" : "true"}"` : ""}>${icon(glyph)}<span>${name}</span></a>`,
   )
-  .join(
-    "",
-  )}</nav><p class="eyebrow sidebar-label">${t("nav.connections")}</p><nav class="nav" aria-label="${t("nav.connections")}">${[
-  ["/receivers", t("common.receivers")],
-  ["/broker", t("broker.title")],
-]
-  .map(
-    ([href, name]) =>
-      `<a href="${href}" ${route === href ? 'aria-current="page"' : ""}>${icon("signal")}${name}</a>`,
-  )
-  .join("")}</nav>`;
+  .join("");
+sidebar.innerHTML = `<a class="wordmark" href="/" aria-label="${t("nav.home")}">${mark()}<span>Cajuí<small>Central</small></span></a><nav class="nav" aria-label="${t("nav.main")}">${links}</nav>`;
+if (equipment.includes(route)) {
+  const tabs = document.createElement("nav");
+  tabs.className = "subnav";
+  tabs.setAttribute("aria-label", t("nav.equipment"));
+  tabs.innerHTML = [
+    ["/devices", t("common.devices")],
+    ["/receivers", t("common.receivers")],
+    ["/broker", t("broker.title")],
+  ]
+    .map(
+      ([href, name]) =>
+        `<a href="${href}" ${route === href ? 'aria-current="page"' : ""}>${name}</a>`,
+    )
+    .join("");
+  document.querySelector("#app").before(tabs);
+}
 document.querySelector("#topbar").innerHTML =
   `<div class="crumb"><button class="icon-button mobile-menu" id="menu" aria-label="${t("nav.open")}" aria-expanded="false" aria-controls="sidebar">${icon("menu")}</button><span class="muted">Cajuí Central</span><span class="muted">/</span><strong>${title}</strong></div><div class="top-actions"><label class="locale-picker"><span class="sr-only">${t("nav.language")}</span><select class="input" id="locale"><option value="en-US" lang="en-US">English (US)</option><option value="pt-BR" lang="pt-BR">Português (Brasil)</option></select></label><button class="icon-button" id="theme" aria-label="${t("nav.theme")}">${icon("moon")}</button></div>`;
 document.title = `${title} · Cajuí Central`;

@@ -149,6 +149,10 @@ pre {
   display: grid;
   gap: 5px;
 }
+/* The product menu needs no group labels: its entries are the tasks. */
+.wordmark + .nav {
+  margin-top: 44px;
+}
 .nav a {
   display: flex;
   align-items: center;
@@ -164,8 +168,34 @@ pre {
 .nav a:hover {
   background: var(--surface-alt);
 }
-.nav a[aria-current="page"] {
+.nav a[aria-current] {
   background: var(--brand-soft);
+  color: var(--brand);
+}
+/* Equipment pages share one entry; tabs move between them. */
+.subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-6);
+  border-bottom: 1px solid var(--line);
+}
+.subnav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-4);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  color: var(--muted);
+  font-weight: 600;
+  text-decoration: none;
+}
+.subnav a:hover {
+  color: var(--ink);
+}
+.subnav a[aria-current="page"] {
+  border-bottom-color: var(--brand);
   color: var(--brand);
 }
 .sidebar-bottom {
@@ -1026,7 +1056,8 @@ dialog::backdrop {
   .sidebar[data-open="true"] {
     display: flex;
   }
-  .sidebar-label {
+  .sidebar-label,
+  .wordmark + .nav {
     margin-top: 22px;
   }
   .topbar {
