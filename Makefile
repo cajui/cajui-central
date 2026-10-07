@@ -32,6 +32,7 @@ check-fast:
 	$(MAKE) check-python
 	$(MAKE) check-ui
 check-full:
+	npm ci --prefix tests/ui --ignore-scripts
 	go mod verify
 	$(MAKE) check-fast
 	$(MAKE) build

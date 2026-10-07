@@ -15,7 +15,8 @@ npm ci --prefix tests/ui --ignore-scripts
 ```
 
 Run `make check-fast` for Go, Python, generated locales, JavaScript formatting and
-model tests. Run `make check-full` before opening a pull request: it also verifies
+model tests. Run `make check-full` before opening a pull request: it reinstalls the exact Node
+dependencies from the lockfile, then verifies
 Go dependencies, builds the binary, scans Go vulnerabilities, exercises broker ACLs,
 smoke-tests the Compose installation and runs browser tests. Every check must pass.
 The full suite requires network access for images and dependencies. Broker ACL tests
