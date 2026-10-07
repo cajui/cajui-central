@@ -1902,8 +1902,11 @@ cj-reading {
 .product-shell {
   min-height: 100vh;
 }
+/* A monitoring screen uses the width it has: content starts beside the menu instead of
+   centering in a 1280 px column, and more places fit side by side. */
 .product-shell .content {
-  max-width: 1280px;
+  max-width: none;
+  margin: 0;
 }
 .product-shell .topbar {
   background: var(--surface);
