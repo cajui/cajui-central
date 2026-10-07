@@ -69,7 +69,6 @@ en-US:
     received_time: Received at Central
     latest_reading: Latest reading
     history_limit: Recent loaded readings only; the selected period may be incomplete.
-    description: The measurements and devices you choose to follow.
     organize: Organize dashboard
     export: Export readings
     summary: Workspace summary
@@ -202,22 +201,28 @@ en-US:
     trend_window: 'trend of the last %{hours} h'
     since: 'since %{time}'
     since_yesterday: 'since yesterday %{time}'
+    at_today: 'at %{time}'
+    at_yesterday: 'yesterday at %{time}'
+    at_date: 'on %{time}'
     receiver_offline: '%{receiver} offline'
     receiver_offline_detail: 'No readings from %{places} until it reconnects.'
     receiver_offline_alone: No device depends on it right now.
     receiver_queue: '%{receiver} has readings waiting'
     receiver_dropped: '%{receiver} gave up readings'
     silent: '%{place} stopped reporting'
-    silent_detail: 'Last reading at %{time}. It reports every %{interval}.'
-    sensor_failed: '%{place}: no %{measurement} reading'
+    silent_detail: 'Last reading %{when}. It reports every %{interval}.'
+    sensor_failed: '%{place}: %{measurement} has no reading'
+    reading_stale: '%{place}: %{measurement} has no recent reading'
+    reading_stale_detail: 'Last value %{when}. The device still sends its other measurements.'
     error_detail: The sensor did not respond in the last reading.
     skipped_detail: The measurement was skipped in the last reading.
     battery: '%{place}: battery at %{value}'
     battery_low_detail: 'Below %{limit} the device saves energy and reports less often.'
     battery_critical_detail: 'Below %{limit} the device stops transmitting. Replace or recharge the battery.'
     short_receiver: '%{receiver} offline'
-    short_silent: 'No readings since %{time}'
-    short_sensor: 'No %{measurement} reading'
+    short_silent: 'No readings %{since}'
+    short_sensor: '%{measurement}: no reading'
+    short_reading_stale: '%{measurement}: no recent reading'
     short_battery: 'Battery at %{value}'
     last_reading: 'Last reading: %{age}'
   layout:

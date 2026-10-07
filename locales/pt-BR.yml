@@ -69,7 +69,6 @@ pt-BR:
     received_time: Recebido no Central
     latest_reading: Leitura mais recente
     history_limit: Apenas leituras recentes carregadas; o período selecionado pode estar incompleto.
-    description: As medições e os transmissores que você escolheu acompanhar.
     organize: Organizar painel
     export: Exportar leituras
     summary: Resumo da área de trabalho
@@ -202,22 +201,28 @@ pt-BR:
     trend_window: 'tendência das últimas %{hours} h'
     since: 'desde %{time}'
     since_yesterday: 'desde ontem %{time}'
+    at_today: 'às %{time}'
+    at_yesterday: 'ontem às %{time}'
+    at_date: 'em %{time}'
     receiver_offline: '%{receiver} sem conexão'
     receiver_offline_detail: 'Sem leituras de %{places} até a conexão voltar.'
     receiver_offline_alone: Nenhum transmissor depende dele agora.
     receiver_queue: '%{receiver} com leituras na fila'
     receiver_dropped: '%{receiver} descartou leituras'
     silent: '%{place} sem leituras'
-    silent_detail: 'Última leitura às %{time}. O transmissor envia a cada %{interval}.'
+    silent_detail: 'Última leitura %{when}. O transmissor envia a cada %{interval}.'
     sensor_failed: '%{place}: %{measurement} sem leitura'
+    reading_stale: '%{place}: %{measurement} sem leitura recente'
+    reading_stale_detail: 'Último valor %{when}. O transmissor continua enviando as outras medições.'
     error_detail: O sensor não respondeu na última leitura.
     skipped_detail: A medição não foi feita na última leitura.
     battery: '%{place}: bateria em %{value}'
     battery_low_detail: 'Abaixo de %{limit} o transmissor economiza energia e envia leituras com menos frequência.'
     battery_critical_detail: 'Abaixo de %{limit} o transmissor para de enviar. Troque ou recarregue a bateria.'
     short_receiver: '%{receiver} sem conexão'
-    short_silent: 'Sem leituras desde %{time}'
+    short_silent: 'Sem leituras %{since}'
     short_sensor: '%{measurement} sem leitura'
+    short_reading_stale: '%{measurement} sem leitura recente'
     short_battery: 'Bateria em %{value}'
     last_reading: 'Última leitura: %{age}'
   layout:

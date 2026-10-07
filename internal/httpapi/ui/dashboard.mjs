@@ -23,7 +23,12 @@ import {
   resolveItem,
 } from "./workspace-model.mjs";
 import { openLayoutEditor } from "./layout-editor.mjs";
-import { attentionItems, placeKey, placeSeverity } from "./overview-model.mjs";
+import {
+  attentionItems,
+  placeKey,
+  placeSeverity,
+  sensorLabel,
+} from "./overview-model.mjs";
 import { fetchSnapshot } from "./snapshot-api.mjs";
 
 // The page holds only the latest 100 samples (about 1 h 40 min each for five devices
@@ -47,11 +52,12 @@ export function mountDashboard(root, { state = {}, notify }) {
     pending = false,
     dialogOpener = null,
     attention = [],
+    shownAttention = "",
     historyOpener = null;
   root.innerHTML = `<header class="page-heading overview-heading"><div><h1>${t("common.dashboard")}</h1><p class="live-line"><span class="live-dot" aria-hidden="true"></span><span id="snapshot-time"></span></p></div><div class="top-actions"><button class="button" id="organize">${t("dashboard.organize")}</button><button class="button" id="export">${icon("download")}${t("dashboard.export")}</button><button class="button" id="refresh">${icon("refresh")}${t("common.refresh")}</button></div></header>
     <div id="fetch-error" class="notice hidden" role="status"></div>
     <section id="summary" class="overview-summary" aria-label="${t("dashboard.summary")}"></section>
-    <section id="attention" class="panel attention-panel" aria-labelledby="attention-heading" hidden><h2 id="attention-heading">${t("overview.attention_heading")} <span>${t("overview.attention_order")}</span></h2><ul class="attention-list"></ul></section>
+    <section id="attention" class="panel attention-panel" aria-labelledby="attention-heading" hidden><div class="attention-head"><h2 id="attention-heading">${t("overview.attention_heading")}</h2><span>${t("overview.attention_order")}</span></div><ul class="attention-list"></ul></section>
     <div class="toolbar" id="toolbar"><div class="segmented" aria-label="${t("dashboard.filter")}"><button data-filter="all" aria-pressed="true">${t("dashboard.all")}</button><button data-filter="attention" aria-pressed="false">${t("dashboard.attention")}</button></div><label class="search">${icon("search")}<span class="sr-only">${t("dashboard.search_label")}</span><input id="search" type="search" placeholder="${t("dashboard.search")}" autocomplete="off"></label></div>
     <section id="devices" class="device-groups" aria-label="${t("dashboard.items")}"></section>
     <dialog class="history-dialog" id="history-panel" aria-labelledby="history-heading history-accessible" aria-describedby="history-context"><div class="dialog-head"><div><h2 id="history-heading" tabindex="-1">${t("common.history")}</h2><p id="history-context"></p><span class="sr-only" id="history-accessible"></span></div><button class="icon-button" id="close-history" aria-label="${t("dashboard.close_history")}">${icon("close")}</button></div><div class="history-summary"><div><span class="small muted">${t("dashboard.latest_reading")}</span><p class="measurement" id="history-value"></p><cj-badge id="history-state"></cj-badge></div><p class="small muted" id="history-time"></p></div><div class="history-controls"><label for="metric-select">${t("common.measurement")}<select id="metric-select" class="input"></select></label><label for="period">${t("dashboard.period")}<select id="period" class="input"><option value="24">${t("dashboard.hours24")}</option><option value="6">${t("dashboard.hours6")}</option><option value="1">${t("dashboard.hour")}</option><option value="0">${t("dashboard.all_data")}</option></select></label></div><cj-chart id="history"></cj-chart><div class="plot-footer"><div><span id="history-limit"></span></div><span id="plot-count"></span></div></dialog>
@@ -118,7 +124,9 @@ export function mountDashboard(root, { state = {}, notify }) {
     const search = query.trim().toLowerCase();
     return groups.filter(
       (g) =>
-        (filter !== "attention" || g.attention) &&
+        (filter !== "attention" ||
+          g.attention ||
+          placeSeverity(placeKey(g), attention) !== "normal") &&
         [
           g.name,
           g.device,
@@ -214,17 +222,7 @@ export function mountDashboard(root, { state = {}, notify }) {
       const rows = place.querySelector(".place-rows");
       for (const sensor of g.sensors)
         for (const c of sensor.channels)
-          rows.append(
-            placeRow(
-              c,
-              g,
-              // A typed sensor name adds context unless it only repeats the measurement.
-              sensor.named &&
-                sensor.name.toLocaleLowerCase() !== c.title.toLocaleLowerCase()
-                ? sensor.name
-                : "",
-            ),
-          );
+          rows.append(placeRow(c, g, sensorLabel(g, sensor, c)));
       place
         .querySelector("[data-details]")
         .addEventListener("click", (event) =>
@@ -234,7 +232,7 @@ export function mountDashboard(root, { state = {}, notify }) {
     }
     const section = document.createElement("div");
     section.className = "places-section";
-    section.innerHTML = `<h2 class="places-heading">${t("overview.places_heading")} <span>${e(t("overview.trend_window", { hours: TREND_HOURS }))}</span></h2>`;
+    section.innerHTML = `<div class="places-heading"><h2>${t("overview.places_heading")}</h2><span>${e(t("overview.trend_window", { hours: TREND_HOURS }))}</span></div>`;
     section.append(list);
     target.append(section);
   }
@@ -263,12 +261,16 @@ export function mountDashboard(root, { state = {}, notify }) {
   function renderAttention() {
     const panel = root.querySelector("#attention");
     panel.hidden = !attention.length;
-    panel.querySelector(".attention-list").innerHTML = attention
+    const html = attention
       .map(
         (item) =>
           `<li data-severity="${item.severity}"><span class="badge" data-state="${item.severity}">${e(states[item.severity])}</span><div class="attention-text"><strong>${item.href ? `<a href="${e(item.href)}">${e(item.title)}</a>` : e(item.title)}</strong>${item.detail ? `<span>${e(item.detail)}</span>` : ""}</div><span class="attention-since">${e(item.since)}</span></li>`,
       )
       .join("");
+    // Rewriting an unchanged list on every refresh would drop focus from its links.
+    if (html === shownAttention) return;
+    panel.querySelector(".attention-list").innerHTML = html;
+    shownAttention = html;
   }
   function renderSummary() {
     const count = (severity) =>
@@ -512,6 +514,7 @@ export function mountDashboard(root, { state = {}, notify }) {
       }
       snapshot = fresh;
       root.querySelector("#fetch-error").classList.add("hidden");
+      delete root.querySelector(".live-line").dataset.state;
       // Re-rendering replaces the card buttons; keep keyboard focus on the same one.
       const spot = focusSpot(document.activeElement);
       render();
@@ -521,6 +524,8 @@ export function mountDashboard(root, { state = {}, notify }) {
         "dashboard.refresh_error",
       );
       root.querySelector("#fetch-error").classList.remove("hidden");
+      // The page shows the last snapshot it has; it is no longer live.
+      root.querySelector(".live-line").dataset.state = "error";
     } finally {
       pending = false;
       button.disabled = false;

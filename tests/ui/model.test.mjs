@@ -796,7 +796,7 @@ test("attention lists problems with a reason, most severe first", async () => {
   const receivers = [
     {
       source_id: "site",
-      device_id: "000048ca433c0001",
+      device_id: "0000aa0000000001",
       availability: "online",
     },
     {
@@ -840,6 +840,116 @@ test("attention lists problems with a reason, most severe first", async () => {
   assert.equal(placeSeverity(placeKey(groups[1]), items), "critical");
   assert.equal(placeSeverity(placeKey(groups[4]), items), "normal");
   assert.equal(attentionItems([group("e", "Station")], [], now).length, 0);
-  assert.match(sinceText(iso(30), now), /^since /);
-  assert.match(sinceText(iso(60 * 24), now), /^since yesterday /);
+  assert.match(sinceText(iso(30), now), /^since \d{2}:\d{2}/);
+  assert.match(sinceText(iso(60 * 24), now), /^since yesterday \d{2}:\d{2}/);
+  assert.match(sinceText(iso(60 * 24 * 3), now), /^since \d{2}\/\d{2}$/);
+  assert.match(
+    sinceText(Date.parse("2025-12-30T12:00:00Z"), now),
+    /^since \d{2}\/\d{2}\/2025$/,
+  );
+});
+
+test("attention says which measurement, since when and why", async () => {
+  const { attentionItems, placeKey, sensorLabel, sinceText } = await import(
+    "../../internal/httpapi/ui/overview-model.mjs"
+  );
+  setLocale("en-US");
+  const now = Date.parse("2026-10-07T12:00:00Z");
+  const at = (minutesAgo) => now - minutesAgo * 60000;
+  const iso = (minutesAgo) => new Date(at(minutesAgo)).toISOString();
+  const channel = (key, title, extra = {}) => ({
+    key,
+    title,
+    state: "ok",
+    at: iso(2),
+    points: [],
+    ...extra,
+  });
+  const place = (device, name, sensors, extra = {}) => ({
+    transport: "mqtt",
+    source: "site",
+    device,
+    name,
+    at: iso(2),
+    interval: 300,
+    stale: false,
+    sensors,
+    diagnostics: [],
+    state: { receiver_id: "0000aa0000000002" },
+    ...extra,
+  });
+  // A failure counts from the first failed reading after the last good one.
+  const failing = channel("soil-2", "Soil moisture", {
+    state: "error",
+    at: iso(5),
+    points: [
+      { time: at(60), value: 41 },
+      { time: at(55), value: null },
+      { time: at(5), value: null },
+    ],
+  });
+  const garden = place("g", "Garden", [
+    { name: "Bed 1", channels: [channel("soil-1", "Soil moisture")] },
+    { name: "Bed 2", channels: [failing] },
+    {
+      name: "Air",
+      named: true,
+      channels: [
+        channel("air", "Temperature", { state: "stale", at: iso(40) }),
+      ],
+    },
+  ]);
+  const [late, failed] = attentionItems([garden], [], now);
+  // The same measurement twice in a place is told apart by its sensor.
+  assert.equal(failed.title, "Garden: Soil moisture · Bed 2 has no reading");
+  assert.equal(failed.since, sinceText(at(55), now));
+  // A measurement that stopped while its device keeps reporting is late, not fine.
+  assert.equal(late.title, "Garden: Temperature · Air has no recent reading");
+  assert.match(
+    late.detail,
+    /^Last value at \d{2}:\d{2}.*other measurements\.$/,
+  );
+  // When every loaded reading failed, the start is unknown rather than guessed.
+  const unknown = channel("x", "Pressure", {
+    state: "error",
+    points: [{ time: at(10), value: null }],
+  });
+  assert.equal(
+    attentionItems(
+      [place("u", "Shed", [{ name: "P", channels: [unknown] }])],
+      [],
+      now,
+    )[0].since,
+    "",
+  );
+  const single = { name: "Probe", channels: [channel("t", "Temperature")] };
+  assert.equal(
+    sensorLabel(place("s", "S", [single]), single, single.channels[0]),
+    "",
+  );
+  // A device silent for days says the day, not only a time.
+  const [silent] = attentionItems(
+    [place("o", "Old shed", [], { stale: true, at: iso(60 * 24 * 2) })],
+    [],
+    now,
+  );
+  assert.match(silent.detail, /^Last reading on \d{2}\/\d{2}\. /);
+  assert.match(silent.short, /^No readings since \d{2}\/\d{2}$/);
+  // Only a device that went quiet with its receiver is explained by it.
+  const receiver = {
+    source_id: "site",
+    device_id: "0000aa0000000002",
+    availability: "offline",
+    availability_at: iso(30),
+  };
+  const before = place("b", "Barn", [], { stale: true, at: iso(60 * 5) });
+  const after = place("c", "Coop", [], { stale: true, at: iso(25) });
+  const items = attentionItems([before, after], [receiver], now);
+  assert.deepEqual(items.find((i) => i.severity === "network").places, [
+    placeKey(after),
+  ]);
+  assert.deepEqual(
+    items.filter((i) => i.key.startsWith("silent/")).map((i) => i.key),
+    [`silent/${placeKey(before)}`],
+  );
 });

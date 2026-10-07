@@ -16,30 +16,48 @@ const order = { critical: 0, warning: 1, network: 2 };
 export const placeKey = (group) =>
   `${group.transport}/${group.source}/${group.device}`;
 
-// "06:58" today, "ontem 22:10" yesterday, a short date before that.
-export function sinceText(value, now) {
-  const at = Date.parse(value);
-  if (!Number.isFinite(at)) return "";
-  const time = new Date(at).toLocaleTimeString(locale(), {
+// A moment as a person says it: a time today, yesterday and a time, or a date before that,
+// with the year when it is not this one. Days are calendar days, not 24-hour spans.
+function moment(at, now) {
+  const date = new Date(at),
+    today = new Date(now),
+    yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const time = date.toLocaleTimeString(locale(), {
     hour: "2-digit",
     minute: "2-digit",
   });
-  const day = (ms) => new Date(ms).toDateString();
-  if (day(at) === day(now)) return t("overview.since", { time });
-  if (day(at) === day(now - 86400000))
-    return t("overview.since_yesterday", { time });
-  return t("overview.since", {
-    time: new Date(at).toLocaleDateString(locale(), {
+  if (date.toDateString() === today.toDateString())
+    return { day: "today", time };
+  if (date.toDateString() === yesterday.toDateString())
+    return { day: "yesterday", time };
+  return {
+    day: "date",
+    time: date.toLocaleDateString(locale(), {
       day: "2-digit",
       month: "2-digit",
+      ...(date.getFullYear() !== today.getFullYear() && { year: "numeric" }),
     }),
-  });
+  };
 }
-function clock(value) {
-  return new Date(Date.parse(value)).toLocaleTimeString(locale(), {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const timeOf = (value) =>
+  typeof value === "number" ? value : Date.parse(value);
+// "since 06:58", "since yesterday 22:10", "since 05/10".
+export function sinceText(value, now) {
+  const at = timeOf(value);
+  if (!Number.isFinite(at)) return "";
+  const { day, time } = moment(at, now);
+  return t(
+    day === "yesterday" ? "overview.since_yesterday" : "overview.since",
+    { time },
+  );
+}
+// "at 06:58", "yesterday at 22:10", "on 05/10".
+function atText(value, now) {
+  const at = timeOf(value);
+  if (!Number.isFinite(at)) return "";
+  const { day, time } = moment(at, now);
+  return t(`overview.at_${day}`, { time });
 }
 function interval(seconds) {
   return seconds % 60 === 0
@@ -56,12 +74,36 @@ function batteryOf(group) {
   return value;
 }
 
-// What needs attention, most severe first, each with its reason and since when. Built
-// from data Central already has: receiver connection and queue, silence, failed
-// readings and battery. Value ranges are not known yet, so values themselves raise
+// When a measurement started failing: the first failed reading after the last good one.
+// Unknown when no good reading is loaded, since the failure may have begun earlier.
+function failingSince(channel) {
+  const points = (channel.points ?? [])
+    .filter((p) => Number.isFinite(p.time))
+    .sort((a, b) => a.time - b.time);
+  const lastGood = points.findLastIndex((p) => numeric(p.value) !== null);
+  return lastGood === -1 ? null : (points[lastGood + 1]?.time ?? null);
+}
+// The sensor's name when the measurement alone does not say which one it is: someone
+// typed it, or the place has the same measurement twice. Never when it repeats the title.
+export function sensorLabel(group, sensor, channel) {
+  const title = channel.title.toLocaleLowerCase();
+  const name = sensor.name ?? "";
+  if (!name || name.toLocaleLowerCase() === title) return "";
+  const repeated =
+    group.sensors
+      .flatMap((s) => s.channels)
+      .filter((c) => c.title.toLocaleLowerCase() === title).length > 1;
+  return sensor.named || repeated ? name : "";
+}
+
+// What needs attention, most severe first, each with its reason and, when known, since
+// when. Built from data Central already has: receiver connection and queue, silence,
+// failed or late readings and battery. Value ranges are not known yet, so values themselves raise
 // nothing.
 export function attentionItems(groups, receivers, now) {
   const items = [];
+  // Places whose silence an offline receiver explains: they are listed under it, once.
+  const explained = new Set();
   for (const r of receivers) {
     if (r.availability !== "offline") {
       // The receiver's own warnings (queue backlog, readings given up); its page explains them.
@@ -82,9 +124,19 @@ export function attentionItems(groups, receivers, now) {
       }
       continue;
     }
+    const offlineAt = r.availability_retained
+      ? NaN
+      : Date.parse(r.availability_at);
+    // A device silent since well before its receiver went offline has its own problem.
     const dependents = groups.filter(
-      (g) => g.state?.receiver_id === r.device_id && g.source === r.source_id,
+      (g) =>
+        g.state?.receiver_id === r.device_id &&
+        g.source === r.source_id &&
+        (!Number.isFinite(offlineAt) ||
+          !g.interval ||
+          Date.parse(g.at) >= offlineAt - g.interval * 3000),
     );
+    for (const g of dependents) explained.add(placeKey(g));
     const names = new Intl.ListFormat(locale(), { type: "conjunction" }).format(
       dependents.map((g) => g.name),
     );
@@ -111,16 +163,16 @@ export function attentionItems(groups, receivers, now) {
     });
   }
   for (const g of groups) {
-    if (g.stale && !g.receiverOffline) {
+    if (g.stale && !explained.has(placeKey(g))) {
       items.push({
         severity: "warning",
         key: `silent/${placeKey(g)}`,
         places: [placeKey(g)],
         title: t("overview.silent", { place: g.name }),
-        short: t("overview.short_silent", { time: clock(g.at) }),
+        short: t("overview.short_silent", { since: sinceText(g.at, now) }),
         detail: g.interval
           ? t("overview.silent_detail", {
-              time: clock(g.at),
+              when: atText(g.at, now),
               interval: interval(g.interval),
             })
           : "",
@@ -128,23 +180,37 @@ export function attentionItems(groups, receivers, now) {
         at: Date.parse(g.at) || 0,
       });
     }
+    // A silent place says so once; its measurements are listed only while it reports.
     if (!g.stale)
-      for (const c of g.sensors.flatMap((s) => s.channels)) {
-        if (c.state !== "error" && c.state !== "skipped") continue;
-        items.push({
-          severity: "warning",
-          key: `reading/${c.key}`,
-          places: [placeKey(g)],
-          title: t("overview.sensor_failed", {
-            place: g.name,
-            measurement: c.title,
-          }),
-          short: t("overview.short_sensor", { measurement: c.title }),
-          detail: t(`overview.${c.state}_detail`),
-          since: sinceText(c.at, now),
-          at: Date.parse(c.at) || 0,
-        });
-      }
+      for (const s of g.sensors)
+        for (const c of s.channels) {
+          if (!["error", "skipped", "stale"].includes(c.state)) continue;
+          const sub = sensorLabel(g, s, c);
+          const measurement = sub ? `${c.title} · ${sub}` : c.title;
+          const stale = c.state === "stale";
+          const start = stale ? Date.parse(c.at) || null : failingSince(c);
+          items.push({
+            severity: "warning",
+            key: `reading/${c.key}`,
+            places: [placeKey(g)],
+            title: t(
+              stale ? "overview.reading_stale" : "overview.sensor_failed",
+              {
+                place: g.name,
+                measurement,
+              },
+            ),
+            short: t(
+              stale ? "overview.short_reading_stale" : "overview.short_sensor",
+              { measurement },
+            ),
+            detail: stale
+              ? t("overview.reading_stale_detail", { when: atText(c.at, now) })
+              : t(`overview.${c.state}_detail`),
+            since: start === null ? "" : sinceText(start, now),
+            at: start ?? (Date.parse(c.at) || 0),
+          });
+        }
     const volts = batteryOf(g);
     if (volts !== null && volts < BATTERY_LOW_V) {
       const critical = volts < BATTERY_CRITICAL_V;

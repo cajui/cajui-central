@@ -475,8 +475,11 @@ for (const width of [390, 820, 1440]) {
     // One place per transmitter, its readings as rows, and nothing to report.
     await expect(page.locator(".place")).toHaveCount(1);
     await expect(
-      page.getByRole("heading", { name: "Places trend of the last 3 h" }),
+      page.getByRole("heading", { name: "Places", exact: true }),
     ).toBeVisible();
+    await expect(page.locator(".places-heading")).toContainText(
+      "trend of the last 3 h",
+    );
     await expect(page.locator(".reading-button")).toHaveCount(2);
     await expect(page.locator("#summary")).toContainText("All clear");
     await expect(page.locator("#summary")).toContainText("1 device");
@@ -1171,6 +1174,7 @@ test("revocation lives with the device name, not on the dashboard", async ({
   );
   await page.goto("/");
   // A healthy receiver is not listed on the overview; only problems are.
+  await expect(page.locator("#summary")).toContainText(/\d+ devices?/);
   await expect(page.locator("#attention")).toBeHidden();
   await expect(
     page.getByRole("button", { name: "Search for transmitters" }),
@@ -1436,7 +1440,7 @@ test("a revoked transmitter leaves the dashboard", async ({ page }) => {
   ];
   await serve(snapshot);
   await page.goto("/");
-  await expect(page.locator(".dashboard-item")).toHaveCount(0);
+  await expect(page.locator(".place")).toHaveCount(0);
   await expect(page.locator("#summary")).toContainText("0 devices");
   await expect(
     page.getByText("No matching items in this section."),
@@ -2038,6 +2042,62 @@ test("focused history selector keeps receiving fresh readings and exposes channe
   await expect(page.locator("#history-panel")).toHaveAccessibleName(
     /Sensor 1.*Temperature history.*Device 1.*receiver/,
   );
+});
+
+test("the overview shows names as text and trends of the last hours", async ({
+  page,
+}) => {
+  const { snapshot, serve } = await liveWorkspace(page);
+  const markup = '<img src=x onerror="window.injected=1">';
+  snapshot.workspace.devices[0].name = `Coop ${markup}`;
+  snapshot.workspace.devices[0].location = `Yard ${markup}`;
+  snapshot.workspace.sensors[0].name = `Probe ${markup}`;
+  // A reading older than the trend window stays in history but not in the trend.
+  const old = structuredClone(snapshot.samples[0]);
+  old.sample_id = "sample-old";
+  old.received_at = new Date(Date.now() - 5 * 3600000).toISOString();
+  snapshot.samples.push(old);
+  await serve(snapshot);
+  await page.goto("/");
+  const place = page.locator(".place");
+  await expect(place.locator("h3")).toHaveText(`Coop ${markup}`);
+  await expect(place.locator(".place-head p")).toContainText(`Yard ${markup}`);
+  await expect(place.locator(".row-sub").first()).toHaveText(`Probe ${markup}`);
+  await expect(page.locator(".place img")).toHaveCount(0);
+  expect(await page.evaluate(() => window.injected)).toBeUndefined();
+  // The newest of the loaded readings is 16 minutes old: the trend starts near its end.
+  const path = await place.locator(".row-trend path").first().getAttribute("d");
+  expect(Number(path.match(/^M([\d.]+),/)[1])).toBeGreaterThan(80);
+});
+
+test("a saved layout keeps its search and a filter that matches the attention list", async ({
+  page,
+}) => {
+  const { snapshot, serve } = await liveWorkspace(page);
+  snapshot.samples[0].readings.push({
+    sensor_id: "battery",
+    metric: "voltage",
+    unit: "V",
+    value: 3.35,
+    status: "ok",
+  });
+  snapshot.workspace.layout.sections = [
+    { title: "Climate", items: [{ kind: "sensor", sensor_id: 1 }] },
+  ];
+  await serve(snapshot);
+  await page.goto("/");
+  await expect(page.locator("#attention")).toContainText(
+    "Device 1: battery at 3.35 V",
+  );
+  await expect(page.locator("#toolbar")).toBeVisible();
+  await page.getByRole("searchbox").fill("Humidity");
+  await expect(page.locator(".reading-button")).toHaveCount(2);
+  await page.getByRole("searchbox").fill("no such sensor");
+  await expect(page.locator(".reading-button")).toHaveCount(0);
+  await page.getByRole("searchbox").fill("");
+  // A low battery needs attention, so the filter keeps its device.
+  await page.locator('[data-filter="attention"]').click();
+  await expect(page.locator(".reading-button")).toHaveCount(2);
 });
 
 test("normal readings stay quiet and an offline receiver is counted apart", async ({
