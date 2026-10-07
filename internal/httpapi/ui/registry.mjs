@@ -1,4 +1,4 @@
-import { t } from "./i18n.mjs";
+import { t, errorMessage } from "./i18n.mjs";
 import {
   escapeHTML as e,
   age,
@@ -292,7 +292,7 @@ export function mountRegistry(root, { state, kind, notify }) {
         });
         location.reload();
       } catch (error) {
-        form.querySelector('[role="alert"]').textContent = error.message;
+        form.querySelector('[role="alert"]').textContent = errorMessage(error);
         button.disabled = false;
       }
     });
@@ -335,7 +335,7 @@ export function mountRegistry(root, { state, kind, notify }) {
       notify(t("registry.archived", { name: entry.name }));
       await refresh();
     } catch (error) {
-      notify(error.message);
+      notify(errorMessage(error));
       button.disabled = false;
     }
   }

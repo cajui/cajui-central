@@ -1,4 +1,4 @@
-import { t } from "./i18n.mjs";
+import { t, errorMessage } from "./i18n.mjs";
 // Management channel commands (cajui-firmware docs/management-v1.md), sent through the
 // local page's capability like workspace edits.
 export async function sendCommand(state, command) {
@@ -94,8 +94,8 @@ export function commandRunner({ session, notify, done }) {
           answerText(answer),
         );
       } catch (error) {
-        notify(error.message);
-        step("failed", error.message);
+        notify(errorMessage(error));
+        step("failed", errorMessage(error));
       } finally {
         running = false;
         button.disabled = false;

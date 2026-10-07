@@ -1,4 +1,4 @@
-import { t, locale } from "./i18n.mjs";
+import { t, locale, errorMessage } from "./i18n.mjs";
 import { escapeHTML as e, receiverLabel } from "./model.mjs";
 import { brokerSnapshot } from "./broker-api.mjs";
 
@@ -174,7 +174,7 @@ export function mountBroker(root, { state }) {
     } catch (error) {
       if (alive) {
         const box = root.querySelector("#broker-error");
-        box.textContent = error.message;
+        box.textContent = errorMessage(error);
         box.classList.remove("hidden");
       }
     } finally {

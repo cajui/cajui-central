@@ -1,6 +1,6 @@
 import { watchDeviceStates } from "./state-events.mjs";
 import { openReceiverSetup } from "./receiver-setup.mjs";
-import { t } from "./i18n.mjs";
+import { t, errorMessage } from "./i18n.mjs";
 import {
   escapeHTML as e,
   age,
@@ -123,7 +123,7 @@ export function mountReceivers(root, { state, notify }) {
             notify(t("registry.archived", { name }));
             await refresh();
           } catch (error) {
-            notify(error.message);
+            notify(errorMessage(error));
             button.disabled = false;
           }
         });

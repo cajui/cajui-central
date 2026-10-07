@@ -1,4 +1,4 @@
-import { t } from "./i18n.mjs";
+import { t, errorMessage } from "./i18n.mjs";
 import { escapeHTML as e } from "./model.mjs";
 import { automaticSections, itemChoices } from "./workspace-model.mjs";
 import {
@@ -109,7 +109,7 @@ export function openLayoutEditor(root, state) {
       });
       location.reload();
     } catch (error) {
-      form.querySelector('[role="alert"]').textContent = error.message;
+      form.querySelector('[role="alert"]').textContent = errorMessage(error);
       button.disabled = false;
     }
   });

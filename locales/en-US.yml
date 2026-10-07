@@ -9,6 +9,7 @@ en-US:
     measurement: Measurement
     measurements: Measurements
     refresh: Refresh
+    network_error: Could not reach Central. Check the connection and try again.
     history: History
     cancel: Cancel
     unknown: Unknown

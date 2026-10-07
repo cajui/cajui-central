@@ -28,9 +28,20 @@ export function t(key, values = {}) {
     return message(key);
   };
   const message = lookup(activeLocale) ?? lookup("en-US") ?? key;
+  // A count is a quantity: it gets the locale's digit grouping ("18.322 leituras").
   return message.replace(/%\{([a-z_]+)\}/g, (match, name) =>
-    Object.hasOwn(values, name) ? String(values[name]) : match,
+    !Object.hasOwn(values, name)
+      ? match
+      : name === "count" && typeof values.count === "number"
+        ? new Intl.NumberFormat(activeLocale).format(values.count)
+        : String(values[name]),
   );
+}
+
+// fetch rejects with a TypeError, worded by the browser in its own language ("Failed to
+// fetch"), when the request never reaches Central; anything else is Central's message.
+export function errorMessage(error) {
+  return error instanceof TypeError ? t("common.network_error") : error.message;
 }
 
 export function metricLabel(metric, fallback) {

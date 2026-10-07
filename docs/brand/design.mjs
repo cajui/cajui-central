@@ -58,6 +58,9 @@ export function mountBrand(root, notify) {
       ["Critical label", "--danger", "--surface"],
       ["Attention notice", "--warning", "--warning-soft"],
       ["Network notice", "--info", "--info-soft"],
+      // Outlines of controls are not text: WCAG 1.4.11 asks 3:1.
+      ["Field outline", "--field-line", "--surface", 3],
+      ["Field outline on page", "--field-line", "--canvas", 3],
       ...["temperature", "humidity", "air", "soil", "light"].map((kind) => [
         `${kind} accent`,
         `--${kind}`,
@@ -65,12 +68,12 @@ export function mountBrand(root, notify) {
       ]),
     ];
     root.querySelector("#contrast-audit").innerHTML = pairs
-      .map(([name, fg, bg]) => {
+      .map(([name, fg, bg, target = 4.5]) => {
         const ratio = contrast(
           css.getPropertyValue(fg).trim(),
           css.getPropertyValue(bg).trim(),
         );
-        return `<tr><td>${name}</td><td><code>${fg} / ${bg}</code></td><td>${ratio.toFixed(2)}:1</td><td>${ratio >= 4.5 ? "Pass" : "Below target"} · 4.5:1</td></tr>`;
+        return `<tr><td>${name}</td><td><code>${fg} / ${bg}</code></td><td>${ratio.toFixed(2)}:1</td><td>${ratio >= target ? "Pass" : "Below target"} · ${target}:1</td></tr>`;
       })
       .join("");
   };
