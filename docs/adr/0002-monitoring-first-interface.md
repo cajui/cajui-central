@@ -7,15 +7,16 @@
 
 The interface grew out of device registration. Its pages list entity types (devices,
 sensors, receivers, broker), the dashboard summary counts registrations, and every reading
-carries a green "updated" badge, so 85% of the status marks on a typical page say the same
-thing. Colour identifies the quantity (temperature, humidity) rather than its condition.
+carries a green "updated" badge, so on a healthy page every status mark says the same thing.
+Colour identifies the quantity (temperature, humidity) rather than its condition.
 
 What it cannot do is the core job of a monitor: tell, at a glance, whether anything needs
 attention, what, where and since when.
 
-- **No notion of a bad value or an unhealthy device.** "Attention" covers only late or
-  failed readings. A low battery, a weak link or a value far outside its useful range looks
-  exactly like a healthy one.
+- **No notion of a bad value or a failing device.** Attention comes only from the data
+  path: late, failed, skipped or missing readings, and receivers that are offline or
+  dropping readings. A low battery, a weak link or a value far outside its useful range
+  looks exactly like a healthy one.
 - **Every reading is drawn as a generic number.** Telemetry carries a numeric value, a
   free-text unit and a status, with no kind. A door contact shows "0 state", and a
   cumulative rain counter looks like a current value.
