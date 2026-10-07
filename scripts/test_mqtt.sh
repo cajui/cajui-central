@@ -30,12 +30,26 @@ docker run --rm --network "${project}_default" \
   -v "$secrets":/secrets:ro -v "$PWD":/src -w /src \
   -v cajui-go-mod:/go/pkg/mod -v cajui-go-build:/root/.cache/go-build \
   golang:1.27 make check
+# Central's non-root UID can read the setup account, but not arbitrary producers.
+docker run --rm --user 65532:65532 -v "$secrets":/secrets:ro --entrypoint sh eclipse-mosquitto:2.0.22 -c '
+  test -r /secrets/producers/receiver-1 && test ! -r /secrets/demo-source
+'
+publish_as receiver-1 producers/receiver-1 telemetry/v1/other/device/samples | grep -q 'Not authorized' \
+  || { echo 'Setup account crossed its source namespace'; exit 1; }
 # MQTT 3.1.1 PUBACK has no negative reason code. MQTT 5 makes ACL rejection observable.
 publish_as demo-source demo-source telemetry/v1/other/device/samples | grep -q 'Not authorized' \
   || { echo 'ACL rejection was not observed'; exit 1; }
 # A producer created at runtime may publish only under its own namespace.
 producer=integration-producer
 compose run --rm credentials producer "$producer" > /dev/null
+# Traverse the directory for the known setup file, without listing credentials or
+# reading another producer's file. Test the actual producer directory boundary.
+docker run --rm --user 65532:65532 -v "$secrets":/secrets:ro --entrypoint sh eclipse-mosquitto:2.0.22 -c '
+  test -r /secrets/producers/receiver-1 &&
+  test ! -r /secrets/producers/integration-producer &&
+  test ! -r /secrets/producers && test -x /secrets/producers
+'
+
 allowed() {
   out=$(publish_as "$producer" "producers/$producer" "telemetry/v1/$producer/device/samples")
   printf '%s\n' "$out" | grep -q 'Not authorized' && echo denied || echo allowed
@@ -43,6 +57,30 @@ allowed() {
 eventually allowed allowed || { echo 'New producer was not accepted after reload'; exit 1; }
 publish_as "$producer" "producers/$producer" telemetry/v1/demo-source/device/samples | grep -q 'Not authorized' \
   || { echo 'Producer ACL rejection was not observed'; exit 1; }
+# The producer also owns its management topics (cajui-firmware docs/management-v1.md), and
+# only those; read-only accounts cannot publish state.
+publish_as "$producer" "producers/$producer" "manage/v1/$producer/device/state" | grep -q 'Not authorized' \
+  && { echo 'Producer management state was rejected'; exit 1; }
+publish_as "$producer" "producers/$producer" manage/v1/demo-source/device/state | grep -q 'Not authorized' \
+  || { echo 'Foreign management state was accepted'; exit 1; }
+publish_as "$producer" "producers/$producer" "manage/v1/$producer/device/commands" | grep -q 'Not authorized' \
+  || { echo 'Producer could publish its own commands'; exit 1; }
+publish_as central central "manage/v1/$producer/device/state" | grep -q 'Not authorized' \
+  || { echo 'Central could publish management state'; exit 1; }
+# Only Central sends commands; the read-only account cannot.
+publish_as central central "manage/v1/$producer/device/commands" | grep -q 'Not authorized' \
+  && { echo 'Central could not publish a command'; exit 1; }
+publish_as homeassistant homeassistant "manage/v1/$producer/device/commands" | grep -q 'Not authorized' \
+  || { echo 'Read-only account could publish a command'; exit 1; }
+publish_as "$producer" "producers/$producer" "manage/v1/$producer/device/results" | grep -q 'Not authorized' \
+  && { echo 'Producer could not publish a result'; exit 1; }
+# Home Assistant Discovery: a producer writes configurations only under its own node level.
+publish_as "$producer" "producers/$producer" "homeassistant/sensor/$producer/device_temperature/config" | grep -q 'Not authorized' \
+  && { echo 'Producer could not publish its discovery configuration'; exit 1; }
+publish_as "$producer" "producers/$producer" homeassistant/sensor/demo-source/device_temperature/config | grep -q 'Not authorized' \
+  || { echo 'Producer could publish another source discovery configuration'; exit 1; }
+publish_as "$producer" "producers/$producer" "homeassistant/switch/$producer/device_relay/config" | grep -q 'Not authorized' \
+  || { echo 'Producer could publish a non-sensor discovery configuration'; exit 1; }
 # Imported and removed credentials take effect without restarting the broker.
 printf 'imported-secret-123\n' | compose run --rm -T credentials import imported-producer > /dev/null
 imported() {

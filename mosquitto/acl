@@ -1,6 +1,15 @@
 user central
 topic read telemetry/v1/+/+/samples
+topic read manage/v1/+/+/availability
+topic read manage/v1/+/+/state
+topic read manage/v1/+/+/results
+topic write manage/v1/+/+/commands
 user homeassistant
+topic read homeassistant/#
 topic read telemetry/v1/+/+/samples
+topic read manage/v1/+/+/availability
+topic read manage/v1/+/+/state
 user demo-source
 topic write telemetry/v1/demo-source/+/samples
+topic write manage/v1/demo-source/+/availability
+topic write manage/v1/demo-source/+/state

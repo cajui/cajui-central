@@ -16,3 +16,7 @@ updates:
     directory: /mosquitto
     schedule:
       interval: weekly
+  - package-ecosystem: npm
+    directory: /tests/ui
+    schedule:
+      interval: weekly

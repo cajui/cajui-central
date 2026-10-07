@@ -1,0 +1,271 @@
+package storage
+
+import (
+	"context"
+	"errors"
+	"github.com/cajui/cajui-central/internal/workspace"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/cajui/cajui-central/internal/devicestate"
+)
+
+func stateFixture(t *testing.T, name, device string) devicestate.State {
+	t.Helper()
+	b, err := os.ReadFile("../../examples/mqtt/" + name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := devicestate.Decode("demo-source", device, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func TestDeviceStatesKeepTheLatestAndIgnoreRepeatedSnapshots(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receiver := stateFixture(t, "receiver-state.json", "00000000000000d1")
+	transmitter := stateFixture(t, "transmitter-state.json", "00000000000000d2")
+	start := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
+	if err = db.SaveAvailability(ctx, "demo-source", "00000000000000d1", "online", start, false); err != nil {
+		t.Fatal(err) // Before any state: kept for when the state arrives.
+	}
+	if err = db.SaveDeviceState(ctx, transmitter, start, false); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.SaveDeviceState(ctx, receiver, start, false); err != nil {
+		t.Fatal(err)
+	}
+	// The broker repeats both retained messages on every subscription.
+	later := start.Add(time.Hour)
+	if err = db.SaveDeviceState(ctx, receiver, later, true); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.SaveAvailability(ctx, "demo-source", "00000000000000d1", "online", later, true); err != nil {
+		t.Fatal(err)
+	}
+	states, err := db.DeviceStates(ctx)
+	if err != nil || len(states) != 2 {
+		t.Fatal(states, err)
+	}
+	r := states[0]
+	if r.Role != "receiver" || !r.ReceivedAt.Equal(start) || r.Retained || *r.Availability != "online" || !r.AvailabilityAt.Equal(start) {
+		t.Fatalf("%+v", r)
+	}
+	if states[1].Role != "transmitter" || states[1].Availability != nil || states[1].AvailabilityAt != nil {
+		t.Fatalf("%+v", states[1])
+	}
+	// A changed snapshot of unknown age replaces the state and is marked retained.
+	uptime := int64(7200)
+	receiver.UptimeS = &uptime
+	if err = db.SaveDeviceState(ctx, receiver, later, true); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.SaveAvailability(ctx, "demo-source", "00000000000000d1", "offline", later, false); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	db, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	states, err = db.DeviceStates(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r = states[0]
+	if *r.UptimeS != 7200 || !r.Retained || !r.ReceivedAt.Equal(later) || *r.Availability != "offline" || !r.AvailabilityAt.Equal(later) {
+		t.Fatalf("%+v", r)
+	}
+	// A live message clears the retained mark.
+	if err = db.SaveDeviceState(ctx, receiver, later.Add(time.Minute), false); err != nil {
+		t.Fatal(err)
+	}
+	if states, _ = db.DeviceStates(ctx); states[0].Retained || states[0].AvailabilityRetained {
+		t.Fatal("live state still marked retained")
+	}
+	// A changed retained availability is of unknown age.
+	if err = db.SaveAvailability(ctx, "demo-source", "00000000000000d1", "online", later, true); err != nil {
+		t.Fatal(err)
+	}
+	if states, _ = db.DeviceStates(ctx); !states[0].AvailabilityRetained || *states[0].Availability != "online" {
+		t.Fatalf("%+v", states[0])
+	}
+	// Clearing the retained topics removes the device.
+	if err = db.DeleteDeviceState(ctx, "demo-source", "00000000000000d2"); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.DeleteAvailability(ctx, "demo-source", "00000000000000d1"); err != nil {
+		t.Fatal(err)
+	}
+	if states, _ = db.DeviceStates(ctx); len(states) != 1 || states[0].Availability != nil {
+		t.Fatalf("%+v", states)
+	}
+}
+
+func TestAMovedDeviceIsListedOnceUnderItsNewestSource(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	at := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
+	for i, source := range []string{"old-user", "new-user", "same-time"} {
+		payload := `{"version":1,"source_id":"` + source + `","device_id":"00000000000000d1","role":"receiver"}`
+		state, err := devicestate.Decode(source, "00000000000000d1", []byte(payload))
+		if err != nil {
+			t.Fatal(err)
+		}
+		stamp := at.Add(time.Duration(i) * time.Hour)
+		if source == "same-time" {
+			stamp = at.Add(time.Hour) // Ties resolve deterministically.
+		}
+		if err = db.SaveDeviceState(ctx, state, stamp, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	states, err := db.DeviceStates(ctx)
+	if err != nil || len(states) != 1 || states[0].SourceID != "same-time" {
+		t.Fatal(states, err)
+	}
+}
+
+func TestDeviceStateStorageFailures(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	receiver := stateFixture(t, "receiver-state.json", "00000000000000d1")
+	if err = db.SaveDeviceState(ctx, receiver, time.Now(), false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.db.Exec(`UPDATE device_states SET received_at='bad'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.DeviceStates(ctx); err == nil {
+		t.Fatal("bad receipt time accepted")
+	}
+	if _, err = db.db.Exec(`UPDATE device_states SET received_at='2026-09-26T12:00:00Z', state='{'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.DeviceStates(ctx); err == nil {
+		t.Fatal("bad state accepted")
+	}
+	if _, err = db.db.Exec(`UPDATE device_states SET state='{}'; INSERT INTO device_availability VALUES('demo-source','00000000000000d1','online','bad',0)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.DeviceStates(ctx); err == nil {
+		t.Fatal("bad availability time accepted")
+	}
+	db.Close()
+	if err = db.SaveDeviceState(ctx, receiver, time.Now(), false); err == nil {
+		t.Fatal("closed database accepted a state")
+	}
+	if _, err = db.DeviceStates(ctx); err == nil {
+		t.Fatal("closed database listed states")
+	}
+	if err = db.DeleteDeviceState(ctx, "s", "d"); err == nil {
+		t.Fatal("closed database deleted a state")
+	}
+}
+
+func TestArchiveReceiverSurvivesRestartAndRetainedMessages(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := stateFixture(t, "receiver-state.json", "00000000000000d1")
+	at := time.Now().UTC()
+	if err = s.SaveDeviceState(ctx, r, at, false); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.ArchiveReceiver(ctx, r.SourceID, r.DeviceID, at.Add(time.Second)); !errors.Is(err, workspace.ErrConflict) {
+		t.Fatal(err)
+	}
+	if err = s.ArchiveReceiver(ctx, r.SourceID, r.DeviceID, at); err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	s, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	uptime := int64(999)
+	r.UptimeS = &uptime // A changed retained snapshot must also remain hidden.
+	if err = s.SaveDeviceState(ctx, r, at.Add(time.Minute), true); err != nil {
+		t.Fatal(err)
+	}
+	if rows, err := s.DeviceStates(ctx); err != nil || len(rows) != 0 {
+		t.Fatal(rows, err)
+	}
+	if _, err = s.DeviceState(ctx, r.SourceID, r.DeviceID); err != nil {
+		t.Fatal("state lost", err)
+	}
+	if err = s.SaveDeviceState(ctx, r, at.Add(2*time.Minute), false); err != nil {
+		t.Fatal(err)
+	}
+	if rows, err := s.DeviceStates(ctx); err != nil || len(rows) != 1 {
+		t.Fatal(rows, err)
+	}
+}
+
+func TestArchiveLatestSourceFallsBackWithoutRefreshingOlderState(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	old := stateFixture(t, "receiver-state.json", "00000000000000d1")
+	old.SourceID = "older-source"
+	newer := old
+	newer.SourceID = "newer-source"
+	at := time.Now().UTC().Add(-time.Hour)
+	if err = db.SaveDeviceState(ctx, old, at, true); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.SaveAvailability(ctx, old.SourceID, old.DeviceID, "offline", at, true); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.SaveDeviceState(ctx, newer, at.Add(time.Minute), false); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.ArchiveReceiver(ctx, newer.SourceID, newer.DeviceID, at.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	states, err := db.DeviceStates(ctx)
+	if err != nil || len(states) != 1 {
+		t.Fatal(states, err)
+	}
+	got := states[0]
+	if got.SourceID != old.SourceID || !got.ReceivedAt.Equal(at) || !got.Retained || got.Availability == nil || *got.Availability != "offline" {
+		t.Fatal("fallback changed original freshness", got)
+	}
+	// Archived snapshots still cannot restore the newer source.
+	n := int64(123)
+	newer.UptimeS = &n
+	if err = db.SaveDeviceState(ctx, newer, at.Add(2*time.Minute), true); err != nil {
+		t.Fatal(err)
+	}
+	states, err = db.DeviceStates(ctx)
+	if err != nil || len(states) != 1 || states[0].SourceID != old.SourceID {
+		t.Fatal(states, err)
+	}
+}

@@ -3,6 +3,7 @@ package httpapi
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	_ "embed"
@@ -15,15 +16,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cajui/cajui-central/internal/commands"
+	"github.com/cajui/cajui-central/internal/devicestate"
 	"github.com/cajui/cajui-central/internal/telemetry"
+	"github.com/cajui/cajui-central/internal/workspace"
 )
 
 type Repository interface {
+	Catalog(context.Context) (workspace.Catalog, error)
+	SaveDevice(context.Context, int64, workspace.Settings) error
+	ArchiveDevice(context.Context, int64, int64) error
+	ArchiveSensor(context.Context, int64, int64) error
+	ArchiveReceiver(context.Context, string, string, time.Time) error
+	SaveSensor(context.Context, int64, workspace.Settings) error
+	SaveLayout(context.Context, workspace.Layout) error
 	Insert(context.Context, telemetry.Reading, time.Time) (bool, error)
 	Recent(context.Context, int) ([]telemetry.Reading, error)
 	Ping(context.Context) error
 	RecentSamples(context.Context, int) ([]telemetry.StoredSample, error)
 	Devices(context.Context, time.Time) ([]telemetry.Device, error)
+	DeviceStates(context.Context) ([]devicestate.Stored, error)
+	commands.Repository
 }
 
 //go:embed index.html
@@ -31,30 +44,57 @@ var page string
 var dashboard = template.Must(template.New("index").Parse(page))
 
 type server struct {
-	repo   Repository
-	token  [32]byte
-	logger *slog.Logger
+	repo    Repository
+	uiToken string
+	token   [32]byte
+	logger  *slog.Logger
+	// Nil when MQTT is not configured: commands then answer 503.
+	publisher     commands.Publisher
+	broker        BrokerObserver
+	receiverSetup ReceiverSetup
+	stateStreams  chan struct{}
 }
 
-func New(repo Repository, token string, logger *slog.Logger) (http.Handler, error) {
+func New(repo Repository, token string, logger *slog.Logger, options ...Option) (http.Handler, error) {
 	if len(token) < 24 {
 		return nil, errors.New("API token must contain at least 24 characters")
 	}
 	if logger == nil {
 		logger = slog.Default()
 	}
-	s := &server{repo: repo, token: sha256.Sum256([]byte(token)), logger: logger}
+	s := &server{repo: repo, token: sha256.Sum256([]byte(token)), logger: logger, uiToken: rand.Text(), stateStreams: make(chan struct{}, 16)}
+	for _, option := range options {
+		option(s)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
-	mux.HandleFunc("GET /{$}", s.index)
+	mux.HandleFunc("GET /{$}", s.localPage(s.index))
+	mux.HandleFunc("GET /devices", s.localPage(s.index))
+	mux.HandleFunc("GET /sensors", s.localPage(s.index))
+	mux.HandleFunc("GET /receivers", s.localPage(s.index))
+	mux.HandleFunc("GET /broker", s.localPage(s.index))
+	mux.HandleFunc("GET /ui-api/broker", s.brokerStatus)
+	mux.HandleFunc("GET /ui-api/receiver-states", s.receiverStates)
+	mux.HandleFunc("GET /ui-api/device-states", s.localDeviceStates)
+	mux.HandleFunc("GET /ui-api/device-states/events", s.deviceStateEvents)
+	mux.HandleFunc("POST /ui-api/receiver-credentials", s.receiverCredentials)
+	mux.HandleFunc("PUT /ui-api/{kind}/{id}", s.editWorkspace)
+	mux.HandleFunc("POST /ui-api/devices/{id}/archive", s.archiveDevice)
+	mux.HandleFunc("POST /ui-api/sensors/{id}/archive", s.archiveSensor)
+	mux.HandleFunc("POST /ui-api/receivers/{source}/{device}/archive", s.archiveReceiver)
+	mux.HandleFunc("GET /ui/{path...}", serveUIAsset)
+	mux.HandleFunc("POST /ui-api/commands", s.localPage(s.sendCommand))
+	mux.HandleFunc("GET /ui-api/commands/{id}", s.localPage(s.commandStatus))
+
 	mux.Handle("GET /api/v1/readings", s.authorize(http.HandlerFunc(s.list)))
 	mux.Handle("GET /api/v1/samples", s.authorize(http.HandlerFunc(s.samples)))
 	mux.Handle("GET /api/v1/devices", s.authorize(http.HandlerFunc(s.devices)))
+	mux.Handle("GET /api/v1/device-states", s.authorize(http.HandlerFunc(s.deviceStates)))
 	mux.Handle("POST /api/v1/readings", s.authorize(http.HandlerFunc(s.ingest)))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; form-action 'none'")
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'")
 		mux.ServeHTTP(w, r)
 	}), nil
 }
@@ -94,7 +134,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// The dashboard is read-only and local; API access always requires a token.
+// Pages and workspace edits are local; ingestion APIs require the API token.
 func (s *server) index(w http.ResponseWriter, r *http.Request) {
 	readings, err := s.repo.Recent(r.Context(), 100)
 	if err != nil {
@@ -112,11 +152,34 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	if err = dashboard.Execute(w, struct {
-		Readings []telemetry.Reading
-		Samples  []telemetry.StoredSample
-		Devices  []telemetry.Device
-	}{readings, samples, devices}); err != nil {
+	catalog, err := s.repo.Catalog(r.Context())
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	states, err := s.repo.DeviceStates(r.Context())
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	language := requestLocale(w, r)
+	w.Header().Set("Content-Language", language)
+	w.Header().Add("Vary", "Accept-Language")
+	w.Header().Add("Vary", "Cookie")
+	title := "common.dashboard"
+	if r.URL.Path == "/broker" {
+		title = "broker.title"
+	}
+	if r.URL.Path == "/devices" {
+		title = "common.devices"
+	}
+	if r.URL.Path == "/sensors" {
+		title = "common.sensors"
+	}
+	if r.URL.Path == "/receivers" {
+		title = "common.receivers"
+	}
+	if err = dashboard.Execute(w, dashboardPage{Title: catalogs[language][title], Route: r.URL.Path, State: dashboardState{Locale: language, Readings: readings, Samples: samples, Devices: devices, DeviceStates: states, Workspace: &catalog, UIToken: s.uiToken, GeneratedAt: time.Now().UTC()}}); err != nil {
 		s.logger.Error("render dashboard", "error", err)
 	}
 }
@@ -193,4 +256,13 @@ func (s *server) devices(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(devices)
+}
+func (s *server) deviceStates(w http.ResponseWriter, r *http.Request) {
+	states, err := s.repo.DeviceStates(r.Context())
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(states)
 }

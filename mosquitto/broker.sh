@@ -22,6 +22,11 @@ valid_producer() {
   [ "${#1}" -le 64 ]
 }
 generate() {
+  # Only the dedicated receiver account is readable by Central's local setup wizard.
+  if [ -f "$secrets/producers/receiver-1" ]; then
+    chown "$central_uid" "$secrets/producers/receiver-1"
+    chmod 0400 "$secrets/producers/receiver-1"
+  fi
   mkdir -p "$auth"
   cp /cajui/acl "$auth/acl.tmp"
   : > "$auth/passwords.tmp"
@@ -36,7 +41,16 @@ generate() {
       continue
     fi
     printf '%s:%s\n' "$name" "$(cat "$path")" >> "$auth/passwords.tmp"
-    printf '\nuser %s\ntopic write telemetry/v1/%s/+/samples\n' "$name" "$name" >> "$auth/acl.tmp"
+    # Telemetry plus the management channel of cajui-firmware (docs/management-v1.md).
+    {
+      printf '\nuser %s\ntopic write telemetry/v1/%s/+/samples\n' "$name" "$name"
+      printf 'topic write manage/v1/%s/+/availability\n' "$name"
+      printf 'topic write manage/v1/%s/+/state\n' "$name"
+      printf 'topic write manage/v1/%s/+/results\n' "$name"
+      printf 'topic read manage/v1/%s/+/commands\n' "$name"
+      # Home Assistant Discovery, confined to the producer's node level (docs/home-assistant.md).
+      printf 'topic write homeassistant/sensor/%s/+/config\n' "$name"
+    } >> "$auth/acl.tmp"
   done
   mosquitto_passwd -U "$auth/passwords.tmp"
   chown -R mosquitto:mosquitto "$auth"
@@ -48,8 +62,9 @@ fingerprint() {
 }
 
 mkdir -p "$secrets/producers"
-for name in api-token central homeassistant demo-source; do ensure "$name"; done
-# Central reads only its API token and broker password.
+for name in api-token central homeassistant demo-source producers/receiver-1; do ensure "$name"; done
+chmod 0711 "$secrets/producers"
+# Central reads its API token, broker password and dedicated setup credential.
 chown "$central_uid" "$secrets/api-token" "$secrets/central"
 chmod 0400 "$secrets/api-token" "$secrets/central"
 generate

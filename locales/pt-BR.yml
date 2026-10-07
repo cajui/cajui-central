@@ -1,0 +1,538 @@
+# Plain-text messages. Interpolation uses Rails-style %{name} placeholders.
+pt-BR:
+  common:
+    dashboard: Visão geral
+    devices: Transmissores
+    receivers: Receptores
+    sensors: Sensores
+    device: Transmissor
+    measurement: Medição
+    measurements: Medições
+    refresh: Atualizar
+    network_error: Não foi possível falar com o Central. Verifique a conexão e tente de novo.
+    history: Histórico
+    cancel: Cancelar
+    unknown: Desconhecido
+    source: Origem
+    transport: Transporte
+    last_report: Último envio
+    status: Estado
+    actions: Ações
+    edit: Editar
+    name: Nome
+    location: Localização
+    optional: (opcional)
+    no_location: Sem localização
+    waiting: Aguardando dados
+  nav:
+    main: Navegação principal
+    equipment: Equipamentos
+    system: Sistema
+    home: Página inicial do Cajuí Central
+    more: Mais
+    light: Usar tema claro
+    dark: Usar tema escuro
+    skip: Pular para o conteúdo
+    language: Idioma
+  states:
+    ok: Atualizado
+    recorded: Registrado
+    stale: Desatualizado
+    error: Erro de leitura
+    skipped: Não amostrado
+    empty: Sem dados
+    loading: Carregando
+    warning: Atenção
+    info: Exemplo
+    network: Rede
+    critical: Crítico
+  age:
+    unknown: Horário desconhecido
+    now: Agora
+    minutes: Há %{count} min
+    hours: Há %{count} h
+    days: Há %{count} d
+  metrics:
+    temperature: Temperatura
+    humidity: Umidade
+    co2: Dióxido de carbono
+    pressure: Pressão
+    battery: Bateria
+    voltage: Tensão
+    soil_moisture: Umidade do solo
+    illuminance: Iluminância
+    level: Nível
+    rssi: Intensidade do sinal (RSSI)
+    snr: Relação sinal-ruído (SNR)
+  dashboard:
+    history_title: Histórico de %{measurement}
+    history_accessible: 'Histórico de %{measurement} · Transmissor %{device} · Origem %{source}'
+    received_time: Recebido no Central
+    latest_reading: Leitura mais recente
+    history_limit: Apenas leituras recentes carregadas; o período selecionado pode estar incompleto.
+    organize: Organizar visão geral
+    export: Exportar leituras
+    summary: Resumo da área de trabalho
+    filter: Filtrar transmissores
+    all: Todos os transmissores
+    attention: Precisam de atenção
+    search_label: Buscar transmissores e sensores
+    search: Buscar transmissores…
+    items: Transmissores e sensores
+    period: Período do gráfico
+    hours24: Últimas 24 horas
+    hours6: Últimas 6 horas
+    hour: Última hora
+    all_data: Todos os dados carregados
+    retention: 'Histórico: últimas 100 amostras + 100 leituras HTTP · últimos valores conhecidos preservados'
+    details: Detalhes do transmissor
+    close_details: Fechar detalhes
+    close_history: Fechar histórico
+    device_diagnostics: Diagnóstico do transmissor
+    last_report: 'Último envio: %{age}'
+    inspect_history: Ver histórico de %{measurement} de %{device}
+    no_items: Nenhum item corresponde ao filtro nesta seção.
+    section_empty: Nada para mostrar nesta seção.
+    make_yours: Personalize sua visão geral
+    get_started: Adicione seus transmissores e escolha o que mostrar aqui.
+    manage_devices: Gerenciar transmissores
+    manage_sensors: Gerenciar sensores
+    inspect: 'Ver %{measurement}: %{value} %{unit}, %{status}, sensor %{sensor}, transmissor %{device}'
+    device_id: ID do transmissor
+    interval: Intervalo esperado
+    not_reported: Não informado
+    registered_sensors: Sensores com nome
+    arrival_status: Estado de recebimento
+    identity_note: Os nomes são rótulos locais. Um envio recente não garante que o transmissor esteja no ar agora.
+    updated: Atualizado às %{time} · Atualiza a cada 30 s
+    refresh_error: Não foi possível atualizar. Exibindo os últimos dados carregados; as leituras podem estar desatualizadas.
+    exported: Medições dos sensores visíveis exportadas.
+    details_short: Detalhes
+    details_for: Detalhes de %{name}
+  registry:
+    devices:
+      description: Os transmissores que enviam suas medições.
+      add: Adicionar transmissor
+      edit: Editar transmissor
+      save: Salvar transmissor
+      search: Buscar transmissores
+      discovery: Escolha Adicionar transmissor para dar um nome a eles.
+      empty: Nenhum transmissor adicionado
+      choose: Toque em Adicionar transmissor para parear o primeiro pelo rádio.
+      registered: Transmissores com nome
+      select: Selecione um transmissor detectado para dar um nome a ele.
+      available: Transmissores disponíveis
+      no_new: Nenhum novo transmissor detectado
+      count:
+        one: '%{count} transmissor disponível para adicionar.'
+        other: '%{count} transmissores disponíveis para adicionar.'
+        zero: '%{count} transmissores disponíveis para adicionar.'
+    sensors:
+      description: Os sensores dos seus transmissores e o que cada um mede.
+      add: Adicionar sensor
+      edit: Editar sensor
+      save: Salvar sensor
+      search: Buscar sensores
+      discovery: Os sensores disponíveis vêm das medições recebidas; dê um nome primeiro ao transmissor correspondente.
+      empty: Nenhum sensor ainda
+      choose: Os sensores aparecem aqui quando um transmissor adicionado envia medições.
+      registered: Sensores
+      select: Selecione um sensor detectado para dar um nome a ele.
+      available: Sensores disponíveis
+      no_new: Nenhum novo sensor detectado
+      count:
+        one: '%{count} sensor disponível para adicionar.'
+        other: '%{count} sensores disponíveis para adicionar.'
+        zero: '%{count} sensores disponíveis para adicionar.'
+    no_matches: Nenhum resultado
+    try_search: Tente outro nome ou localização.
+    name_location: Nome / localização
+    signal: Sinal
+    archive: Remover da lista
+    archive_name: Remover %{name} da lista
+    archive_confirm: 'Remover %{name} da lista? As leituras continuam guardadas, e ele volta com o mesmo nome se enviar dados de novo.'
+    archived: '%{name} removido da lista.'
+    edit_name: Editar %{name}
+    select_name: Selecionar %{name}
+    sensor_identity: 'Transmissor: %{device} · Sensor: %{sensor}'
+    identity_note: Os nomes podem mudar. A identidade e o histórico registrado permanecem os mesmos.
+    register_parent: Dê um nome ao transmissor primeiro
+    name_action: Dar nome
+    pairing:
+      naming_heading: Dar um nome
+      no_receiver: Nenhum receptor está conectado ao Central. Ligue um receptor para parear transmissores pelo rádio.
+      offline: Sem conexão. Ligue o receptor para parear.
+      step_search: Toque em Buscar transmissores.
+      step_button: No transmissor, segure o botão PRG por três segundos.
+      step_accept: Toque em Adicionar quando ele aparecer abaixo.
+      awaiting_data: Pareado, aguardando a primeira leitura
+      revoked_heading: Revogados
+      revoked_note: O receptor não aceita mais estes transmissores. O nome e o histórico continuam.
+      revoked_sensors_note: O transmissor destes sensores foi revogado. O nome e o histórico continuam.
+      repair: Parear de novo
+      repair_name: Parear %{name} de novo
+      revoked: 'Revogado: o receptor não aceita mais este transmissor. Para ele voltar, use Adicionar transmissor e segure o botão PRG dele por três segundos.'
+      known: Já pareado. Adicionar de novo refaz o pareamento; o nome e o histórico continuam.
+      signal: Sinal %{value} dBm
+      no_receiver_title: Nenhum receptor conectado
+      via: Pelo %{receiver}
+      offline_title: Receptor sem conexão
+      idle_title: Parear um transmissor
+      again_title: Parear outro transmissor
+      searching_title: Procurando transmissores
+      time_left: faltam %{time}
+      hold_button: No transmissor, segure o botão PRG por três segundos. Ele aparece logo abaixo.
+      id: ID %{id}
+      new_device: Transmissor novo
+      retry: Tentar de novo
+      done_waiting: Pareado. Aguardando a primeira leitura…
+      done_reporting: Pareado e enviando leituras.
+      done_name: Pareado e enviando leituras. Dê um nome a ele.
+      finish: Concluir
+    send: Transmissores e sensores aparecem aqui após a primeira medição.
+  overview:
+    all_clear: Tudo normal
+    problems:
+      one: '%{count} problema'
+      other: '%{count} problemas'
+      zero: '%{count} problemas'
+    attention_heading: Precisa de atenção
+    attention_order: mais grave primeiro
+    places_heading: Lugares
+    trend_window: 'tendência das últimas %{hours} h'
+    since: 'desde %{time}'
+    since_yesterday: 'desde ontem %{time}'
+    at_today: 'às %{time}'
+    at_yesterday: 'ontem às %{time}'
+    at_date: 'em %{time}'
+    receiver_offline: '%{receiver} sem conexão'
+    receiver_offline_detail: 'Sem leituras de %{places} até a conexão voltar.'
+    receiver_offline_alone: Nenhum transmissor depende dele agora.
+    receiver_queue: '%{receiver} com leituras na fila'
+    receiver_dropped: '%{receiver} descartou leituras'
+    silent: '%{place} sem leituras'
+    silent_detail: 'Última leitura %{when}. O transmissor envia a cada %{interval}.'
+    sensor_failed: '%{place}: %{measurement} sem leitura'
+    reading_stale: '%{place}: %{measurement} sem leitura recente'
+    reading_stale_detail: 'Último valor %{when}. O transmissor continua enviando as outras medições.'
+    error_detail: O sensor não respondeu na última leitura.
+    skipped_detail: A medição não foi feita na última leitura.
+    battery: '%{place}: bateria em %{value}'
+    battery_low_detail: 'Abaixo de %{limit} o transmissor economiza energia e envia leituras com menos frequência.'
+    battery_critical_detail: 'Abaixo de %{limit} o transmissor para de enviar. Troque ou recarregue a bateria.'
+    short_receiver: '%{receiver} sem conexão'
+    short_silent: 'Sem leituras %{since}'
+    short_sensor: '%{measurement} sem leitura'
+    short_reading_stale: '%{measurement} sem leitura recente'
+    short_battery: 'Bateria em %{value}'
+    last_reading: 'Última leitura: %{age}'
+  layout:
+    help: Crie seções e escolha transmissores, sensores completos ou medições individuais. Remover um item daqui
+      preserva seu nome e histórico.
+    add_section: Adicionar seção
+    automatic: Usar organização automática
+    save: Salvar visão geral
+    automatic_note: 'Organização automática: a visão geral mostra um bloco por transmissor, depois do que precisa de atenção.'
+    empty: Ainda não há seções. Adicione uma para começar ou salve uma visão geral vazia.
+    section: Seção %{number}
+    title: Título da seção
+    section_up: Mover seção %{number} para cima
+    section_down: Mover seção %{number} para baixo
+    up: Mover para cima
+    down: Mover para baixo
+    remove_section: Remover seção
+    add_to: Adicionar a esta seção
+    choose: Escolha um item…
+    add_item: Adicionar item
+    unavailable: Item indisponível
+    item_up: Mover item %{number} para cima
+    item_down: Mover item %{number} para baixo
+    remove_item: Remover item %{number}
+    remove: Remover
+    device_choice: Transmissor · %{name}
+    sensor_choice: Sensor · %{name} · %{device}
+  errors:
+    conflict: Estas configurações mudaram ou o transmissor ainda não tem nome. Recarregue a página antes
+      de salvar novamente.
+    session: Sua sessão de edição expirou. Recarregue esta página local e tente novamente.
+    invalid: Confira os nomes e os itens selecionados e tente novamente.
+    save: Não foi possível salvar. Suas alterações continuam aqui; confira a conexão e tente novamente.
+    required: Preencha este campo.
+    too_long: Use no máximo %{count} caracteres.
+  components:
+    no_sensor: Nenhum sensor selecionado
+    view_history: Ver histórico
+    latest: Última leitura
+    reported: Último valor recebido
+    known: Último valor conhecido
+    unavailable: Valor indisponível
+    skipped: Leitura não realizada
+    waiting: Aguardando leituras
+    battery: bateria
+    signal: intensidade do sinal recebido
+    fill: Nível de preenchimento
+    empty: Vazio
+    full: Cheio
+    binary: Sensor binário
+  chart:
+    gaps: As interrupções indicam períodos sem leituras.
+    empty: Nenhuma leitura neste período
+    choose_period: Escolha um período maior ou aguarde uma nova amostra.
+    description: '%{label} em %{unit}; %{observations}. Use o controle deslizante ou a tabela para ver os valores
+      exatos.'
+    inspect: Examinar leitura
+    observations: Examinar observações de %{label}
+    table: Ver tabela de dados
+    data: Dados de %{label}
+    time: Horário (local)
+    value: Valor (%{unit})
+    no_reading: Sem leitura
+  ssr:
+    heading: Leituras recebidas
+    description: Dados recentes. As visualizações interativas carregam quando o JavaScript está disponível.
+    node_sensor: Nó / sensor
+    metric: Métrica
+    value: Valor
+    received: Recebido (UTC)
+    empty: Nenhuma leitura recebida ainda. Conecte um transmissor para começar a receber medições.
+    known: Transmissores conhecidos
+    silence: Até 100 transmissores. Silêncio significa que nenhuma nova amostra única foi recebida durante três
+      intervalos esperados. Leituras com erro também contam como comunicação.
+    source_device: Origem / transmissor
+    sensor_status: Estado do sensor
+    no_recent: Sem amostras recentes
+    recent: Amostra recente
+    no_error: Nenhum erro informado
+    no_mqtt: Nenhum transmissor MQTT recebido ainda.
+    samples: Amostras MQTT
+    sample_note: Últimas 100 amostras. Os valores abaixo são medições recebidas; valores ausentes não são zero.
+    sensor_metric: Sensor / métrica
+    value_status: Valor / estado
+  counts:
+    devices:
+      one: '%{count} transmissor'
+      other: '%{count} transmissores'
+      zero: '%{count} transmissores'
+    sensors:
+      one: '%{count} sensor'
+      other: '%{count} sensores'
+      zero: '%{count} sensores'
+    observations:
+      one: '%{count} observação'
+      other: '%{count} observações'
+      zero: '%{count} observações'
+    registered:
+      one: '%{count} sensor com nome'
+      other: '%{count} sensores com nome'
+      zero: '%{count} sensores com nome'
+    detected:
+      one: '%{count} transmissor detectado está pronto para receber um nome.'
+      other: '%{count} transmissores detectados estão prontos para receber um nome.'
+      zero: '%{count} transmissores detectados estão prontos para receber um nome.'
+    minutes:
+      one: '%{count} minuto'
+      other: '%{count} minutos'
+      zero: '%{count} minutos'
+    seconds:
+      one: '%{count} segundo'
+      other: '%{count} segundos'
+      zero: '%{count} segundos'
+  receivers:
+    archive_confirm: "Remover %{name} da lista? O histórico e o acesso ao broker continuam. Ele volta quando publicar um novo estado."
+    heading: Receptores
+    description: Conexão, fila e firmware de cada receptor.
+    empty: Nenhum receptor ainda
+    empty_hint: Um receptor aparece aqui assim que se conecta ao broker.
+    name: Receptor %{id}
+    online: Conectado
+    offline: Sem conexão
+    unknown: Conexão não informada
+    firmware: Firmware
+    firmware_pending: "%{version}, aguardando confirmação"
+    local_build: Compilação local
+    uptime: Tempo ligado
+    duration:
+      minutes: '%{count} min'
+      hours: '%{count} h'
+      days: '%{count} d'
+    availability_changed: Última mudança de conexão
+    wifi: Sinal do Wi-Fi
+    queue: Aguardando envio
+    queue_value: "%{depth} de %{capacity}"
+    forwarded: Enviadas ao broker
+    readings:
+      zero: "%{count} leituras"
+      one: "%{count} leitura"
+      other: "%{count} leituras"
+    retries: Novas tentativas de envio
+    reset: Último reinício
+    transmitters:
+      zero: Nenhum transmissor
+      one: "%{count} transmissor"
+      other: "%{count} transmissores"
+    offline_notice: Sem conexão. Verifique a energia e o Wi-Fi do receptor.
+    queue_notice:
+      one: "%{count} leitura aguarda envio ao broker."
+      other: "%{count} leituras aguardam envio ao broker."
+    dropped_notice:
+      one: "%{count} leitura antiga foi descartada por fila cheia desde que o receptor ligou."
+      other: "%{count} leituras antigas foram descartadas por fila cheia desde que o receptor ligou."
+    pairing_notice:
+      zero: Pareamento aberto; nenhum transmissor pediu para entrar ainda.
+      one: Pareamento aberto; %{count} transmissor pediu para entrar.
+      other: Pareamento aberto; %{count} transmissores pediram para entrar.
+    pending_notice: Uma atualização de firmware está em teste e será confirmada após um minuto de funcionamento normal.
+    retained_notice: Estado recebido do broker quando o Central se conectou; a idade é desconhecida.
+    binding: Pareamento
+    binding_active: Pareado
+    binding_pending: Pareamento preparado, ainda não ativado
+    binding_revoked: Revogado
+    receiver: Receptor
+    last_frame: Último quadro de rádio
+    receiver_offline: O receptor dele está sem conexão
+    reset_reasons:
+      power_on: Ligado na energia
+      software: Reinício pelo software
+      panic: Falha
+      watchdog: Watchdog
+      brownout: Tensão baixa
+      deep_sleep: Despertar do sono
+      external: Botão de reset
+      other: Outro
+  commands:
+    request_name: Transmissor %{id}
+    search: Buscar transmissores
+    stop: Parar busca
+    add: Adicionar
+    revoke_unavailable: "Para revogar, é preciso identificar o receptor, que deve estar online e oferecer essa função."
+    revoke: Revogar transmissor
+    revoke_confirm: Revogar %{name}? Ele deixa de ser aceito até ser pareado de novo pelo botão.
+    requests: Pedindo para entrar
+    conflict: Dois aparelhos usaram este ID; busque de novo.
+    in_progress: Outro comando ainda está em andamento; aguarde a resposta.
+    sending: Enviando ao receptor…
+    waiting_node: O receptor enviou a oferta; aguardando o transmissor confirmar.
+    undelivered: O receptor não respondeu. Verifique se ele está conectado e tente de novo.
+    applied:
+      pairing_open: Busca iniciada por dois minutos.
+      pairing_close: Busca encerrada.
+      pairing_accept: Transmissor pareado.
+      node_revoke: Transmissor revogado.
+    reasons:
+      invalid: O receptor não entendeu o comando.
+      unsupported: Este firmware não permite essa ação.
+      busy: O receptor estava ocupado; tente de novo.
+      unknown_node: O receptor não conhece esse transmissor.
+      closed: A busca está encerrada; comece uma nova.
+      not_requested: Esse transmissor não está mais pedindo para entrar.
+      conflict: Dois aparelhos usaram este ID; busque de novo.
+      full: O receptor não tem vaga para outro transmissor.
+      superseded: Outra oferta substituiu esta.
+      storage: O receptor não conseguiu salvar a mudança.
+      failed: O receptor não conseguiu concluir a ação.
+    errors:
+      send: Não foi possível enviar o comando. Tente de novo.
+      offline: O Central não está conectado ao broker.
+      status: Não foi possível conferir a resposta. Atualize a página.
+
+  broker:
+    "title": "Broker MQTT"
+    "description": "Conexão do Central, configurações e mensagens recebidas."
+    "load_error": "Não foi possível consultar o broker. Tente novamente."
+    "settings": "Configurações da conexão"
+    "settings_note": "Configurações desta instalação, somente para consulta. Para trocar o broker, atualize a configuração do servidor e reinicie o Central."
+    "messages": "Mensagens recebidas"
+    "scope": "Somente os tópicos que o Central acompanha. Não inclui todo o tráfego do broker."
+    "pause": "Pausar"
+    "resume": "Retomar"
+    "filter": "Filtrar por tópico, origem ou dispositivo"
+    "all": "Todos"
+    "connection": "Central → broker"
+    "disabled": "MQTT não configurado"
+    "connected": "Conectado"
+    "disconnected": "Desconectado"
+    "problem_connection": "A conexão falhou ou foi interrompida. Confira endereço, credenciais e rede."
+    "problem_subscription": "O broker não aceitou todas as assinaturas. Confira as permissões."
+    "received": "Mensagens observadas"
+    "since_start": "Desde que o Central iniciou."
+    "rejected": "Rejeitadas ou aguardando nova tentativa"
+    "rejected_note": "Mensagens inválidas ou falhas ao armazenar."
+    "address": "Endereço usado pelo Central"
+    "port": "Porta"
+    "enabled": "Ativado"
+    "off": "Desativado"
+    "central_user": "Usuário do Central"
+    "client": "ID do cliente"
+    "subscriptions": "Tópicos acompanhados"
+    "buffer": "Até %{count} mensagens recentes em memória. Reiniciar o Central limpa este visualizador, não as leituras armazenadas."
+    "status_accepted": "Reconhecida"
+    "status_ignored": "Ignorada / duplicada"
+    "status_rejected": "Rejeitada"
+    "status_retry": "Nova tentativa de armazenamento"
+    "retained": "Estado retido"
+    "payload_omitted": "Conteúdo omitido: apenas dados válidos e reconhecidos são exibidos."
+    "empty": "Nenhuma mensagem correspondente por enquanto."
+    "time": "Horário"
+    "device": "Dispositivo"
+    "kind": "Tipo"
+    "details": "Detalhes"
+    "expand": "Expandir"
+    "collapse": "Recolher"
+    "expand_message": "Expandir mensagem %{id}"
+    "collapse_message": "Recolher mensagem %{id}"
+    "source": "Origem"
+    "topic": "Tópico"
+    "size": "Tamanho"
+    "kind_samples": "Leitura"
+    "kind_state": "Estado"
+    "kind_availability": "Conexão"
+    "kind_results": "Resultado de comando"
+    "kind_deleted": "Remoção"
+  setup:
+    "add": "Adicionar receptor"
+    "loading": "Conferindo o broker…"
+    "credential_error": "Não foi possível ler a credencial do receptor. Confira a configuração da instalação."
+    "no_broker": "O MQTT não está configurado. Inicie o broker incluído com Docker Compose ou configure primeiro um broker externo."
+    "offline_broker": "O Central precisa estar conectado ao broker antes de adicionar um receptor."
+    "host": "Endereço do broker para o receptor"
+    "transport": "Transporte do broker: %{mode}. O firmware do receptor precisa oferecer esse transporte."
+    "user": "Usuário MQTT do receptor"
+    "password": "Senha MQTT do receptor"
+    "shared_credential": "A instalação incluída usa uma conta compartilhada para receptores, separada da conta do Central. Este assistente não cria nem revoga contas individuais por dispositivo."
+    "show": "Mostrar senha"
+    "hide": "Ocultar senha"
+    "copy_error": "Não foi possível copiar automaticamente. Selecione a senha e copie manualmente."
+    "external_credentials": "Use uma conta de produtor fornecida pelo administrador do broker. Não use a conta do Central."
+    "invalid_host": "Informe um endereço do broker acessível pelo receptor, sem protocolo de URL nem espaços."
+    "check_error": "Não foi possível conferir a conexão. Tentando novamente…"
+    "waiting": "Aguardando um receptor se conectar. Receptores que já estavam online ao abrir o assistente não entram nesta lista. Se o seu não aparecer, confira o Wi-Fi e os dados do broker."
+    "found_one": "Um receptor se conectou. Confirme que é o seu."
+    "found_many": "Mais de um receptor se conectou. Escolha o seu na lista."
+    "confirm": "Confirmar %{name}"
+    "progress": "Progresso da configuração"
+    "connect_title": "Conectar ao receptor"
+    "transfer_title": "Dados de conexão"
+    "find_title": "Encontrar receptor"
+    "back": "Voltar"
+    "wifi_ready": "Wi-Fi configurado — continuar"
+    "settings_ready": "Encontrar receptor"
+    "on_phone": "No celular, próximo ao receptor:"
+    "press": "Segure o botão PRG do receptor por três segundos."
+    "join": "Conecte o celular à rede Wi-Fi Cajui-XXXX."
+    "open_page": "Abra http://192.168.4.1 no navegador do celular."
+    "save_wifi": "Naquela página, escolha sua rede Wi-Fi e salve a senha."
+    "keep_open": "Mantenha este assistente aberto no computador. Na próxima etapa, você preencherá os dados de conexão na página do receptor."
+    "transfer_hint": "Na página do receptor, no celular, preencha estes dados de MQTT e salve."
+    "change_address": "Usar outro endereço"
+    "missing_address": "Informar endereço do broker"
+    "address_help": "Informe o endereço do broker na rede local, acessível ao receptor. Isso altera apenas os dados mostrados aqui, não a configuração do servidor."
+    "use_address": "Usar estes dados"
+    "help": "Ajuda para conectar"
+    "copy_devices": "Copiar funciona neste dispositivo. Se estiver configurando em outro celular, leia os valores e digite-os lá."
+    "find_hint": "Mantenha o receptor ligado. Novas conexões aparecem aqui automaticamente."
+    "not_found": "Meu receptor não apareceu"
+    "copied": "Copiado."
+    "copy_value": "Copiar"
+    "copy_field": "Copiar %{field}"
+    "secret_hidden": "Senha oculta"
+    "searching": "Procurando receptor…"

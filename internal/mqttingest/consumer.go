@@ -1,4 +1,5 @@
-// Package mqttingest consumes an open telemetry stream without publishing application receipts.
+// Package mqttingest consumes an open telemetry stream, and the device state of
+// cajui-firmware receivers, without publishing application receipts.
 package mqttingest
 
 import (
@@ -6,27 +7,50 @@ import (
 	"crypto/tls"
 	"errors"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/cajui/cajui-central/internal/commands"
+	"github.com/cajui/cajui-central/internal/devicestate"
 	"github.com/cajui/cajui-central/internal/telemetry"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
-const Topic = "telemetry/v1/+/+/samples"
+const (
+	Topic             = "telemetry/v1/+/+/samples"
+	StateTopic        = "manage/v1/+/+/state"
+	AvailabilityTopic = "manage/v1/+/+/availability"
+	ResultsTopic      = "manage/v1/+/+/results"
+)
+
+// Topics Central subscribes to, all with QoS 1.
+var Topics = map[string]byte{Topic: 1, StateTopic: 1, AvailabilityTopic: 1, ResultsTopic: 1}
 
 type Repository interface {
 	InsertSample(context.Context, telemetry.Sample, time.Time) (bool, error)
+	SaveDeviceState(context.Context, devicestate.State, time.Time, bool) error
+	SaveAvailability(context.Context, string, string, string, time.Time, bool) error
+	DeleteDeviceState(context.Context, string, string) error
+	DeleteAvailability(context.Context, string, string) error
+	SaveCommandResult(context.Context, string, string, devicestate.Result, time.Time) error
 }
 type Config struct {
 	URL, ClientID, Username, Password string
 	TLS                               *tls.Config
 }
 type Consumer struct {
-	config    Config
-	repo      Repository
-	logger    *slog.Logger
-	connected atomic.Bool
+	config                    Config
+	repo                      Repository
+	logger                    *slog.Logger
+	connected                 atomic.Bool
+	mu                        sync.Mutex
+	live                      mqtt.Client // Set while subscribed; commands go out on this connection.
+	observationMu             sync.Mutex
+	messages                  [MessageLimit]ObservedMessage
+	messageHead, messageCount int
+	observed, rejected        uint64
+	problem                   string
 }
 
 func New(config Config, repo Repository, logger *slog.Logger) *Consumer {
@@ -35,10 +59,20 @@ func New(config Config, repo Repository, logger *slog.Logger) *Consumer {
 	}
 	return &Consumer{config: config, repo: repo, logger: logger}
 }
-func (c *Consumer) Connected() bool { return c.connected.Load() }
+func (c *Consumer) Configured() bool { return c.config.URL != "" }
+func (c *Consumer) Connected() bool  { return c.connected.Load() }
 
-// Handle rejects retained snapshots: an old retained sample is not a new arrival.
-func (c *Consumer) Handle(ctx context.Context, topic string, payload []byte, retained bool) (bool, error) {
+// Handle rejects retained samples: an old retained sample is not a new arrival. Device
+// state and availability are retained by design and are always handled.
+func (c *Consumer) Handle(ctx context.Context, topic string, payload []byte, retained bool) (accepted bool, err error) {
+	var normalized any
+	defer func() { c.observe(topic, payload, retained, accepted, err, normalized) }()
+	if len(payload) > telemetry.MaxSampleBytes {
+		return false, telemetry.ErrInvalid
+	}
+	if source, device, kind, ok := devicestate.ParseTopic(topic); ok {
+		return c.handleManaged(ctx, source, device, kind, payload, retained, &normalized)
+	}
 	if retained {
 		return false, nil
 	}
@@ -49,48 +83,106 @@ func (c *Consumer) Handle(ctx context.Context, topic string, payload []byte, ret
 	if topic != "telemetry/v1/"+s.SourceID+"/"+s.DeviceID+"/samples" {
 		return false, telemetry.ErrInvalid
 	}
+	normalized = s
 	return c.repo.InsertSample(ctx, s, time.Now())
+}
+
+func (c *Consumer) handleManaged(ctx context.Context, source, device, kind string, payload []byte, retained bool, normalized *any) (bool, error) {
+	switch {
+	case kind == "results":
+		// Answers are never retained by a well-behaved receiver; a retained one is stale.
+		if retained {
+			return false, nil
+		}
+		result, err := devicestate.DecodeResult(payload)
+		if err != nil {
+			return false, telemetry.ErrInvalid
+		}
+		*normalized = result
+		return true, c.repo.SaveCommandResult(ctx, source, device, result, time.Now())
+	// An empty message clears a retained topic: the device is gone.
+	case len(payload) == 0 && kind == "availability":
+		return true, c.repo.DeleteAvailability(ctx, source, device)
+	case len(payload) == 0:
+		return true, c.repo.DeleteDeviceState(ctx, source, device)
+	case kind == "availability":
+		value, err := devicestate.DecodeAvailability(payload)
+		if err != nil {
+			return false, telemetry.ErrInvalid
+		}
+		*normalized = value
+		return true, c.repo.SaveAvailability(ctx, source, device, value, time.Now(), retained)
+	}
+	state, err := devicestate.Decode(source, device, payload)
+	if err != nil {
+		return false, telemetry.ErrInvalid
+	}
+	*normalized = state
+	return true, c.repo.SaveDeviceState(ctx, state, time.Now(), retained)
 }
 
 type message struct {
 	topic    string
 	payload  []byte
 	retained bool
+	ack      func()
 }
 
-// Run reconnects until cancellation. The bounded queue deliberately permits loss
-// under overload. Broker PUBACK is independent of Central's database commit.
+// settled reports whether a handled message may be acknowledged to the broker: stored,
+// or permanently rejected. Transient storage failures stay unacknowledged so the
+// persistent session redelivers them after the next reconnect.
+func settled(err error) bool {
+	return err == nil || errors.Is(err, telemetry.ErrInvalid) || errors.Is(err, telemetry.ErrConflict)
+}
+
+// Run reconnects until cancellation. The session is persistent: while Central is
+// disconnected, the broker keeps its subscription and queues samples, including across
+// broker restarts. Each message is acknowledged only after it is stored, so the broker
+// never sends more than its in-flight window and nothing acknowledged is ever dropped.
 func (c *Consumer) Run(ctx context.Context) {
 	inbox := make(chan message, 128)
 	options := mqtt.NewClientOptions().AddBroker(c.config.URL).SetClientID(c.config.ClientID).
 		SetUsername(c.config.Username).SetPassword(c.config.Password).SetTLSConfig(c.config.TLS).
-		SetCleanSession(true).SetAutoReconnect(false).SetConnectRetry(false).
+		SetCleanSession(false).SetAutoAckDisabled(true).SetAutoReconnect(false).SetConnectRetry(false).
 		SetConnectTimeout(5 * time.Second).SetWriteTimeout(5 * time.Second).
 		SetKeepAlive(30 * time.Second).SetPingTimeout(5 * time.Second)
 	lost := make(chan struct{}, 1)
 	options.SetConnectionLostHandler(func(_ mqtt.Client, _ error) {
 		c.connected.Store(false)
+		c.connectionProblem("connection")
 		select {
 		case lost <- struct{}{}:
 		default:
 		}
 	})
 	handler := func(_ mqtt.Client, m mqtt.Message) {
-		if m.Retained() || len(m.Payload()) > telemetry.MaxSampleBytes {
+		_, _, _, managed := devicestate.ParseTopic(m.Topic())
+		if (m.Retained() && !managed) || len(m.Payload()) > telemetry.MaxSampleBytes {
+			var reason error
+			if len(m.Payload()) > telemetry.MaxSampleBytes {
+				reason = telemetry.ErrInvalid
+			}
+			c.observe(m.Topic(), m.Payload(), m.Retained(), false, reason, nil)
+			m.Ack() // Never ingested: acknowledge so the broker discards it.
 			return
 		}
-		item := message{m.Topic(), append([]byte(nil), m.Payload()...), m.Retained()}
+		item := message{m.Topic(), append([]byte(nil), m.Payload()...), m.Retained(), m.Ack}
 		select {
 		case inbox <- item:
 		default:
-			c.logger.Warn("MQTT ingestion queue full; sample dropped")
+			// Left unacknowledged: redelivered by the persistent session.
+			c.logger.Warn("MQTT ingestion queue full; sample deferred")
 		}
 	}
+	// Samples queued during an absence can arrive right after CONNECT, before Subscribe
+	// registers its handler.
+	options.SetDefaultPublishHandler(handler)
 	client := mqtt.NewClient(options)
-	defer func() { c.connected.Store(false); client.Disconnect(250) }()
+	defer func() { c.setLive(nil); c.connected.Store(false); client.Disconnect(250) }()
 	retry := time.Second
 	for ctx.Err() == nil {
 		if err := wait(ctx, client.Connect()); err != nil {
+			c.connectionProblem("connection")
 			c.logger.Warn("MQTT connection unavailable")
 			if !pause(ctx, retry) {
 				return
@@ -98,14 +190,18 @@ func (c *Consumer) Run(ctx context.Context) {
 			retry = min(retry*2, 30*time.Second)
 			continue
 		}
-		subscription := client.Subscribe(Topic, 1, handler)
+		subscription := client.SubscribeMultiple(Topics, handler)
 		subscriptionError := wait(ctx, subscription)
 		if subscriptionError == nil {
-			if result, ok := subscription.(*mqtt.SubscribeToken); !ok || result.Result()[Topic] > 1 {
-				subscriptionError = errors.New("subscription refused")
+			result, ok := subscription.(*mqtt.SubscribeToken)
+			for topic := range Topics {
+				if !ok || result.Result()[topic] > 1 {
+					subscriptionError = errors.New("subscription refused")
+				}
 			}
 		}
 		if subscriptionError != nil {
+			c.connectionProblem("subscription")
 			client.Disconnect(250)
 			if !pause(ctx, retry) {
 				return
@@ -114,7 +210,9 @@ func (c *Consumer) Run(ctx context.Context) {
 			continue
 		}
 		retry = time.Second
+		c.setLive(client)
 		c.connected.Store(true)
+		c.connectionProblem("")
 		c.logger.Info("MQTT subscription ready")
 	connected:
 		for {
@@ -122,21 +220,64 @@ func (c *Consumer) Run(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-lost:
+				c.setLive(nil)
 				break connected
 			case m := <-inbox:
 				operation, cancel := context.WithTimeout(ctx, 5*time.Second)
 				_, err := c.Handle(operation, m.topic, m.payload, m.retained)
 				cancel()
-				if err != nil {
-					if errors.Is(err, telemetry.ErrInvalid) || errors.Is(err, telemetry.ErrConflict) {
-						c.logger.Warn("MQTT sample rejected")
-					} else {
-						c.logger.Error("MQTT sample storage failed")
-					}
+				if settled(err) {
+					m.ack()
+				}
+				switch {
+				case err == nil:
+				case errors.Is(err, telemetry.ErrInvalid) || errors.Is(err, telemetry.ErrConflict):
+					c.logger.Warn("MQTT message rejected", "topic", m.topic)
+				case ctx.Err() != nil:
+					// Shutdown interrupted it; unacknowledged, it is redelivered on restart.
+				default:
+					c.logger.Error("MQTT sample storage failed")
 				}
 			}
 		}
 		client.Disconnect(250)
+		// Packet IDs belong to the lost connection: acknowledging these on a new one could
+		// acknowledge a different message. The broker redelivers them instead.
+		drain(inbox)
+	}
+}
+func (c *Consumer) setLive(client mqtt.Client) {
+	c.mu.Lock()
+	c.live = client
+	c.mu.Unlock()
+}
+
+// PublishCommand sends a command with QoS 1, never retained: a retained command would run
+// again whenever the receiver reconnects.
+func (c *Consumer) PublishCommand(ctx context.Context, source, device string, command devicestate.Command) error {
+	c.mu.Lock()
+	client := c.live
+	c.mu.Unlock()
+	if client == nil {
+		return commands.ErrUnavailable
+	}
+	payload, err := command.Payload()
+	if err != nil {
+		return err
+	}
+	err = wait(ctx, client.Publish(devicestate.Topic(source, device, "commands"), 1, false, payload))
+	if errors.Is(err, mqtt.ErrNotConnected) {
+		return commands.ErrUnavailable // Refused before it entered the client's store.
+	}
+	return err
+}
+func drain(inbox chan message) {
+	for {
+		select {
+		case <-inbox:
+		default:
+			return
+		}
 	}
 }
 func wait(ctx context.Context, t mqtt.Token) error {

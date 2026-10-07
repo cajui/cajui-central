@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/cajui/cajui-central/internal/devicestate"
 	"github.com/cajui/cajui-central/internal/storage"
 	"github.com/cajui/cajui-central/internal/telemetry"
+	"github.com/cajui/cajui-central/internal/workspace"
 	"io"
 	"log/slog"
 	"net/http"
@@ -33,7 +35,7 @@ func testHandler(t *testing.T) http.Handler {
 	return h
 }
 func request(h http.Handler, method, path, body, auth, content string) *httptest.ResponseRecorder {
-	r := httptest.NewRequest(method, path, strings.NewReader(body))
+	r := httptest.NewRequest(method, "http://localhost"+path, strings.NewReader(body))
 	r.Header.Set("Authorization", auth)
 	r.Header.Set("Content-Type", content)
 	w := httptest.NewRecorder()
@@ -139,6 +141,21 @@ func TestStorageFailure(t *testing.T) {
 func (brokenRepo) RecentSamples(context.Context, int) ([]telemetry.StoredSample, error) {
 	return nil, errors.New("database failure")
 }
+func (brokenRepo) DeviceState(context.Context, string, string) (devicestate.State, error) {
+	return devicestate.State{}, errors.New("private database failure")
+}
+func (brokenRepo) InsertCommand(context.Context, string, string, devicestate.Command, time.Time) error {
+	return errors.New("private database failure")
+}
+func (brokenRepo) DeleteCommand(context.Context, string) error {
+	return errors.New("private database failure")
+}
+func (brokenRepo) Command(context.Context, string) (devicestate.CommandRecord, error) {
+	return devicestate.CommandRecord{}, errors.New("private database failure")
+}
+func (brokenRepo) DeviceStates(context.Context) ([]devicestate.Stored, error) {
+	return nil, errors.New("private database failure")
+}
 func (brokenRepo) Devices(context.Context, time.Time) ([]telemetry.Device, error) {
 	return nil, errors.New("database failure")
 }
@@ -154,11 +171,19 @@ func TestMQTTSampleRoutesAndDashboard(t *testing.T) {
 	if _, err = db.InsertSample(context.Background(), sample, time.Now().Add(-time.Minute)); err != nil {
 		t.Fatal(err)
 	}
+	stateJSON := `{"version":1,"source_id":"source","device_id":"00000000000000d1","role":"receiver","model":"bench-<receiver>"}`
+	state, err := devicestate.Decode("source", "00000000000000d1", []byte(stateJSON))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.SaveDeviceState(context.Background(), state, time.Now(), false); err != nil {
+		t.Fatal(err)
+	}
 	h, err := New(db, token, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/api/v1/samples", "/api/v1/devices"} {
+	for _, path := range []string{"/api/v1/samples", "/api/v1/devices", "/api/v1/device-states"} {
 		req := httptest.NewRequest("GET", path, nil)
 		out := httptest.NewRecorder()
 		h.ServeHTTP(out, req)
@@ -173,20 +198,56 @@ func TestMQTTSampleRoutesAndDashboard(t *testing.T) {
 		}
 	}
 	out := httptest.NewRecorder()
-	h.ServeHTTP(out, httptest.NewRequest("GET", "/", nil))
-	for _, want := range []string{"No recent samples", "21.5", "source"} {
+	h.ServeHTTP(out, httptest.NewRequest("GET", "http://localhost/", nil))
+	for _, want := range []string{"No recent samples", "21.5", "source", `"device_states":[{`, `bench-\u003creceiver\u003e`} {
 		if !strings.Contains(out.Body.String(), want) {
-			t.Fatal(out.Body.String())
+			t.Fatal(want, out.Body.String())
 		}
 	}
+	if strings.Contains(out.Body.String(), "bench-<receiver>") {
+		t.Fatal("device text reached the page unescaped")
+	}
 	broken, _ := New(brokenRepo{}, token, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	for _, path := range []string{"/api/v1/samples", "/api/v1/devices"} {
+	for _, path := range []string{"/api/v1/samples", "/api/v1/devices", "/api/v1/device-states"} {
 		req := httptest.NewRequest("GET", path, nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		out = httptest.NewRecorder()
 		broken.ServeHTTP(out, req)
 		if out.Code != 500 {
 			t.Fatal(out.Code)
+		}
+	}
+}
+
+func (brokenRepo) Catalog(context.Context) (workspace.Catalog, error) {
+	return workspace.Catalog{}, errors.New("private database failure")
+}
+func (brokenRepo) SaveDevice(context.Context, int64, workspace.Settings) error {
+	return errors.New("private database failure")
+}
+func (brokenRepo) ArchiveDevice(context.Context, int64, int64) error {
+	return errors.New("private database failure")
+}
+func (brokenRepo) SaveSensor(context.Context, int64, workspace.Settings) error {
+	return errors.New("private database failure")
+}
+func (brokenRepo) SaveLayout(context.Context, workspace.Layout) error {
+	return errors.New("private database failure")
+}
+
+func (brokenRepo) ArchiveSensor(context.Context, int64, int64) error {
+	return errors.New("private database failure")
+}
+func (brokenRepo) ArchiveReceiver(context.Context, string, string, time.Time) error {
+	return errors.New("private database failure")
+}
+
+func TestConnectionsSSRMarksCurrentPage(t *testing.T) {
+	h := testHandler(t)
+	for _, path := range []string{"/receivers", "/broker"} {
+		w := request(h, "GET", path, "", "", "")
+		if w.Code != 200 || !strings.Contains(w.Body.String(), `href="`+path+`" aria-current="page"`) {
+			t.Fatal("missing SSR current page", path)
 		}
 	}
 }

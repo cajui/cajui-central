@@ -1,8 +1,10 @@
 # Cajuí Central
 
 Local server for sensor readings: an HTTP API and MQTT consumer receive them, SQLite stores them and
-an embedded web page shows the latest ones. Hardware-agnostic. Early stage: no
-actuator control yet.
+an embedded web page shows the latest ones. It is designed for devices running
+[cajui-firmware](https://github.com/cajui/cajui-firmware), whose device state it also shows
+([ADR 0001](docs/adr/0001-first-party-devices.md)); the telemetry contract stays open to
+other producers. Early stage: no actuator control yet.
 
 ## Running
 
@@ -71,7 +73,7 @@ curl --fail-with-body http://127.0.0.1:8080/api/v1/readings \
   --data '{"node_id":"demo-node","sensor_id":"ambient","session_id":"boot-1","sequence":1,"metric":"temperature","value":26.7,"unit":"degC"}'
 ```
 
-Refresh the page. The request is idempotent: repeating it does not duplicate the
+The dashboard refreshes automatically or with Refresh. The request is idempotent: repeating it does not duplicate the
 reading; change `sequence` to add a sample. Data persists across restarts.
 
 ## Development
@@ -100,8 +102,11 @@ go tool cover -html=coverage.out   # coverage report, after make check
 All `/api` routes require `Authorization: Bearer <CAJUI_API_TOKEN>`.
 
 - `GET /healthz`: 200 when the database is reachable, 503 otherwise.
-- `GET /`: web page with the last 100 readings (no authentication, loopback only).
+- `GET /`, `/devices`, `/receivers`, `/sensors`: local workspace pages (no login, loopback hosts only).
 - `GET /api/v1/readings`: JSON list, most recently received first.
+- `GET /api/v1/device-states`: latest [device state](#device-state) per device.
+- `POST /ui-api/commands`, `GET /ui-api/commands/{id}`: [device commands](#device-commands)
+  from the local page (same origin and page capability, like workspace edits).
 - `POST /api/v1/readings`: one JSON object, `Content-Type: application/json`.
 
 Fields: `node_id`, `sensor_id`, `session_id` and `metric` are 1–64 characters
@@ -118,8 +123,8 @@ no multi-metric transaction and no end-to-end delivery guarantee.
 
 ## Roadmap
 
-Next: TLS for producers on the local network. Not yet implemented: device registry,
-alerts beyond silence detection, automations, user authentication.
+Next: TLS for producers on the local network. Not yet implemented: alerts beyond
+silence detection, automations, user authentication or remote device provisioning.
 
 ## License
 
@@ -128,8 +133,9 @@ alerts beyond silence detection, automations, user authentication.
 ## MQTT
 
 The Compose stack runs Mosquitto with authentication and per-user ACLs. Central and the
-`homeassistant` account can only read samples; the `demo-source` account can only write
-under `telemetry/v1/demo-source/`; each producer can only write under its own namespace.
+`homeassistant` account can only read samples and device state; the `demo-source` account
+can only write under its own namespaces; each producer can only write under its own
+namespaces.
 Never share an unrestricted broker account across devices. `docker compose run --rm demo`
 publishes the simulated [`sample.json`](examples/mqtt/sample.json); repeating it is
 deduplicated. Do not put real credentials or measurements in example files.
@@ -180,24 +186,68 @@ publication without an error reason; producer provisioning must verify topic
 permissions. MQTT 5 publishers can inspect negative PUBACK reason codes. The
 consumer uses MQTT 3.1.1 and works alongside MQTT 5 clients on Mosquitto.
 
-Central uses a clean MQTT session: samples published while it is disconnected
-may be lost. Its bounded 128-message ingestion queue may drop samples under overload;
-storage failures are logged without exposing payloads or credentials. Retained
-snapshots are ignored so a reconnect does not make old data appear newly received.
-Broker persistence alone does not give this clean-session consumer an offline backlog.
+Central keeps a persistent MQTT session (clean session off, fixed client ID). While it
+is stopped or reconnecting, including across broker restarts, the broker keeps its
+subscription and queues samples for it, then delivers them on reconnection. Each sample
+is acknowledged to the broker only after it is stored, or permanently rejected, so the
+broker never sends more than its in-flight window and an acknowledged sample is never
+dropped; a sample interrupted by shutdown or a storage failure is redelivered after the
+next reconnect. The broker keeps at most 1000 queued messages per client and discards
+the session of a client absent for seven days; beyond those limits samples are lost.
+Queued samples keep their identity, so redeliveries are deduplicated, but their
+`received_at` is the delivery time. Only one Central may use a given client ID. The
+broker's retained snapshot, sent on every new subscription, is ignored so that an old
+sample does not appear newly received; a sample published while Central was away is a
+new arrival even if the publisher set retain.
 
 A known device becomes stale after three expected intervals without a **new unique
 sample**. Duplicate retries do not refresh that deadline. Error readings still count
 as communication and have a separate error indicator. This is an arrival-based
 alert, not proof of radio connectivity or a guarantee that a backfilled measurement
-is current. Unknown devices cannot be reported as missing. The page must be refreshed
-to update alerts. `/healthz` checks the database, not MQTT connectivity; connection
+is current. Unknown devices cannot be reported as missing. The dashboard refreshes automatically while visible and idle, or with its Refresh button. `/healthz` checks the database, not MQTT connectivity; connection
 and subscription progress are logged.
 
 Authenticated `GET /api/v1/samples` returns the latest 100 sample envelopes with
 `received_at`; `GET /api/v1/devices` returns up to 100 most recently observed devices,
 with `last_received_at`, `expected_interval_seconds`, `stale`, and `sensor_error`.
-The dashboard shows both MQTT samples and the existing HTTP readings separately.
+The workspace scopes MQTT and HTTP identities separately and lets users place their
+registered sensors together on a dashboard.
+
+### Device state
+
+Central also subscribes to the retained `manage/v1/+/+/state` and
+`manage/v1/+/+/availability` topics of the
+[cajui-firmware management channel](https://github.com/cajui/cajui-firmware/blob/main/docs/management-v1.md):
+receiver firmware, uptime, Wi-Fi signal, queue (including samples dropped when full), forwarding counts, last restart and pairing
+window, and each transmitter's pairing and last radio frame. It keeps only the latest state
+and availability per device, validates known fields, ignores unknown ones and keeps absent
+values unknown. The broker repeats retained messages on every subscription: an identical
+snapshot keeps its original receipt time, and a changed one is marked as of unknown age
+until a live message replaces it. An empty message on either topic, which clears a
+retained topic, removes that state or availability. A device seen under several sources
+has moved; only its most recent state is listed. State is not telemetry and never enters
+sample history.
+Central has no write access to these topics. The receivers page shows each receiver's
+state; the dashboard lists a receiver only when it needs attention: offline, with readings
+waiting in its queue, or having given up readings because the queue was full.
+
+The generated ACL lets each producer write `manage/v1/<source_id>/+/availability`,
+`.../state` and `.../results` and read `.../commands`; Central and `homeassistant` read
+state and availability; Central also writes `manage/v1/+/+/commands` and reads
+`.../results`. On another broker, grant the same topics before updating receivers.
+
+### Device commands
+
+Commands live on the devices page; the dashboard only monitors. When a receiver's state
+lists the `pairing` capability, the Add device dialog offers Search for transmitters: it
+opens the receiver's two-minute pairing window, lists the transmitters asking to join
+with their signal, adds one on request and then offers it for naming once its first
+reading arrives. With `revoke`, a transmitter's edit dialog offers a confirmed Revoke. Central checks the command against the
+advertised capabilities, records it, publishes it with QoS 1 and never retained, and
+follows the receiver's answer on `manage/v1/+/+/results`. An answer that does not arrive
+within 30 seconds is reported as not delivered. The broker's authentication and ACL are
+the whole authorization of a command, so only Central's account may write commands.
+Every action remains available on the receiver's own setup page.
 
 ### Connecting an existing broker
 
@@ -206,7 +256,7 @@ The dashboard shows both MQTT samples and the existing HTTP readings separately.
 | `CAJUI_MQTT_URL` | Optional; `ssl://host:8883` uses system CA trust and TLS 1.2 or newer. `tcp://host:1883` requires explicit plaintext opt-in. No URL credentials. |
 | `CAJUI_MQTT_USERNAME` | Required when MQTT is enabled. |
 | `CAJUI_MQTT_PASSWORD_FILE` | File containing the password; preferred over `CAJUI_MQTT_PASSWORD`. Mutually exclusive. |
-| `CAJUI_MQTT_CLIENT_ID` | Default `cajui-central`; use a distinct stable ID for each running instance. |
+| `CAJUI_MQTT_CLIENT_ID` | Default `cajui-central`. Names the persistent session: keep it stable, and give each running instance its own. |
 | `CAJUI_MQTT_ALLOW_PLAINTEXT` | Set `1` only for trusted local development. |
 | `CAJUI_API_TOKEN_FILE` | File alternative to `CAJUI_API_TOKEN`; mutually exclusive. |
 
@@ -244,6 +294,13 @@ PUBACK while the broker drops the sample; the integration test checks the ACL wi
 
 ### Home Assistant, without Central
 
+Receivers running cajui-firmware announce themselves and their transmitters through
+[MQTT Discovery](https://github.com/cajui/cajui-firmware/blob/main/docs/home-assistant.md):
+configure the Home Assistant MQTT integration with the `homeassistant` account and the
+entities appear. The generated ACL lets each producer write
+`homeassistant/sensor/<source_id>/+/config` and the `homeassistant` account read
+`homeassistant/#`. The manual configuration below is for producers without Discovery.
+
 Use the same broker and its read-only `homeassistant` account. Configure the
 [MQTT integration](https://www.home-assistant.io/integrations/mqtt/) in Home Assistant,
 then merge [`home-assistant.yaml`](examples/mqtt/home-assistant.yaml) into its
@@ -253,7 +310,7 @@ expiration to your devices. The example defines temperature and humidity, extrac
 values by sensor/metric rather than array position, and marks error/skipped readings
 unavailable. It uses the standard [MQTT Sensor configuration](https://www.home-assistant.io/integrations/sensor.mqtt/).
 
-This is manual configuration, **not automatic discovery**. Home Assistant subscribes
+This example is manual configuration, not automatic discovery. Home Assistant subscribes
 directly; Central can be stopped or absent. `expire_after` is configured explicitly
 (900 seconds for the example's 300-second interval). Unlike Central's sample
 identity deduplication, Home Assistant's example evaluates each message, so retries
@@ -281,3 +338,280 @@ Python tests evaluate the Home Assistant example templates; they do not run a fu
 Home Assistant installation. Both suites run in CI. There is no application-level
 receipt, auto-discovery, device provisioning wizard, or publisher firmware in this
 repository.
+
+## Interface
+
+The menu starts with **Overview**, then two areas: **Equipment** (**Devices**,
+**Receivers** and **Sensors**) and **System** (**MQTT broker**). On screens up to 1000 px
+wide it sits at the bottom: each area opens a sheet with its pages, and **More** holds
+language and theme. Without JavaScript, the server-rendered menu links every page. Setup and display
+are independent: a dashboard item references a registration, not a copy of its name
+or measurements. No frontend build or additional service is needed.
+
+1. Open **Equipment → Devices → Add device**. Pair a transmitter by radio or choose an observed
+   device, name it, and optionally assign a location.
+2. Its sensors appear on **Sensors** and the overview by themselves, named after what
+   they measure (for example "Temperature and humidity"); **Edit** renames one.
+3. Open **Overview → Organize overview**. Create named sections, select devices,
+   complete sensors or individual measurements, and move sections/items up or down.
+   Save to persist the arrangement, or cancel to discard the draft.
+
+The automatic arrangement is an overview. It starts with what needs attention, most
+severe first, each with its reason and, when known, since when: a receiver problem, a
+device that stopped reporting, a failed or late reading, or a battery below the
+[cajui-firmware](https://github.com/cajui/cajui-firmware) power-mode limits (low under
+3.4 V, critical under 3.2 V; both provisional). Below it, each added device is one
+block, standing in for its place, with a row per measurement: value, unit and a trend
+of the last 3 hours on a time axis shared by every row. Values themselves raise nothing
+until measurement ranges exist.
+An explicitly empty arrangement remains empty. Removing a dashboard item or section
+never deletes its registration or history. Names and locations can be edited; their
+stable identities remain unchanged. There is no registration deletion or telemetry
+purge in this UI. Dashboard preferences are shared by this local Central instance,
+not per browser. The editor supports up to 20 sections, 50 items per section and 200
+items total; a repeated item is allowed in different sections but not twice within one.
+
+**Available** means observed in received telemetry, not physically scanned or paired.
+The protocol does not necessarily announce a component model. Registering an item
+neither pairs radios nor changes broker permissions. A temperature/humidity sensor
+has one registration and two measurements. Source, transport and device identity
+scope every sensor, so repeated IDs from different producers remain separate.
+
+SQLite schema version 3 adds durable observed devices, sensors, last measurements,
+registration settings and layout preferences. Migration backfills existing history
+transactionally, without guessing names or changing original readings. Observations
+and new telemetry commit together; duplicate retries never refresh inventory times.
+Known sensors remain listed when absent from the most recent 100 samples/readings.
+Schema version 6 adds `workspace_devices.archived`: an archived device and its sensors
+leave the catalog, their telemetry stays, and the next observation brings them back.
+Schema version 7 adds removal flags for sensors and receiver states. Removing an item
+keeps its history and names. Fresh telemetry restores a sensor; a fresh, non-retained
+state restores a receiver. Removal does not revoke radio or MQTT credentials.
+An older binary refuses a database migrated to a newer schema.
+Back up before upgrading; an older binary cannot open a version 3 database. To roll
+back, restore a pre-upgrade backup together with the older binary.
+
+The product shows actual received data only. It has no brand pages, component
+catalog, simulated gallery or design-system navigation. The reference lives in
+[`docs/brand/`](docs/brand/README.md) and is served separately for development.
+
+On the overview a reading is a compact row; organized sections use larger tiles with
+identifiable icons and quantity accents. Sensor failures and device silence remain
+explicit, independent states; an accent does not imply a healthy range. Select a reading to open its history in a modal dialog. Its measurement selector is
+limited to that sensor on that device. Battery, RSSI and SNR histories are available
+from device details in a separate diagnostic scope. Closing the history restores focus
+to its originating card; live updates preserve the open dialog. The latest reading and timestamp
+remain separate from the historical selection. Pointer, touch and keyboard inspection share
+a visible point marker. The marker follows new readings until a click, touch or keyboard
+action pins an observation; hovering only previews it. Reopening the dialog or changing
+measurements starts a fresh inspection. The latest reading includes its channel state.
+Gaps remain disconnected, and the dialog identifies the history
+as recent loaded readings rather than a complete period. History uses Central receipt
+timestamps, converted to the browser time zone, with newest readings first; it does
+not infer acquisition times for queued samples. Table expansion and slider or summary focus survive
+live refreshes. In an organized dashboard, search matches devices and
+sensors by their registered names and locations. Export includes the visible sensor
+measurements, deduplicated when a measurement appears in multiple sections. The
+summary gives the number of problems by severity, or says all is clear with the number
+of registered devices.
+
+A device block on the overview, or a device card in an organized dashboard, shows its
+identity and last arrival with one **Details** action. The devices page judges each health value where it is
+shown: a late last report and a low battery are marked as attention, a battery where the
+device stops transmitting as critical, and a receiver without connection as network.
+Signal has no agreed limits and stays neutral. Radio diagnostics and links to their histories live in that dialog. The
+version 1 convention recognized here is `sensor_id: "radio"` with `rssi` in `dBm`
+or `snr` in `dB`. These exact channels are excluded from environmental sensor counts
+and the sensor CSV. Their values, data quality and histories remain available.
+Other names and units are not silently reclassified. No transport or firmware
+contract is changed by this presentation rule.
+
+A reading error, a skipped sample, a stale value and an absent measurement remain
+distinct. Zero remains a valid number. HTTP readings have no declared reporting
+interval, so their status is **Recorded**, without a freshness guarantee. A device
+reporting successfully does not mean its measurements are within a healthy range.
+
+History uses **arrival timestamps** from the latest loaded records (up to 100 MQTT
+samples and 100 HTTP readings, plus each known channel’s last observation), with one
+measurement/unit per chart. Period selection
+filters that snapshot, not a full historical query. Missing observations and gaps
+beyond three expected intervals break the line. Pointer and keyboard inspection and
+a data table expose the same values. Unknown diagnostics are never replaced by zero.
+
+The dashboard refreshes every 30 seconds while visible and not being interacted
+with. Inventory pages have an explicit Refresh button. A failed dashboard refresh
+retains the previous snapshot with a warning. Edits use revision checks: a stale
+window cannot silently overwrite a newer name or layout. A failed save keeps the
+draft visible. Without JavaScript, read-only receipt tables remain.
+
+The interface is embedded in the same executable and container image: local
+JavaScript modules, CSS, SVG icons and the licensed Manrope font. There is no frontend
+compilation, runtime CDN or additional installation step. Theme preference stays in
+browser storage without credentials or telemetry. Outdoor legibility still needs
+evaluation on the intended tablet under actual lighting conditions.
+
+### Languages
+
+The UI supports **Brazilian Portuguese (`pt-BR`)** and **US English (`en-US`)**,
+including registration, chart controls, reading states, dates and numbers. Select a
+language in the header; the choice is remembered in a browser preference cookie.
+Without a saved preference, Central follows the browser language, falling back to
+English. Names you assign to devices, sensors and dashboard sections stay unchanged.
+
+Translations are authored in Rails-like YAML catalogs and embedded as committed
+assets. There is no additional installation or frontend build requirement.
+See [localization](docs/localization.md) for preference rules, catalog conventions,
+development checks and the stable API/CSV boundary.
+
+### Brand and component documentation
+
+See [`docs/brand/README.md`](docs/brand/README.md) for identity, component examples,
+research and the standalone reference server (`python3 scripts/serve_brand.py`).
+The server binds to `127.0.0.1:8092` and serves an allowlist of reference files and
+shared UI assets. Python is optional for documentation development, not Central.
+Reference files and examples are outside the Go embed and container build inputs.
+The former `/design/*` routes and reference modules return 404 in Central.
+
+The reference reuses the product's tokens, font, icons and native components from
+`internal/httpapi/ui/`. `cj-reading` is a measurement inside a sensor group;
+`cj-sensor` is a standalone card used in the reference gallery. Other shared pieces
+include `cj-badge`, `cj-chart`, `cj-device`, `cj-battery`, `cj-signal`, `cj-state`
+and `cj-level`. Binary/level examples do not introduce actuator APIs or new telemetry
+schemas. Font license: `internal/httpapi/ui/assets/fonts/OFL-Manrope.txt`.
+
+### Script policy and access
+
+The CSP permits scripts, styles, fonts, images and fetch requests from the same origin
+only. Inline executable scripts, `eval`, external resources, frames and form submission
+remain blocked. The initial data snapshot is JSON escaped by Go's HTML template;
+telemetry text is escaped by the components. API tokens are never embedded in HTML,
+JavaScript or browser storage. Refresh reads the same public loopback-only document,
+without exposing the ingestion credential. Existing authenticated APIs are unchanged.
+
+Local edits use `PUT /ui-api/devices/{id}`, `/ui-api/sensors/{id}` and
+`/ui-api/dashboard/layout`; `POST /ui-api/devices/{id}/archive` with `{"revision":n}`
+removes a device and its sensors from the pages (offered for revoked transmitters) while
+its telemetry stays stored, and its next observation brings it back with its name. These are browser-workspace endpoints, not ingestion APIs.
+They require an allowed loopback Host, an exactly matching Origin, a process-scoped
+`X-Cajui-Workspace` capability from the local page, JSON content type and bounded
+payloads. Cross-site fetch metadata is rejected. Names and optional locations are
+limited to 80 characters; edits require the current revision. Browser capabilities
+expire on server restart and are never stored in browser storage. Reload to recover.
+These controls prevent cross-site edits and reject rebinding hosts; they are **not
+user authentication**. Anyone with access to the local service can configure the
+workspace. The application must remain on loopback.
+
+### Frontend development checks
+
+Development tests use Node 22 and Python 3 for the reference server; neither is a runtime dependency. With an isolated Central
+instance running on `127.0.0.1:8091` (or `CAJUI_UI_TEST_URL`):
+
+```sh
+npm ci --prefix tests/ui --ignore-scripts
+npm --prefix tests/ui run format:check
+npm --prefix tests/ui run test:model
+python3 -m unittest discover -s tests -p test_brand_server.py -v
+(cd tests/ui && npx playwright install chromium)
+CAJUI_UI_API_TOKEN_FILE=/path/to/isolated-test-token npm --prefix tests/ui test
+```
+
+The registration test writes simulated data and preferences to that isolated instance;
+never point it at a real workspace. CI uses `/tmp/cajui-ui-token` by default.
+
+Playwright starts the separate reference server automatically. It tests persistent
+registration, stale-edit conflicts, section ordering/removal, product grouping,
+reference isolation, desktop/tablet/mobile interactions, filtering, inspection, export, unavailable
+refresh, safe text handling, language selection and localized registration/charts, plus
+accessibility checks in both themes. The automatic
+accessibility audit covers selected WCAG A/AA rules, not a complete conformance review.
+The Go suite checks asset routing, CSP, escaped snapshot data and API compatibility.
+These tests run in CI. Prettier is a development formatter, not a compilation step.
+
+Devices and sensors offer **Remove from list** in their **Edit** dialog; receivers offer it on
+their cards. Transmitter revocation is shown for MQTT devices only and requires an online
+receiver advertising that capability. Receiver and sensor removal preserves history.
+`POST /ui-api/sensors/{id}/archive` takes `{"revision":n}`;
+`POST /ui-api/receivers/{source}/{device}/archive` takes the displayed `received_at`
+timestamp. Both require the same local origin and UI capability as workspace edits.
+Stale revisions or receiver timestamps return 409. Archiving a receiver hides only
+that source/device pair. An older, unarchived origin for the same device may become
+visible, keeping its original timestamp, availability and retained status.
+
+### Receiver setup and MQTT diagnostics
+
+**Equipment → Receivers → Add receiver** guides the first connection in three steps:
+connect to the receiver and save Wi-Fi, transfer MQTT connection details, then find
+and confirm the receiver. Known values are selectable text with copy actions; the
+password is retrieved only when Show password is selected. An optional address editor
+changes only the values shown by the assistant, not server configuration. Missing
+addresses require entry before discovery. Back navigation preserves the details and
+hides the password again. Configure
+Wi-Fi on the receiver first, then enter the broker's LAN address, port and producer
+credentials. The wizard lists receivers that become online after it opens, excluding those already
+online at the start and retained snapshots. Confirm the receiver that appears, or
+choose yours if several connect. No identifier needs to be typed. It does not enroll transmitters or configure
+Wi-Fi remotely. Its two-second search polls `GET /ui-api/receiver-states`, a local
+UI-capability-protected endpoint that reads only device states and returns
+`generated_at` and receiver-only `device_states`, without loading telemetry or HTML.
+
+The bundled broker creates a dedicated `receiver-1` producer account. Compose lets
+Central read only that producer's password file, in addition to its own credentials.
+The wizard retrieves the receiver password only after an explicit local action;
+it is absent from page snapshots, diagnostics and browser storage. Multiple receivers
+can share this account initially; this does not provide per-receiver credential revocation.
+For an external broker, create a producer account with the appropriate topic ACLs.
+Never give receivers Central's account. Username validation also applies when no
+password file is configured. Passwords must contain 1–64 printable non-space ASCII
+bytes, matching the receiver firmware. Credential read failures return a generic
+503; server logs identify the failure category without recording passwords or paths.
+
+Optional server settings:
+
+| Variable | Purpose |
+| --- | --- |
+| `CAJUI_RECEIVER_USERNAME` | Dedicated producer username shown in setup |
+| `CAJUI_RECEIVER_PASSWORD_FILE` | Operator-configured producer password file |
+| `CAJUI_RECEIVER_HOST` | Explicit broker address reachable from receivers; if unset, setup requires manual entry |
+| `CAJUI_RECEIVER_PORT` | Externally reachable broker port |
+
+Central does not infer the receiver address from its own broker connection URL:
+an address reachable inside a container may not resolve on the receiver's network.
+
+**System → MQTT broker** shows connection status, subscriptions and read-only
+connection settings. It keeps the last 100 inbound observations in memory, newest
+first, with filters, pause and normalized JSON for accepted messages. Only topics
+subscribed to by Central are visible. Invalid payloads are omitted. Counters and
+this diagnostic buffer reset on restart; stored measurements remain intact. The
+buffer uses a fixed-size ring and reuses validated values from ingestion, avoiding
+a second payload decode.
+This is a diagnostic view, not a broker administration console or durable audit log.
+Broker settings still come from environment variables and secret files.
+
+MQTT diagnostics use a compact table with local receipt time (including seconds),
+device, message type and result. Expand a row for the full timestamp/time zone,
+identifiers, topic, size and normalized JSON. Expanded rows stay open during refresh
+and filtering while the message remains in the buffer. Unchanged rows keep their
+DOM nodes during polling, preserving text selection when new messages arrive. Narrow screens move type and
+result into the details.
+
+
+### Live connection status
+
+The receiver list and dashboard subscribe to `GET /ui-api/device-states/events`
+using SSE over streaming fetch. SQLite state/availability commits and receiver
+archival invalidate the current snapshot; idle streams send only a 15-second
+heartbeat. Events carry current device states, not telemetry history or credentials.
+The stream itself does not poll the database; the existing thirty-second page
+refresh remains for other page data.
+
+Both this endpoint and the recovery `GET /ui-api/device-states` require a local host
+and the page capability in the `X-Cajui-Workspace` header. No token is placed in the
+URL. Up to 16 streams are allowed, writes have a five-second timeout, and slow
+subscribers coalesce changes rather than building an unbounded event queue.
+
+Hidden pages pause streaming; visible pages reconnect with a fresh snapshot.
+If streaming fails, the client fetches a lightweight state snapshot and retries
+after two seconds. A stalled connection times out after 35 seconds. Server restarts
+refresh the local capability from the page without reloading the browser. Regular
+telemetry refresh remains separate. Live UI updates do not shorten MQTT's keepalive
+interval or the broker's time to detect a receiver that loses power abruptly.
