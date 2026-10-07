@@ -1198,6 +1198,66 @@ function pairingSnapshot() {
     },
   };
 }
+test("the devices page judges each health value where it is shown", async ({
+  page,
+}) => {
+  const state = pairingSnapshot();
+  state.device_states[0].availability = "offline";
+  state.device_states.push({
+    source_id: "site",
+    device_id: "0000aa000000b002",
+    role: "transmitter",
+    receiver_id: "0000aa000000a001",
+    binding: "active",
+    received_at: state.generated_at,
+  });
+  const at = new Date(Date.now() - 3 * 3600000).toISOString();
+  state.samples.push({
+    source_id: "site",
+    device_id: "0000aa000000b002",
+    sample_id: "s1",
+    received_at: at,
+    expected_interval_seconds: 300,
+    readings: [
+      {
+        sensor_id: "battery",
+        metric: "voltage",
+        unit: "V",
+        value: 3.1,
+        status: "ok",
+      },
+      {
+        sensor_id: "radio",
+        metric: "rssi",
+        unit: "dBm",
+        value: -71,
+        status: "ok",
+      },
+    ],
+  });
+  state.workspace.devices.push({
+    id: 7,
+    transport: "mqtt",
+    source: "site",
+    device: "0000aa000000b002",
+    name: "Coop",
+    location: "",
+    revision: 1,
+    received_at: at,
+    interval: 300,
+  });
+  await liveDevices(page, state);
+  const row = page.getByRole("row").filter({ hasText: "Coop" });
+  const mark = (column) => row.locator(`td[data-label="${column}"] .badge`);
+  await expect(mark("Last report")).toHaveAttribute("data-state", "stale");
+  await expect(mark("Battery")).toHaveAttribute("data-state", "critical");
+  await expect(mark("Battery")).toHaveText("3.10 V · Stale");
+  await expect(mark("Receiver")).toHaveAttribute("data-state", "network");
+  await expect(mark("Receiver")).toHaveText("Receiver A001 · Offline");
+  // Signal has no agreed limits: it stays neutral.
+  await expect(mark("Signal")).toHaveCount(0);
+  await expect(row.locator('td[data-label="Status"]')).toHaveCount(0);
+});
 test("one dialog pairs a transmitter by radio and names it as it appears", async ({
   page,
 }) => {
@@ -1334,17 +1394,18 @@ test("revocation lives with the device name, not on the dashboard", async ({
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBeTruthy();
-  await expect(
-    row.getByRole("button", { name: "Revoke transmitter", exact: true }),
-  ).toBeVisible();
-  await expect(
-    row.getByRole("button", { name: "Remove Coop from the list", exact: true }),
-  ).toBeVisible();
+  // The row keeps only Edit; revoking and removing live in its dialog.
+  await expect(row.getByRole("button")).toHaveText(["Edit"]);
   await edit.click();
   await expect(
     page
       .getByRole("dialog")
       .getByRole("button", { name: "Revoke transmitter", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Remove Coop from the list", exact: true }),
   ).toBeVisible();
   const home = await (await page.request.get("/?lang=en-US")).text();
   await page.route("**/", (route) =>
@@ -1580,7 +1641,6 @@ test("a revoked transmitter says so instead of offering Revoke", async ({
   await expect(
     section.getByRole("row").filter({ hasText: "Coop" }),
   ).toHaveCount(1);
-  await expect(row.locator('td[data-label="Status"]')).toHaveText("Revoked");
   await page.getByRole("button", { name: "Edit Coop", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText("Revoked: the receiver");
   await expect(
@@ -1601,6 +1661,7 @@ test("a revoked transmitter says so instead of offering Revoke", async ({
   const gone = structuredClone(state);
   gone.workspace.devices = [];
   await serve(gone);
+  await page.getByRole("button", { name: "Edit Coop", exact: true }).click();
   await page
     .getByRole("button", { name: "Remove Coop from the list", exact: true })
     .click();
