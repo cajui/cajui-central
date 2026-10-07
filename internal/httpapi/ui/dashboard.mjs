@@ -1,3 +1,4 @@
+import { pollWhileVisible } from "./page-polling.mjs";
 import { watchDeviceStates } from "./state-events.mjs";
 import { t, locale } from "./i18n.mjs";
 import {
@@ -591,14 +592,5 @@ export function mountDashboard(root, { state = {}, notify }) {
     render();
     restoreFocus(spot, { preventScroll: true });
   });
-  const timer = setInterval(() => {
-    if (!document.hidden) refresh();
-  }, 30000);
-  window.addEventListener(
-    "pagehide",
-    () => {
-      clearInterval(timer);
-    },
-    { once: true },
-  );
+  pollWhileVisible(refresh, 30000);
 }

@@ -49,10 +49,12 @@ type server struct {
 	token   [32]byte
 	logger  *slog.Logger
 	// Nil when MQTT is not configured: commands then answer 503.
-	publisher     commands.Publisher
-	broker        BrokerObserver
-	receiverSetup ReceiverSetup
-	stateStreams  chan struct{}
+	publisher      commands.Publisher
+	broker         BrokerObserver
+	receiverSetup  ReceiverSetup
+	stateStreams   chan struct{}
+	commandContext context.Context
+	commandTimeout time.Duration
 }
 
 func New(repo Repository, token string, logger *slog.Logger, options ...Option) (http.Handler, error) {
@@ -62,7 +64,7 @@ func New(repo Repository, token string, logger *slog.Logger, options ...Option) 
 	if logger == nil {
 		logger = slog.Default()
 	}
-	s := &server{repo: repo, token: sha256.Sum256([]byte(token)), logger: logger, uiToken: rand.Text(), stateStreams: make(chan struct{}, 16)}
+	s := &server{repo: repo, token: sha256.Sum256([]byte(token)), logger: logger, uiToken: rand.Text(), stateStreams: make(chan struct{}, 16), commandContext: context.Background(), commandTimeout: 12 * time.Second}
 	for _, option := range options {
 		option(s)
 	}

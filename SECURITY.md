@@ -18,9 +18,12 @@ Compose generates random credentials on first start and stores them unencrypted 
 `secrets` volume. Anyone who controls Docker on the host can read them. Never share a
 token or password in issues, logs or screenshots.
 
-Reporting: private vulnerability reporting is not enabled yet. Contact the maintainer
-directly; do not open a public issue for a vulnerability. Dependabot proposes
-dependency updates; CI does not replace security review.
+Report vulnerabilities through [GitHub private vulnerability reporting](https://github.com/cajui/cajui-central/security/advisories/new).
+Do not include sensitive reports in public issues. Include the affected revision,
+reproduction steps and impact, without real credentials or personal data.
+Security fixes currently target the latest main revision; older development images
+do not receive separate backports. There is no guaranteed response time.
+Dependabot proposes dependency updates; CI does not replace security review.
 
 The interface runs same-origin JavaScript modules and local styles/fonts. The CSP
 blocks inline executable scripts, evaluation, external resources and framing. The

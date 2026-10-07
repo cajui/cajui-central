@@ -1,3 +1,4 @@
+import { pollWhileVisible } from "./page-polling.mjs";
 import { t } from "./i18n.mjs";
 import {
   escapeHTML as e,
@@ -557,18 +558,10 @@ export function mountRegistry(root, { state, kind, notify }) {
   // New devices and pairing requests appear within seconds while the add dialog is
   // open; the list itself follows the dashboard's 30 s cadence.
   const idle = () => !document.hidden && !commands.running;
-  const timer = setInterval(() => {
+  pollWhileVisible(() => {
     if (idle()) refresh();
   }, 30000);
-  const addTimer = setInterval(() => {
+  pollWhileVisible(() => {
     if (idle() && addDialog && addDialog.dataset.mode !== "form") refresh();
   }, 3000);
-  window.addEventListener(
-    "pagehide",
-    () => {
-      clearInterval(timer);
-      clearInterval(addTimer);
-    },
-    { once: true },
-  );
 }

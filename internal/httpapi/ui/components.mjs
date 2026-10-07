@@ -254,6 +254,10 @@ class Chart extends Component {
       const p = g.points[Number(slider.value)];
       output.textContent = `${time(p.time)} · ${formatMeasurement(p.value, metric, unit)} ${formatUnit(unit)}`;
       selection.textContent = output.textContent;
+      slider.setAttribute(
+        "aria-valuetext",
+        `${new Date(p.time).toLocaleString(locale())} · ${numeric(p.value) === null ? t("chart.no_reading") : `${formatMeasurement(p.value, metric, unit)} ${formatUnit(unit)}`}`,
+      );
       marker.setAttribute("cx", g.x(p.time));
       marker.setAttribute("cy", numeric(p.value) === null ? 0 : g.y(p.value));
       marker.style.display = numeric(p.value) === null ? "none" : "";

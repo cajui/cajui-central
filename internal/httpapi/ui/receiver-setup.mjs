@@ -55,7 +55,9 @@ export async function openReceiverSetup(root, state, onDone) {
       (baseline.device_states ?? [])
         .filter(
           (r) =>
-            r.role === "receiver" && r.availability === "online" && !r.retained,
+            r.role === "receiver" &&
+            r.availability === "online" &&
+            r.availability_retained !== true,
         )
         .map(identity),
     );
@@ -221,10 +223,10 @@ export async function openReceiverSetup(root, state, onDone) {
           const matches = (next.device_states ?? []).filter(
             (r) =>
               r.role === "receiver" &&
-              r.retained === false &&
+              r.availability_retained !== true &&
               !alreadyOnline.has(identity(r)) &&
               r.availability === "online" &&
-              Date.parse(r.received_at) >= openedAt,
+              Date.parse(r.availability_at) >= openedAt,
           );
           const signature = JSON.stringify(matches.map(identity).sort());
           if (result.dataset.matches === signature) return;

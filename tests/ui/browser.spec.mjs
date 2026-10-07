@@ -146,6 +146,7 @@ test("component states, literal text and keyboard chart inspection", async ({
   await slider.focus();
   await page.keyboard.press("Home");
   await expect(slider).toHaveValue("0");
+  await expect(slider).toHaveAttribute("aria-valuetext", /.+ · .+/);
   await page.keyboard.press("ArrowRight");
   await expect(slider).toHaveValue("1");
   await page.locator("#catalog-chart summary").click();
@@ -1936,11 +1937,16 @@ test("receiver wizard retrieves secrets explicitly and waits for new connections
   state.device_states[0].received_at = new Date(
     Date.now() + 1000,
   ).toISOString();
-  state.device_states[0].retained = true;
+  state.device_states[0].availability_at = new Date(
+    Date.now() + 1000,
+  ).toISOString();
+  state.device_states[0].availability_retained = true;
   const previous = snapshots;
   await expect.poll(() => snapshots).toBeGreaterThan(previous);
   await expect(page.locator("#setup-result button")).toHaveCount(0);
-  state.device_states[0].retained = false;
+  delete state.device_states[0].availability_retained;
+  state.device_states[0].received_at = "2020-01-01T00:00:00Z";
+  state.device_states[0].retained = true;
   await expect(page.locator("#setup-result button")).toBeVisible({
     timeout: 10000,
   });
@@ -2097,11 +2103,15 @@ for (const path of ["/receivers", "/"]) {
         ? expect(indicator).toBeHidden()
         : expect(indicator).toContainText("Online");
     await offline();
+    if (path === "/receivers")
+      await page.locator("[data-receiver]").first().focus();
     await page.waitForFunction(() => typeof window.pushState === "function");
     snapshot.device_states[0].availability = "online";
     snapshot.generated_at = new Date(Date.now() + 1000).toISOString();
     await page.evaluate((value) => window.pushState(value), snapshot);
     await online();
+    if (path === "/receivers")
+      await expect(page.locator("[data-receiver]").first()).toBeFocused();
     snapshot.device_states[0].availability = "offline";
     snapshot.generated_at = new Date(Date.now() + 2000).toISOString();
     await page.evaluate((value) => window.pushState(value), snapshot);
@@ -2501,4 +2511,43 @@ test("startup restores server content after a module failure and works without J
   } finally {
     await noJS.close();
   }
+});
+
+test("page polling pauses while cached and resumes only once on restoration", async ({
+  page,
+}) => {
+  await page.goto("/?lang=en-US");
+  await page.clock.install();
+  await page.evaluate(async () => {
+    const { pollWhileVisible } = await import("/ui/page-polling.mjs");
+    window.pollCount = 0;
+    pollWhileVisible(() => window.pollCount++, 1000);
+  });
+  await page.clock.runFor(1000);
+  expect(await page.evaluate(() => window.pollCount)).toBe(1);
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new PageTransitionEvent("pagehide", { persisted: true }),
+    ),
+  );
+  await page.clock.runFor(3000);
+  expect(await page.evaluate(() => window.pollCount)).toBe(1);
+  await page.evaluate(() => {
+    window.dispatchEvent(
+      new PageTransitionEvent("pageshow", { persisted: true }),
+    );
+    window.dispatchEvent(
+      new PageTransitionEvent("pageshow", { persisted: true }),
+    );
+  });
+  expect(await page.evaluate(() => window.pollCount)).toBe(2);
+  await page.clock.runFor(1000);
+  expect(await page.evaluate(() => window.pollCount)).toBe(3);
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new PageTransitionEvent("pagehide", { persisted: true }),
+    ),
+  );
+  await page.clock.runFor(1000);
+  expect(await page.evaluate(() => window.pollCount)).toBe(3);
 });

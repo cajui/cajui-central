@@ -1,3 +1,4 @@
+import { pollWhileVisible } from "./page-polling.mjs";
 import { watchDeviceStates } from "./state-events.mjs";
 import { openReceiverSetup } from "./receiver-setup.mjs";
 import { t } from "./i18n.mjs";
@@ -98,12 +99,16 @@ export function mountReceivers(root, { state, notify }) {
   root.innerHTML = `<header class="page-heading"><div><h1>${t("receivers.heading")}</h1><p>${t("receivers.description")}</p></div><div class="top-actions"><button class="button primary" id="add-receiver">${t("setup.add")}</button><button class="button" id="refresh">${icon("refresh")}${t("common.refresh")}</button></div></header><div id="fetch-error" class="notice hidden" role="status"></div><div id="receiver-list" class="receiver-items"></div>`;
   function render() {
     const list = root.querySelector("#receiver-list");
+    const focused = list.contains(document.activeElement)
+      ? document.activeElement.dataset.receiver
+      : null;
     const receivers = receiversOf(snapshot);
     list.replaceChildren(
       ...receivers.map((r) => {
         const card = receiverCard(r, snapshot);
         const button = document.createElement("button");
         button.className = "button danger-text";
+        button.dataset.receiver = JSON.stringify([r.source_id, r.device_id]);
         button.textContent = t("registry.archive");
         button.setAttribute(
           "aria-label",
@@ -133,6 +138,10 @@ export function mountReceivers(root, { state, notify }) {
     );
     if (!receivers.length)
       list.innerHTML = `<div class="empty">${icon("signal")}<h2>${t("receivers.empty")}</h2><p>${t("receivers.empty_hint")}</p></div>`;
+    if (focused)
+      list
+        .querySelector(`[data-receiver="${CSS.escape(focused)}"]`)
+        ?.focus({ preventScroll: true });
   }
   async function refresh() {
     if (pending) return;
@@ -183,10 +192,5 @@ export function mountReceivers(root, { state, notify }) {
     snapshot = { ...snapshot, ...next };
     render();
   });
-  const timer = setInterval(() => {
-    if (!document.hidden) refresh();
-  }, 30000);
-  window.addEventListener("pagehide", () => clearInterval(timer), {
-    once: true,
-  });
+  pollWhileVisible(refresh, 30000);
 }
