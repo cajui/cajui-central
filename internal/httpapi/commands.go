@@ -20,6 +20,10 @@ func WithCommands(publisher commands.Publisher) Option {
 	return func(s *server) { s.publisher = publisher }
 }
 
+func WithCommandContext(ctx context.Context) Option {
+	return func(s *server) { s.commandContext = ctx }
+}
+
 // sendCommand is a local write like workspace edits: same origin plus the page capability.
 func (s *server) sendCommand(w http.ResponseWriter, r *http.Request) {
 	if !s.trustedLocalWrite(r) {
@@ -43,8 +47,9 @@ func (s *server) sendCommand(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid command", 400)
 		return
 	}
-	// A closed tab must not turn a command already handed to the broker into a failure.
-	record, err := commands.Send(context.WithoutCancel(r.Context()), s.repo, s.publisher, input.SourceID, input.DeviceID, input.Type, input.NodeID, time.Now())
+	ctx, cancel := context.WithTimeout(s.commandContext, s.commandTimeout)
+	defer cancel()
+	record, err := commands.Send(ctx, s.repo, s.publisher, input.SourceID, input.DeviceID, input.Type, input.NodeID, time.Now())
 	switch {
 	case errors.Is(err, devicestate.ErrInvalid):
 		http.Error(w, "command not offered by this device", 400)

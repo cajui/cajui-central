@@ -156,3 +156,64 @@ func TestArchiveReceiverEndpoint(t *testing.T) {
 		t.Fatal(rows, err)
 	}
 }
+
+type commandContextRepo struct {
+	Repository
+	inspect func(context.Context) error
+}
+
+func (r commandContextRepo) DeviceState(ctx context.Context, _, _ string) (devicestate.State, error) {
+	return devicestate.State{}, r.inspect(ctx)
+}
+
+func TestCommandExecutionContext(t *testing.T) {
+	for _, scenario := range []string{"closed browser", "deadline", "shutdown"} {
+		t.Run(scenario, func(t *testing.T) {
+			lifecycle, stop := context.WithCancel(context.Background())
+			defer stop()
+			called := false
+			repo := commandContextRepo{inspect: func(ctx context.Context) error {
+				called = true
+				if _, ok := ctx.Deadline(); !ok {
+					t.Fatal("command has no deadline")
+				}
+				if scenario == "closed browser" {
+					if ctx.Err() != nil {
+						t.Fatal("browser cancellation reached the command", ctx.Err())
+					}
+					return devicestate.ErrUnknownDevice
+				}
+				if scenario == "shutdown" {
+					stop()
+				}
+				select {
+				case <-ctx.Done():
+				case <-time.After(time.Second):
+					t.Fatal("command did not stop")
+				}
+				want := context.DeadlineExceeded
+				if scenario == "shutdown" {
+					want = context.Canceled
+				}
+				if ctx.Err() != want {
+					t.Fatalf("got %v, want %v", ctx.Err(), want)
+				}
+				return ctx.Err()
+			}}
+			h, err := New(repo, token, slog.New(slog.NewTextHandler(io.Discard, nil)), WithCommands(&fakePublisher{}), WithCommandContext(lifecycle), func(s *server) { s.commandTimeout = 20 * time.Millisecond; s.uiToken = "test-capability" })
+			if err != nil {
+				t.Fatal(err)
+			}
+			w := commandRequest(h, `{"source_id":"r","device_id":"00000000000000d1","type":"pairing.open"}`, "test-capability", func(r *http.Request) {
+				if scenario == "closed browser" {
+					ctx, cancel := context.WithCancel(r.Context())
+					cancel()
+					*r = *r.WithContext(ctx)
+				}
+			})
+			if !called || w.Code != 404 && w.Code != 500 {
+				t.Fatalf("repository called=%v, status=%d", called, w.Code)
+			}
+		})
+	}
+}

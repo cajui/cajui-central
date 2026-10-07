@@ -40,7 +40,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 	defer db.Close()
-	var options []httpapi.Option
+	options := []httpapi.Option{httpapi.WithCommandContext(ctx)}
 	if c.MQTT.URL != "" {
 		consumer := mqttingest.New(c.MQTT, db, slog.Default())
 		options = append(options, httpapi.WithCommands(consumer), httpapi.WithBroker(consumer, httpapi.ReceiverSetup{Username: c.ReceiverUsername, PasswordFile: c.ReceiverPasswordFile, Host: c.ReceiverHost, Port: c.ReceiverPort}))
