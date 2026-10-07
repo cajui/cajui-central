@@ -7,9 +7,14 @@ const referenceURL = "http://127.0.0.1:8092";
 test.beforeEach(async ({ page }) => {
   await page.route("**/ui-api/device-states/events", (route) => route.abort());
   await page.route("**/ui-api/device-states", async (route) => {
-    const snapshot = await page.evaluate(() =>
-      JSON.parse(document.querySelector("#initial-state").textContent),
-    );
+    // A request still in flight when the test navigates has no page left to read the
+    // snapshot from, and its answer no longer matters.
+    const snapshot = await page
+      .evaluate(() =>
+        JSON.parse(document.querySelector("#initial-state").textContent),
+      )
+      .catch(() => null);
+    if (!snapshot) return route.abort();
     await route.fulfill({
       json: {
         generated_at: snapshot.generated_at,
