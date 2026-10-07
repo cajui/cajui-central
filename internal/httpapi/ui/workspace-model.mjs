@@ -88,6 +88,8 @@ export function workspaceGroups(state, now = Date.parse(state.generated_at)) {
               defaultSensorName(record))
             : label(s.id)),
         location: record?.location || "",
+        // Only a name someone typed is worth repeating next to each measurement.
+        named: Boolean(record?.name),
       });
       for (const c of s.channels) {
         c.deviceName = g.name;

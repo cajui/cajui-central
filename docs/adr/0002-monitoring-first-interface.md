@@ -75,3 +75,7 @@ attention, what, where and since when.
   events each need a further decision and record before they are built.
 - Until ranges exist, only data health and equipment health raise attention. Value
   conditions stay neutral rather than guessed.
+- The battery limits of the cajui-firmware power modes are the first built-in range: a
+  battery under the limit where the device reports less often raises attention, and
+  under the limit where it stops transmitting it is critical. They stay as provisional
+  as the firmware's and become configurable with the other ranges.

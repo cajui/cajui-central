@@ -92,20 +92,6 @@ export function receiverCard(r, snapshot) {
   card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("signal")}</span><div><h2>${e(receiverLabel(r.device_id))}</h2><p class="muted">${e(t("receivers.transmitters", { count: transmitters }))}</p></div><span class="badge" data-state="${badge}">${e(t(`receivers.${summary.status}`))}</span></div>${summary.notices.length ? `<ul class="receiver-notices">${summary.notices.map((n) => `<li data-level="${n.level}">${n.level === "info" ? `<span>${e(n.text)}</span>` : `<span class="badge" data-state="${n.level === "error" ? "network" : "warning"}">${e(n.text)}</span>`}</li>`).join("")}</ul>` : ""}<dl class="detail-list receiver-details">${rows.map(([k, v]) => `<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join("")}</dl>`;
   return card;
 }
-// One line per receiver on the dashboard; problems carry their first notice.
-export function receiverStatusLine(r) {
-  const summary = receiverSummary(r);
-  const badge = { online: "ok", offline: "network", unknown: "empty" }[
-    summary.status
-  ];
-  const problem = summary.notices.find((n) => n.level !== "info");
-  const link = document.createElement("a");
-  link.className = "receiver-status";
-  link.href = "/receivers";
-  link.dataset.status = problem ? problem.level : summary.status;
-  link.innerHTML = `${icon("signal")}<strong>${e(receiverLabel(r.device_id))}</strong><span class="badge" data-state="${badge}">${e(t(`receivers.${summary.status}`))}</span>${problem ? `<span class="receiver-status-note">${e(problem.text)}</span>` : ""}`;
-  return link;
-}
 export function mountReceivers(root, { state, notify }) {
   let snapshot = state,
     pending = false;

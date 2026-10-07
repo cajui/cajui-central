@@ -28,6 +28,12 @@ export const states = Object.freeze({
   get info() {
     return t("states.info");
   },
+  get network() {
+    return t("states.network");
+  },
+  get critical() {
+    return t("states.critical");
+  },
 });
 export const escapeHTML = (value) =>
   String(value ?? "").replace(
@@ -145,9 +151,14 @@ export function plotGeometry(
   width = 620,
   height = 170,
   gap = Infinity,
+  span = null,
 ) {
   const valid = points
-    .filter((p) => Number.isFinite(p.time))
+    .filter(
+      (p) =>
+        Number.isFinite(p.time) &&
+        (!span || (p.time >= span[0] && p.time <= span[1])),
+    )
     .sort((a, b) => a.time - b.time);
   const values = valid.map((p) => numeric(p.value)).filter((v) => v !== null);
   if (!values.length) return null;
@@ -165,8 +176,9 @@ export function plotGeometry(
     top = high + pad;
   min = Math.max(-Number.MAX_VALUE, bottom * scale);
   max = Math.min(Number.MAX_VALUE, top * scale);
-  const start = valid[0].time,
-    end = valid.at(-1).time;
+  // A fixed span puts several plots on one time axis; otherwise the readings set it.
+  const start = span ? span[0] : valid[0].time,
+    end = span ? span[1] : valid.at(-1).time;
   const x = (t) => ((t - start) / (end - start || 1)) * width;
   const y = (v) => height - ((v / scale - bottom) / (top - bottom)) * height;
   let path = "",
@@ -368,12 +380,14 @@ export function receiverSummary(state) {
   if (online && depth)
     notices.push({
       level: "warning",
+      kind: "queue",
       text: t("receivers.queue_notice", { count: depth }),
     });
   const dropped = numeric(state.queue?.dropped);
   if (dropped)
     notices.push({
       level: "warning",
+      kind: "dropped",
       text: t("receivers.dropped_notice", { count: dropped }),
     });
   if (state.pairing?.open)

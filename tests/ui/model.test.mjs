@@ -95,6 +95,21 @@ test("charts preserve gaps, actual time spacing, negative and constant readings"
   assert.ok(plot.min < -5);
   assert.ok(plot.max > 10);
   assert.equal(plotGeometry([{ time: 1, value: null }]), null);
+  // A fixed span leaves out older readings and keeps its own time axis.
+  const recent = plotGeometry(
+    [
+      { time: 0, value: 1 },
+      { time: 50, value: 2 },
+      { time: 100, value: 3 },
+    ],
+    100,
+    10,
+    Infinity,
+    [40, 140],
+  );
+  assert.equal(recent.points.length, 2);
+  assert.equal(recent.x(140), 100);
+  assert.match(recent.path, /^M10\.00,/);
   const constant = plotGeometry([
     { time: 1, value: 0 },
     { time: 2, value: 0 },
@@ -723,4 +738,218 @@ test("an unnamed sensor of an added device is shown with a name from its reading
     .filter((s) => !s.stored)
     .map((s) => s.name);
   assert.equal(new Set(names).size, 2);
+});
+
+test("attention lists problems with a reason, most severe first", async () => {
+  const { attentionItems, placeSeverity, placeKey, sinceText } = await import(
+    "../../internal/httpapi/ui/overview-model.mjs"
+  );
+  setLocale("en-US");
+  const now = Date.parse("2026-10-07T12:00:00Z");
+  const iso = (minutesAgo) => new Date(now - minutesAgo * 60000).toISOString();
+  const group = (device, name, extra = {}) => ({
+    transport: "mqtt",
+    source: "site",
+    device,
+    name,
+    at: iso(2),
+    interval: 300,
+    stale: false,
+    sensors: [],
+    diagnostics: [],
+    state: { receiver_id: "r1" },
+    ...extra,
+  });
+  const battery = (value) => [
+    { sensor: "battery", metric: "voltage", value, state: "ok" },
+  ];
+  const groups = [
+    group("a", "Coop", { diagnostics: battery(3.35) }),
+    group("b", "Garden", {
+      sensors: [
+        {
+          channels: [
+            {
+              key: "k1",
+              title: "Soil moisture",
+              state: "error",
+              at: iso(4),
+            },
+          ],
+        },
+      ],
+      diagnostics: battery(3.1),
+    }),
+    group("c", "Compost", {
+      stale: true,
+      at: iso(180),
+      state: { receiver_id: "r2" },
+    }),
+    group("d", "Tank", {
+      stale: true,
+      at: iso(60),
+      receiverOffline: true,
+      state: { receiver_id: "r3" },
+    }),
+    group("e", "Station", { diagnostics: battery(4.1) }),
+  ];
+  const receivers = [
+    {
+      source_id: "site",
+      device_id: "0000aa0000000001",
+      availability: "online",
+    },
+    {
+      source_id: "site",
+      device_id: "r3",
+      availability: "offline",
+      availability_at: iso(50),
+      // An offline receiver's last queue is old news; the connection is the problem.
+      queue: { depth: 4, dropped: 2 },
+    },
+    {
+      source_id: "site",
+      device_id: "r4",
+      availability: "online",
+      queue: { depth: 0, dropped: 3 },
+    },
+  ];
+  const items = attentionItems(groups, receivers, now);
+  assert.deepEqual(
+    items.map((i) => [i.severity, i.key]),
+    [
+      ["critical", "battery/mqtt/site/b"],
+      ["warning", "reading/k1"],
+      ["warning", "silent/mqtt/site/c"],
+      // Untimed warnings keep their order: a receiver can affect several places.
+      ["warning", "receiver/site/r4/dropped"],
+      ["warning", "battery/mqtt/site/a"],
+      ["network", "receiver/site/r3"],
+    ],
+  );
+  const dropped = items.find((i) => i.key === "receiver/site/r4/dropped");
+  assert.equal(dropped.title, "Receiver R4 gave up readings");
+  assert.match(dropped.detail, /3 old readings were given up/);
+  assert.equal(dropped.href, "/receivers");
+  const offline = items.find((i) => i.severity === "network");
+  assert.match(offline.detail, /No readings from Tank/);
+  assert.deepEqual(offline.places, ["mqtt/site/d"]);
+  // A silent place behind an offline receiver is explained by the receiver, once.
+  assert.equal(items.filter((i) => i.key === "silent/mqtt/site/d").length, 0);
+  assert.match(items[0].detail, /Below 3\.2 V the device stops transmitting/);
+  assert.equal(placeSeverity(placeKey(groups[1]), items), "critical");
+  assert.equal(placeSeverity(placeKey(groups[4]), items), "normal");
+  assert.equal(attentionItems([group("e", "Station")], [], now).length, 0);
+  assert.match(sinceText(iso(30), now), /^since \d{2}:\d{2}/);
+  assert.match(sinceText(iso(60 * 24), now), /^since yesterday \d{2}:\d{2}/);
+  assert.match(sinceText(iso(60 * 24 * 3), now), /^since \d{2}\/\d{2}$/);
+  assert.match(
+    sinceText(Date.parse("2025-12-30T12:00:00Z"), now),
+    /^since \d{2}\/\d{2}\/2025$/,
+  );
+});
+
+test("attention says which measurement, since when and why", async () => {
+  const { attentionItems, placeKey, sensorLabel, sinceText } = await import(
+    "../../internal/httpapi/ui/overview-model.mjs"
+  );
+  setLocale("en-US");
+  const now = Date.parse("2026-10-07T12:00:00Z");
+  const at = (minutesAgo) => now - minutesAgo * 60000;
+  const iso = (minutesAgo) => new Date(at(minutesAgo)).toISOString();
+  const channel = (key, title, extra = {}) => ({
+    key,
+    title,
+    state: "ok",
+    at: iso(2),
+    points: [],
+    ...extra,
+  });
+  const place = (device, name, sensors, extra = {}) => ({
+    transport: "mqtt",
+    source: "site",
+    device,
+    name,
+    at: iso(2),
+    interval: 300,
+    stale: false,
+    sensors,
+    diagnostics: [],
+    state: { receiver_id: "0000aa0000000002" },
+    ...extra,
+  });
+  // A failure counts from the first failed reading after the last good one.
+  const failing = channel("soil-2", "Soil moisture", {
+    state: "error",
+    at: iso(5),
+    points: [
+      { time: at(60), value: 41 },
+      { time: at(55), value: null },
+      { time: at(5), value: null },
+    ],
+  });
+  const garden = place("g", "Garden", [
+    { name: "Bed 1", channels: [channel("soil-1", "Soil moisture")] },
+    { name: "Bed 2", channels: [failing] },
+    {
+      name: "Air",
+      named: true,
+      channels: [
+        channel("air", "Temperature", { state: "stale", at: iso(40) }),
+      ],
+    },
+  ]);
+  const [late, failed] = attentionItems([garden], [], now);
+  // The same measurement twice in a place is told apart by its sensor.
+  assert.equal(failed.title, "Garden: Soil moisture · Bed 2 has no reading");
+  assert.equal(failed.since, sinceText(at(55), now));
+  // A measurement that stopped while its device keeps reporting is late, not fine.
+  assert.equal(late.title, "Garden: Temperature · Air has no recent reading");
+  assert.match(
+    late.detail,
+    /^Last value at \d{2}:\d{2}.*other measurements\.$/,
+  );
+  // When every loaded reading failed, the start is unknown rather than guessed.
+  const unknown = channel("x", "Pressure", {
+    state: "error",
+    points: [{ time: at(10), value: null }],
+  });
+  assert.equal(
+    attentionItems(
+      [place("u", "Shed", [{ name: "P", channels: [unknown] }])],
+      [],
+      now,
+    )[0].since,
+    "",
+  );
+  const single = { name: "Probe", channels: [channel("t", "Temperature")] };
+  assert.equal(
+    sensorLabel(place("s", "S", [single]), single, single.channels[0]),
+    "",
+  );
+  // A device silent for days says the day, not only a time.
+  const [silent] = attentionItems(
+    [place("o", "Old shed", [], { stale: true, at: iso(60 * 24 * 2) })],
+    [],
+    now,
+  );
+  assert.match(silent.detail, /^Last reading on \d{2}\/\d{2}\. /);
+  assert.match(silent.short, /^No readings since \d{2}\/\d{2}$/);
+  // Only a device that went quiet with its receiver is explained by it.
+  const receiver = {
+    source_id: "site",
+    device_id: "0000aa0000000002",
+    availability: "offline",
+    availability_at: iso(30),
+  };
+  const before = place("b", "Barn", [], { stale: true, at: iso(60 * 5) });
+  const after = place("c", "Coop", [], { stale: true, at: iso(25) });
+  const items = attentionItems([before, after], [receiver], now);
+  assert.deepEqual(items.find((i) => i.severity === "network").places, [
+    placeKey(after),
+  ]);
+  assert.deepEqual(
+    items.filter((i) => i.key.startsWith("silent/")).map((i) => i.key),
+    [`silent/${placeKey(before)}`],
+  );
 });

@@ -228,8 +228,8 @@ retained topic, removes that state or availability. A device seen under several 
 has moved; only its most recent state is listed. State is not telemetry and never enters
 sample history.
 Central has no write access to these topics. The receivers page shows each receiver's
-state; the dashboard keeps one status line per receiver, highlighted when it is offline
-or has a queue or dropped-sample notice.
+state; the dashboard lists a receiver only when it needs attention: offline, with readings
+waiting in its queue, or having given up readings because the queue was full.
 
 The generated ACL lets each producer write `manage/v1/<source_id>/+/availability`,
 `.../state` and `.../results` and read `.../commands`; Central and `homeassistant` read
@@ -353,8 +353,14 @@ or measurements. No frontend build or additional service is needed.
    complete sensors or individual measurements, and move sections/items up or down.
    Save to persist the arrangement, or cancel to discard the draft.
 
-The automatic arrangement shows the sensors and devices of added devices in separate
-sections.
+The automatic arrangement is an overview. It starts with what needs attention, most
+severe first, each with its reason and, when known, since when: a receiver problem, a
+device that stopped reporting, a failed or late reading, or a battery below the
+[cajui-firmware](https://github.com/cajui/cajui-firmware) power-mode limits (low under
+3.4 V, critical under 3.2 V; both provisional). Below it, each added device is one
+block, standing in for its place, with a row per measurement: value, unit and a trend
+of the last 3 hours on a time axis shared by every row. Values themselves raise nothing
+until measurement ranges exist.
 An explicitly empty arrangement remains empty. Removing a dashboard item or section
 never deletes its registration or history. Names and locations can be edited; their
 stable identities remain unchanged. There is no registration deletion or telemetry
@@ -386,9 +392,9 @@ The product shows actual received data only. It has no brand pages, component
 catalog, simulated gallery or design-system navigation. The reference lives in
 [`docs/brand/`](docs/brand/README.md) and is served separately for development.
 
-Readings use large values, identifiable icons and quantity accents. Sensor failures
-and device silence remain explicit, independent states; an accent does not imply a
-healthy range. Select a reading to open its history in a modal dialog. Its measurement selector is
+On the overview a reading is a compact row; organized sections use larger tiles with
+identifiable icons and quantity accents. Sensor failures and device silence remain
+explicit, independent states; an accent does not imply a healthy range. Select a reading to open its history in a modal dialog. Its measurement selector is
 limited to that sensor on that device. Battery, RSSI and SNR histories are available
 from device details in a separate diagnostic scope. Closing the history restores focus
 to its originating card; live updates preserve the open dialog. The latest reading and timestamp
@@ -400,13 +406,14 @@ Gaps remain disconnected, and the dialog identifies the history
 as recent loaded readings rather than a complete period. History uses Central receipt
 timestamps, converted to the browser time zone, with newest readings first; it does
 not infer acquisition times for queued samples. Table expansion and slider or summary focus survive
-live refreshes. Search matches devices and
+live refreshes. In an organized dashboard, search matches devices and
 sensors by their registered names and locations. Export includes the visible sensor
 measurements, deduplicated when a measurement appears in multiple sections. The
-summary counts registered devices and sensors independently of dashboard placement.
+summary gives the number of problems by severity, or says all is clear with the number
+of registered devices.
 
-Device cards summarize identity, sensor count and last arrival, with one **Details**
-action. Radio diagnostics and links to their histories live in that dialog. The
+A device block on the overview, or a device card in an organized dashboard, shows its
+identity and last arrival with one **Details** action. Radio diagnostics and links to their histories live in that dialog. The
 version 1 convention recognized here is `sensor_id: "radio"` with `rssi` in `dBm`
 or `snr` in `dB`. These exact channels are excluded from environmental sensor counts
 and the sensor CSV. Their values, data quality and histories remain available.
