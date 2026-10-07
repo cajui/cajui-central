@@ -9,8 +9,6 @@ const state = JSON.parse(document.querySelector("#initial-state").textContent);
 setLocale(state.locale ?? document.documentElement.lang);
 document.documentElement.lang = locale();
 const route = location.pathname;
-// Transmitters, receivers and the broker are one task: keeping the equipment working.
-const equipment = ["/devices", "/receivers", "/broker"];
 const title =
   {
     "/devices": t("common.devices"),
@@ -31,53 +29,77 @@ const systemDark = matchMedia("(prefers-color-scheme: dark)");
 document.documentElement.dataset.theme =
   chosenTheme ?? (systemDark.matches ? "dark" : "light");
 const sidebar = document.querySelector("#sidebar");
-// Navigation by task (ADR 0002): follow, maintain the equipment, name the sensors.
-// Places and events join when their data exists.
-const sections = [
-  ["/", t("common.dashboard"), "overview", route === "/"],
-  ["/devices", t("nav.equipment"), "device", equipment.includes(route)],
-  ["/sensors", t("common.sensors"), "temperature", route === "/sensors"],
+// The overview on its own, then areas (ADR 0002, grouped as the owner chose): the
+// equipment someone installs and the system it reports through. Places and events
+// join when their data exists.
+const overview = ["/", t("common.dashboard"), "overview"];
+const areas = [
+  [
+    "equipment",
+    t("nav.equipment"),
+    "device",
+    [
+      ["/devices", t("common.devices"), "device"],
+      ["/receivers", t("common.receivers"), "signal"],
+      ["/sensors", t("common.sensors"), "temperature"],
+    ],
+  ],
+  [
+    "system",
+    t("nav.system"),
+    "components",
+    [["/broker", t("broker.title"), "components"]],
+  ],
 ];
-const links = (className) =>
-  sections
-    .map(
-      ([href, name, glyph, current]) =>
-        `<a class="${className}" href="${href}" ${current ? `aria-current="${href === route ? "page" : "true"}"` : ""}>${icon(glyph)}<span>${name}</span></a>`,
-    )
-    .join("");
-sidebar.innerHTML = `<a class="wordmark" href="/" aria-label="${t("nav.home")}">${mark()}<span>Cajuí<small>Central</small></span></a><nav class="nav" aria-label="${t("nav.main")}">${links("")}</nav>`;
-if (equipment.includes(route)) {
-  const tabs = document.createElement("nav");
-  tabs.className = "subnav";
-  tabs.setAttribute("aria-label", t("nav.equipment"));
-  tabs.innerHTML = [
-    ["/devices", t("common.devices")],
-    ["/receivers", t("common.receivers")],
-    ["/broker", t("broker.title")],
-  ]
-    .map(
-      ([href, name]) =>
-        `<a href="${href}" ${route === href ? 'aria-current="page"' : ""}>${name}</a>`,
-    )
-    .join("");
-  document.querySelector("#app").before(tabs);
-}
+const link = ([href, name, glyph], className = "") =>
+  `<a ${className ? `class="${className}" ` : ""}href="${href}" ${route === href ? 'aria-current="page"' : ""}>${icon(glyph)}<span>${name}</span></a>`;
+sidebar.innerHTML = `<a class="wordmark" href="/" aria-label="${t("nav.home")}">${mark()}<span>Cajuí<small>Central</small></span></a><nav class="nav" aria-label="${t("nav.main")}">${link(overview)}${areas
+  .map(
+    ([id, name, , pages]) =>
+      `<p class="eyebrow sidebar-label" id="area-${id}">${name}</p><div class="nav-group" role="group" aria-labelledby="area-${id}">${pages.map((page) => link(page)).join("")}</div>`,
+  )
+  .join("")}</nav>`;
 document.querySelector("#topbar").innerHTML =
   `<div class="crumb"><span class="muted">Cajuí Central</span><span class="muted">/</span><strong>${title}</strong></div><div class="top-actions" id="top-settings"><div class="shell-settings" id="settings"><label class="locale-picker"><span class="settings-label">${t("nav.language")}</span><select class="input" id="locale"><option value="en-US" lang="en-US">English (US)</option><option value="pt-BR" lang="pt-BR">Português (Brasil)</option></select></label><button class="icon-button theme-button" id="theme" type="button">${icon("moon")}<span class="settings-label" id="theme-text"></span></button></div></div>`;
-// On a phone the menu sits at the bottom, within reach of the thumb, and language and
-// theme wait under More instead of crowding the top bar. Each control exists once and
-// moves between the top bar and that sheet.
+// On a phone the menu sits at the bottom, within reach of the thumb: the overview, one
+// tab per area that opens a sheet with its pages, and More for language and theme,
+// which would otherwise crowd the top bar. Each control exists once and moves between
+// the top bar and that sheet.
+function sheet(id, label, content) {
+  const element = document.createElement("div");
+  element.id = id;
+  element.className = "nav-sheet";
+  element.popover = "auto";
+  element.setAttribute("role", "dialog");
+  element.setAttribute("aria-label", label);
+  element.innerHTML = content;
+  return element;
+}
 const tabbar = document.createElement("nav");
 tabbar.className = "tabbar";
 tabbar.setAttribute("aria-label", t("nav.main"));
-tabbar.innerHTML = `${links("tab")}<button class="tab" type="button" popovertarget="more">${icon("menu")}<span>${t("nav.more")}</span></button>`;
-const more = document.createElement("div");
-more.id = "more";
-more.className = "more-sheet";
-more.popover = "auto";
-more.setAttribute("role", "dialog");
-more.setAttribute("aria-label", t("nav.more"));
-document.querySelector(".shell").append(tabbar, more);
+tabbar.innerHTML = `${link(overview, "tab")}${areas
+  .map(
+    ([id, name, glyph, pages]) =>
+      `<button class="tab" type="button" popovertarget="sheet-${id}" ${pages.some(([href]) => href === route) ? 'aria-current="true"' : ""}>${icon(glyph)}<span>${name}</span></button>`,
+  )
+  .join(
+    "",
+  )}<button class="tab" type="button" popovertarget="more">${icon("menu")}<span>${t("nav.more")}</span></button>`;
+const more = sheet("more", t("nav.more"), "");
+document
+  .querySelector(".shell")
+  .append(
+    tabbar,
+    ...areas.map(([id, name, , pages]) =>
+      sheet(
+        `sheet-${id}`,
+        name,
+        `<div class="sheet-links">${pages.map((page) => link(page)).join("")}</div>`,
+      ),
+    ),
+    more,
+  );
 const settings = document.querySelector("#settings");
 const phone = matchMedia("(max-width: 1000px)");
 function placeSettings() {

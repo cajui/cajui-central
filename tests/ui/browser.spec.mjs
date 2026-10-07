@@ -560,17 +560,27 @@ test("on a phone the menu sits at the bottom, with language and theme under More
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBeTruthy();
-  await tabs.getByRole("link", { name: "Equipment" }).click();
+  // Each area opens a sheet with its pages, and the area stays marked on them.
+  await tabs.getByRole("button", { name: "Equipment" }).click();
+  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  await expect(equipment.getByRole("link")).toHaveText([
+    "Devices",
+    "Receivers",
+    "Sensors",
+  ]);
+  await equipment.getByRole("link", { name: "Devices" }).click();
   await expect(
     page.getByRole("heading", { name: "Devices", exact: true, level: 1 }),
   ).toBeVisible();
+  const menu = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(menu.getByRole("button", { name: "Equipment" })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await menu.getByRole("button", { name: "System" }).click();
   await expect(
-    page
-      .getByRole("navigation", { name: "Main navigation" })
-      .getByRole("link", {
-        name: "Equipment",
-      }),
-  ).toHaveAttribute("aria-current", "page");
+    page.getByRole("dialog", { name: "System" }).getByRole("link"),
+  ).toHaveText(["MQTT broker"]);
 });
 
 test("known measurements keep their decimals on every screen", async ({
@@ -951,19 +961,22 @@ test("language selection persists across navigation and server-rendered pages", 
   await expect(
     page.getByRole("heading", { name: "Visão geral", exact: true }),
   ).toBeVisible();
-  // Equipment is one entry; its pages are tabs, the transmitters first.
+  // The equipment pages are an area of the menu, the broker another.
   await page
-    .getByRole("navigation", { name: "Navegação principal" })
-    .getByRole("link", { name: "Equipamentos", exact: true })
+    .getByRole("group", { name: "Equipamentos" })
+    .getByRole("link", { name: "Transmissores", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "Transmissores", exact: true }),
   ).toBeVisible();
   await expect(
     page
-      .getByRole("navigation", { name: "Equipamentos" })
+      .getByRole("group", { name: "Equipamentos" })
       .getByRole("link", { name: "Transmissores", exact: true }),
   ).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("group", { name: "Sistema" }).getByRole("link"),
+  ).toHaveText(["Broker MQTT"]);
   await page
     .getByRole("button", { name: "Adicionar transmissor", exact: true })
     .click();
