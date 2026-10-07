@@ -38,13 +38,14 @@ const sections = [
   ["/devices", t("nav.equipment"), "device", equipment.includes(route)],
   ["/sensors", t("common.sensors"), "temperature", route === "/sensors"],
 ];
-const links = sections
-  .map(
-    ([href, name, glyph, current]) =>
-      `<a href="${href}" ${current ? `aria-current="${href === route ? "page" : "true"}"` : ""}>${icon(glyph)}<span>${name}</span></a>`,
-  )
-  .join("");
-sidebar.innerHTML = `<a class="wordmark" href="/" aria-label="${t("nav.home")}">${mark()}<span>Cajuí<small>Central</small></span></a><nav class="nav" aria-label="${t("nav.main")}">${links}</nav>`;
+const links = (className) =>
+  sections
+    .map(
+      ([href, name, glyph, current]) =>
+        `<a class="${className}" href="${href}" ${current ? `aria-current="${href === route ? "page" : "true"}"` : ""}>${icon(glyph)}<span>${name}</span></a>`,
+    )
+    .join("");
+sidebar.innerHTML = `<a class="wordmark" href="/" aria-label="${t("nav.home")}">${mark()}<span>Cajuí<small>Central</small></span></a><nav class="nav" aria-label="${t("nav.main")}">${links("")}</nav>`;
 if (equipment.includes(route)) {
   const tabs = document.createElement("nav");
   tabs.className = "subnav";
@@ -62,7 +63,32 @@ if (equipment.includes(route)) {
   document.querySelector("#app").before(tabs);
 }
 document.querySelector("#topbar").innerHTML =
-  `<div class="crumb"><button class="icon-button mobile-menu" id="menu" aria-label="${t("nav.open")}" aria-expanded="false" aria-controls="sidebar">${icon("menu")}</button><span class="muted">Cajuí Central</span><span class="muted">/</span><strong>${title}</strong></div><div class="top-actions"><label class="locale-picker"><span class="sr-only">${t("nav.language")}</span><select class="input" id="locale"><option value="en-US" lang="en-US">English (US)</option><option value="pt-BR" lang="pt-BR">Português (Brasil)</option></select></label><button class="icon-button" id="theme" aria-label="${t("nav.theme")}">${icon("moon")}</button></div>`;
+  `<div class="crumb"><span class="muted">Cajuí Central</span><span class="muted">/</span><strong>${title}</strong></div><div class="top-actions" id="top-settings"><div class="shell-settings" id="settings"><label class="locale-picker"><span class="settings-label">${t("nav.language")}</span><select class="input" id="locale"><option value="en-US" lang="en-US">English (US)</option><option value="pt-BR" lang="pt-BR">Português (Brasil)</option></select></label><button class="icon-button theme-button" id="theme" type="button">${icon("moon")}<span class="settings-label" id="theme-text"></span></button></div></div>`;
+// On a phone the menu sits at the bottom, within reach of the thumb, and language and
+// theme wait under More instead of crowding the top bar. Each control exists once and
+// moves between the top bar and that sheet.
+const tabbar = document.createElement("nav");
+tabbar.className = "tabbar";
+tabbar.setAttribute("aria-label", t("nav.main"));
+tabbar.innerHTML = `${links("tab")}<button class="tab" type="button" popovertarget="more">${icon("menu")}<span>${t("nav.more")}</span></button>`;
+const more = document.createElement("div");
+more.id = "more";
+more.className = "more-sheet";
+more.popover = "auto";
+more.setAttribute("role", "dialog");
+more.setAttribute("aria-label", t("nav.more"));
+document.querySelector(".shell").append(tabbar, more);
+const settings = document.querySelector("#settings");
+const phone = matchMedia("(max-width: 1000px)");
+function placeSettings() {
+  if (phone.matches) more.append(settings);
+  else {
+    if (more.matches(":popover-open")) more.hidePopover();
+    document.querySelector("#top-settings").append(settings);
+  }
+}
+placeSettings();
+phone.addEventListener("change", placeSettings);
 document.title = `${title} · Cajuí Central`;
 const language = document.querySelector("#locale");
 language.value = locale();
@@ -72,35 +98,14 @@ language.addEventListener("change", () => {
   url.searchParams.set("lang", language.value);
   location.assign(url);
 });
-const menu = document.querySelector("#menu");
-function closeMenu() {
-  sidebar.dataset.open = "false";
-  menu.setAttribute("aria-expanded", "false");
-}
-menu.addEventListener("click", () => {
-  const open = sidebar.dataset.open !== "true";
-  sidebar.dataset.open = String(open);
-  menu.setAttribute("aria-expanded", String(open));
-});
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && sidebar.dataset.open === "true") {
-    const restoreFocus = sidebar.contains(document.activeElement);
-    closeMenu();
-    if (restoreFocus) menu.focus();
-  }
-});
-document.addEventListener("click", (event) => {
-  if (!sidebar.contains(event.target) && !menu.contains(event.target))
-    closeMenu();
-});
 const themeButton = document.querySelector("#theme");
+// The button says what it does: hidden next to the icon on a wide screen, written out
+// under More on a phone.
 function themeLabel() {
-  themeButton.setAttribute(
-    "aria-label",
+  themeButton.querySelector("#theme-text").textContent =
     document.documentElement.dataset.theme === "dark"
       ? t("nav.light")
-      : t("nav.dark"),
-  );
+      : t("nav.dark");
 }
 themeLabel();
 themeButton.addEventListener("click", () => {

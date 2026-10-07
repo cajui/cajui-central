@@ -525,6 +525,49 @@ for (const width of [390, 820, 1440]) {
     ).toBeTruthy();
   });
 }
+test("on a phone the menu sits at the bottom, with language and theme under More", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await liveWorkspace(page);
+  const tabs = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(tabs).toBeVisible();
+  await expect(page.locator("#sidebar")).toBeHidden();
+  await expect(tabs.getByRole("link", { name: "Overview" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  const language = page.getByRole("combobox", { name: "Language" });
+  await expect(language).toBeHidden();
+  const more = tabs.getByRole("button", { name: "More" });
+  await more.click();
+  await expect(language).toBeVisible();
+  await page.getByRole("button", { name: "Switch to dark theme" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.keyboard.press("Escape");
+  await expect(language).toBeHidden();
+  // The end of the page stays readable above the bar.
+  await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
+  const bar = await tabs.boundingBox();
+  const footer = await page.locator(".footer").boundingBox();
+  expect(footer.y + footer.height).toBeLessThanOrEqual(bar.y);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await tabs.getByRole("link", { name: "Equipment" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Devices", exact: true, level: 1 }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("navigation", { name: "Main navigation" })
+      .getByRole("link", {
+        name: "Equipment",
+      }),
+  ).toHaveAttribute("aria-current", "page");
+});
 test("product accessibility and isolated reference routes", async ({
   page,
 }) => {

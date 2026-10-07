@@ -342,8 +342,9 @@ repository.
 ## Interface
 
 The menu is organized by task: **Overview**, **Equipment** (with tabs for **Devices**,
-**Receivers** and **MQTT broker**) and **Sensors**. Without JavaScript, the server-rendered
-menu links every page. Setup and display
+**Receivers** and **MQTT broker**) and **Sensors**. On screens up to 1000 px wide it sits
+at the bottom, with language and theme under **More**. Without JavaScript, the
+server-rendered menu links every page. Setup and display
 are independent: a dashboard item references a registration, not a copy of its name
 or measurements. No frontend build or additional service is needed.
 
