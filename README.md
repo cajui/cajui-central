@@ -388,7 +388,19 @@ catalog, simulated gallery or design-system navigation. The reference lives in
 
 Readings use large values, identifiable icons and quantity accents. Sensor failures
 and device silence remain explicit, independent states; an accent does not imply a
-healthy range. Select a reading to open its history. Search matches devices and
+healthy range. Select a reading to open its history in a modal dialog. Its measurement selector is
+limited to that sensor on that device. Battery, RSSI and SNR histories are available
+from device details in a separate diagnostic scope. Closing the history restores focus
+to its originating card; live updates preserve the open dialog. The latest reading and timestamp
+remain separate from the historical selection. Pointer, touch and keyboard inspection share
+a visible point marker. The marker follows new readings until a click, touch or keyboard
+action pins an observation; hovering only previews it. Reopening the dialog or changing
+measurements starts a fresh inspection. The latest reading includes its channel state.
+Gaps remain disconnected, and the dialog identifies the history
+as recent loaded readings rather than a complete period. History uses Central receipt
+timestamps, converted to the browser time zone, with newest readings first; it does
+not infer acquisition times for queued samples. Table expansion and slider or summary focus survive
+live refreshes. Search matches devices and
 sensors by their registered names and locations. Export includes the visible sensor
 measurements, deduplicated when a measurement appears in multiple sections. The
 summary counts registered devices and sensors independently of dashboard placement.

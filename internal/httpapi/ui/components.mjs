@@ -145,6 +145,12 @@ class Device extends Component {
   }
 }
 class Chart extends Component {
+  resetInspection() {
+    this.inspectedTime = undefined;
+    this.tableOpen = false;
+    const table = this.querySelector("details");
+    if (table) table.open = false;
+  }
   connectedCallback() {
     this.render();
     this.observer = new ResizeObserver(() => {
@@ -156,20 +162,33 @@ class Chart extends Component {
     this.observer?.disconnect();
   }
   render() {
+    if (!this.clientWidth) return;
+    if (this.channelKey !== this.data.key) {
+      this.resetInspection();
+      this.channelKey = this.data.key;
+    }
+    const sliderFocused =
+      this.querySelector("input[type=range]") === document.activeElement;
+    const previousTable = this.querySelector("details");
+    if (previousTable) this.tableOpen = previousTable.open;
+    const tableFocused =
+      previousTable?.querySelector("summary") === document.activeElement;
     this.dataset.kind = metricIcon(this.data.metric);
     this.lastWidth = Math.round(this.clientWidth);
     const width = Math.max(this.lastWidth, 260),
-      plotWidth = width - 84;
+      plotWidth = width - 84,
+      plotHeight = this.data.plotHeight ?? 164;
     const {
       points = [],
       unit = "",
       label = t("common.history"),
       interval = 0,
+      timeLabel = t("chart.time"),
     } = this.data;
     const g = plotGeometry(
       points,
       plotWidth,
-      164,
+      plotHeight,
       interval ? interval * 3000 : Infinity,
     );
     if (!g) {
@@ -197,7 +216,7 @@ class Chart extends Component {
     const ticks = [0, 0.25, 0.5, 0.75, 1]
       .map(
         (f) =>
-          `<line class="gridline" x1="64" y1="${18 + 164 * f}" x2="${width - 20}" y2="${18 + 164 * f}"/><text x="54" y="${22 + 164 * f}" text-anchor="end">${formatValue(g.max * (1 - f) + g.min * f)}</text>`,
+          `<line class="gridline" x1="64" y1="${18 + plotHeight * f}" x2="${width - 20}" y2="${18 + plotHeight * f}"/><text x="54" y="${22 + plotHeight * f}" text-anchor="end">${formatValue(g.max * (1 - f) + g.min * f)}</text>`,
       )
       .join("");
     const time = (t) =>
@@ -206,20 +225,42 @@ class Chart extends Component {
         minute: "2-digit",
         hour12: false,
       });
-    this.innerHTML = `<svg class="plot" viewBox="0 0 ${width} 216" role="img" aria-label="${e(t("chart.description", { label, unit: formatUnit(unit), observations: t("counts.observations", { count: g.points.length }) }))}">${ticks}<g transform="translate(64 18)"><path class="series" d="${g.path}"/>${isolated}<line class="gridline cursor" x1="0" x2="0" y1="0" y2="164"/></g><text x="64" y="208">${time(g.start)}</text><text x="${width / 2}" y="208" text-anchor="middle">${time((g.start + g.end) / 2)}</text><text x="${width - 20}" y="208" text-anchor="end">${time(g.end)}</text></svg><label class="plot-inspect"><span>${t("chart.inspect")}</span><input type="range" min="0" max="${g.points.length - 1}" value="${g.points.length - 1}" aria-label="${e(t("chart.observations", { label }))}"><output></output></label><details class="small muted"><summary>${t("chart.table")}</summary><div class="table-wrap"><table><caption class="sr-only">${e(t("chart.data", { label }))}</caption><thead><tr><th>${t("chart.time")}</th><th>${e(t("chart.value", { unit: formatUnit(unit) }))}</th></tr></thead><tbody>${g.points.map((p) => `<tr><td>${e(new Date(p.time).toLocaleString(locale()))}</td><td>${numeric(p.value) === null ? t("chart.no_reading") : formatValue(p.value)}</td></tr>`).join("")}</tbody></table></div></details>`;
+    this.innerHTML = `<svg class="plot" viewBox="0 0 ${width} ${plotHeight + 52}" role="img" aria-label="${e(t("chart.description", { label, unit: formatUnit(unit), observations: t("counts.observations", { count: g.points.length }) }))}">${ticks}<g transform="translate(64 18)"><path class="series" d="${g.path}"/>${isolated}<circle class="selected-point" r="5"/><line class="gridline cursor" x1="0" x2="0" y1="0" y2="${plotHeight}"/></g><text x="64" y="${plotHeight + 44}">${time(g.start)}</text><text x="${width / 2}" y="${plotHeight + 44}" text-anchor="middle">${time((g.start + g.end) / 2)}</text><text x="${width - 20}" y="${plotHeight + 44}" text-anchor="end">${time(g.end)}</text></svg><p class="chart-selection" aria-hidden="true"></p><label class="plot-inspect"><span>${t("chart.inspect")}</span><input type="range" min="0" max="${g.points.length - 1}" value="${g.points.length - 1}" aria-label="${e(t("chart.observations", { label }))}"><output class="sr-only"></output></label>${g.path.split("M").length > 2 ? `<p class="small muted chart-gaps">${t("chart.gaps")}</p>` : ""}<details class="small muted" ${this.tableOpen ? "open" : ""}><summary>${t("chart.table")}</summary><div class="table-wrap"><table><caption class="sr-only">${e(t("chart.data", { label }))}</caption><thead><tr><th>${e(timeLabel)}</th><th>${e(t("chart.value", { unit: formatUnit(unit) }))}</th></tr></thead><tbody>${[
+      ...g.points,
+    ]
+      .reverse()
+      .map(
+        (p) =>
+          `<tr><td>${e(new Date(p.time).toLocaleString(locale()))}</td><td>${numeric(p.value) === null ? t("chart.no_reading") : formatValue(p.value)}</td></tr>`,
+      )
+      .join("")}</tbody></table></div></details>`;
+    if (tableFocused)
+      this.querySelector("summary").focus({ preventScroll: true });
     const slider = this.querySelector("input"),
       output = this.querySelector("output"),
-      cursor = this.querySelector(".cursor");
+      cursor = this.querySelector(".cursor"),
+      marker = this.querySelector(".selected-point"),
+      selection = this.querySelector(".chart-selection");
+    const saved = g.points.findIndex((p) => p.time === this.inspectedTime);
+    if (saved >= 0) slider.value = saved;
     const inspect = () => {
       const p = g.points[Number(slider.value)];
       output.textContent = `${time(p.time)} · ${formatValue(p.value)} ${formatUnit(unit)}`;
+      selection.textContent = output.textContent;
+      marker.setAttribute("cx", g.x(p.time));
+      marker.setAttribute("cy", numeric(p.value) === null ? 0 : g.y(p.value));
+      marker.style.display = numeric(p.value) === null ? "none" : "";
       cursor.setAttribute("x1", g.x(p.time));
       cursor.setAttribute("x2", g.x(p.time));
     };
-    slider.addEventListener("input", inspect);
+    slider.addEventListener("input", () => {
+      this.inspectedTime = g.points[Number(slider.value)].time;
+      inspect();
+    });
+    if (sliderFocused) slider.focus({ preventScroll: true });
     inspect();
     const svg = this.querySelector("svg");
-    svg.addEventListener("pointermove", (event) => {
+    const selectPoint = (event) => {
       const bounds = svg.getBoundingClientRect();
       const time =
         g.start +
@@ -238,6 +279,15 @@ class Chart extends Component {
           nearest = i;
       });
       slider.value = nearest;
+      if (event.type === "pointerdown" || event.buttons)
+        this.inspectedTime = g.points[nearest].time;
+      inspect();
+    };
+    svg.addEventListener("pointerdown", selectPoint);
+    svg.addEventListener("pointermove", selectPoint);
+    svg.addEventListener("pointerleave", () => {
+      const pinned = g.points.findIndex((p) => p.time === this.inspectedTime);
+      slider.value = pinned >= 0 ? pinned : g.points.length - 1;
       inspect();
     });
   }

@@ -62,6 +62,11 @@ en-US:
     rssi: RSSI
     snr: SNR
   dashboard:
+    history_title: '%{measurement} history'
+    history_accessible: '%{measurement} history · Device %{device} · Source %{source}'
+    received_time: Received at Central
+    latest_reading: Latest reading
+    history_limit: Recent loaded readings only; the selected period may be incomplete.
     description: The measurements and devices you choose to follow.
     organize: Organize dashboard
     export: Export readings
@@ -80,6 +85,8 @@ en-US:
     retention: 'History: latest 100 samples + 100 HTTP readings · latest known values retained'
     details: Device details
     close_details: Close details
+    close_history: Close history
+    device_diagnostics: Device diagnostics
     last_report: Last report %{age}
     inspect_history: Inspect %{measurement} history for %{device}
     no_items: No matching items in this section.
@@ -89,10 +96,6 @@ en-US:
     manage_devices: Manage devices
     manage_sensors: Manage sensors
     inspect: 'Inspect %{measurement}: %{value} %{unit}, %{status}, sensor %{sensor}, device %{device}'
-    history_title: '%{measurement} history'
-    history_context: Device %{device} · %{sensor} · Source %{source}
-    radio: Radio link
-    sensor_context: Sensor %{sensor}
     device_id: Device ID
     interval: Expected interval
     not_reported: Not reported
@@ -234,6 +237,7 @@ en-US:
     full: Full
     binary: Binary sensor
   chart:
+    gaps: Breaks indicate missing readings.
     empty: No readings in this period
     choose_period: Choose a longer period or wait for a new sample.
     description: '%{label} in %{unit}; %{observations}. Use the slider or data table for exact values.'

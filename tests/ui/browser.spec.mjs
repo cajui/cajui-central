@@ -246,7 +246,9 @@ test("tablet recognition, touch targets and history keep quantity separate from 
   expect(temperatureBox.y).toBe(humidityBox.y);
   await humidity.tap();
   await expect(page.locator("#history-heading")).toBeFocused();
-  await expect(page.locator("#chart-legend")).toContainText("Humidity");
+  await expect(page.locator("#metric-select option:checked")).toContainText(
+    "Humidity",
+  );
   const color = await page
     .locator("#history .series")
     .evaluate((el) => getComputedStyle(el).stroke);
@@ -399,9 +401,11 @@ test("live data keeps refreshing while a chart or dialog is open", async ({
 }) => {
   await page.clock.install();
   const { snapshot, serve } = await liveWorkspace(page);
-  const reading = page.getByRole("button", { name: /Inspect Humidity:/ });
+  const reading = page.locator(".reading-button").nth(1);
   await reading.click();
   await expect(page.locator("#history-heading")).toBeFocused();
+  await page.locator("#history summary").click();
+  await expect(page.locator("#history details")).toHaveAttribute("open", "");
   const next = structuredClone(snapshot);
   const humidity = (state, value) => {
     state.samples[0].readings[1].value = value;
@@ -412,6 +416,16 @@ test("live data keeps refreshing while a chart or dialog is open", async ({
   await page.clock.fastForward(31000);
   await expect(reading).toHaveAccessibleName(/Inspect Humidity: 71/);
   await expect(page.locator("#history-panel")).toBeVisible();
+  await expect(page.locator("#history details")).toHaveAttribute("open", "");
+  await expect(page.locator("#history summary")).toBeFocused();
+  await page.locator("#history summary").click();
+  await page.clock.fastForward(31000);
+  await expect(page.locator("#history details")).not.toHaveAttribute(
+    "open",
+    "",
+  );
+  await page.keyboard.press("Escape");
+  await expect(reading).toBeFocused();
   await page
     .getByRole("button", { name: "Details for Device 1", exact: true })
     .focus();
@@ -450,13 +464,23 @@ for (const width of [390, 820, 1440]) {
     await expect(page.locator("#history-panel")).not.toBeVisible();
     await page.getByRole("button", { name: /Inspect Humidity:/ }).click();
     await expect(page.locator("#history-heading")).toBeFocused();
-    await expect(page.locator("#chart-legend")).toContainText("Humidity");
+    await expect(page.locator("#metric-select option:checked")).toContainText(
+      "Humidity",
+    );
+    await expect(page.locator("#metric-select option")).toHaveText([
+      "Temperature · °C",
+      "Humidity · %",
+    ]);
+    await page.keyboard.press("Escape");
     await page
       .getByRole("button", { name: "Details for Device 1", exact: true })
       .click();
     await expect(page.locator(".diagnostic-button")).toHaveCount(2);
     await page.getByRole("button", { name: /Inspect RSSI history/ }).click();
-    await expect(page.locator("#chart-legend")).toContainText("RSSI");
+    await expect(page.locator("#metric-select option:checked")).toContainText(
+      "RSSI",
+    );
+    await page.keyboard.press("Escape");
     await page.locator("#refresh").click();
     await expect(page.getByRole("dialog")).not.toBeVisible();
     await expect(page.locator(".transmitter-card button")).toHaveCount(1);
@@ -658,7 +682,7 @@ test("persistent registration, independent dashboard composition and safe edits"
   await expect(page.locator("cj-reading")).toHaveCount(2);
   await expect(page.locator("#app img")).toHaveCount(0);
   await page.getByRole("button", { name: /Inspect Humidity:/ }).click();
-  await expect(page.locator("#history-context")).toContainText(renamed);
+  await expect(page.locator("#history-heading")).toContainText(renamed);
   await page.reload();
   await expect(page.locator(".dashboard-section > h2")).toHaveText([
     "Equipment",
@@ -805,17 +829,21 @@ for (const language of ["pt-BR", "en-US"]) {
       pt ? "1 transmissor" : "1 device",
     );
     await page.locator(".reading-button").first().click();
-    await expect(page.locator("#history-heading")).toHaveText(
-      pt ? "Histórico de Temperatura" : "Temperature history",
-    );
+    await expect(page.locator("#history-heading")).toHaveText("Sensor 1");
     await expect(page.locator("#history svg.plot")).toHaveAttribute(
       "aria-label",
       pt ? /4 observações/ : /4 observations/,
     );
     await page.locator("#history summary").click();
     await expect(page.locator("#history table th").first()).toHaveText(
-      pt ? "Horário (local)" : "Time (local)",
+      pt ? "Recebido no Central" : "Received at Central",
     );
+    await page
+      .getByRole("button", {
+        name: pt ? "Fechar histórico" : "Close history",
+        exact: true,
+      })
+      .click();
     await page
       .getByRole("button", {
         name: pt ? "Organizar painel" : "Organize dashboard",
@@ -1763,3 +1791,216 @@ for (const path of ["/receivers", "/"]) {
     expect(pageLoads).toBe(1);
   });
 }
+
+test("history dialogs isolate sensor and device diagnostics and restore focus", async ({
+  page,
+}) => {
+  const { snapshot, serve } = await liveWorkspace(page);
+  const battery = {
+    sensor_id: "battery",
+    metric: "voltage",
+    unit: "V",
+    value: 3.8,
+    status: "ok",
+  };
+  snapshot.samples[0].readings.push(battery);
+  const extra = {
+    sensor_id: "sensor-2",
+    metric: "temperature",
+    unit: "degC",
+    value: 19,
+    status: "ok",
+  };
+  snapshot.samples[0].readings.push(extra);
+  snapshot.workspace.sensors.push({
+    id: 3,
+    device_id: 1,
+    sensor: "sensor-2",
+    name: "Other sensor",
+    location: "",
+    revision: 1,
+    measurements: [
+      { ...extra, received_at: snapshot.samples[0].received_at, interval: 300 },
+    ],
+  });
+  const secondSample = structuredClone(snapshot.samples[0]);
+  secondSample.device_id = "device-2";
+  snapshot.samples.push(secondSample);
+  snapshot.workspace.devices.push({
+    ...snapshot.workspace.devices[0],
+    id: 2,
+    device: "device-2",
+    name: "Device 2",
+  });
+  snapshot.workspace.sensors.push({
+    ...snapshot.workspace.sensors[0],
+    id: 4,
+    device_id: 2,
+    name: "Second device sensor",
+  });
+  await serve(snapshot);
+  await page.reload();
+  await page.locator("html.ready").waitFor();
+  const opener = page.locator(".reading-button").first();
+  await opener.click();
+  const dialog = page.locator("#history-panel");
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+  await expect(dialog).toHaveAttribute(
+    "aria-labelledby",
+    "history-heading history-accessible",
+  );
+  await expect(page.locator("#metric-select option")).toHaveText([
+    "Temperature · °C",
+    "Humidity · %",
+  ]);
+  await expect(page.locator("#history-heading")).toContainText("Sensor 1");
+  await page.locator("#metric-select").selectOption({ label: "Humidity · %" });
+  await expect(page.locator("#history-heading")).toHaveText("Sensor 1");
+  await page.locator("#period").selectOption("0");
+  await expect(page.locator("#history-value")).not.toHaveText("");
+  const controls = await page
+    .locator(".history-controls select")
+    .evaluateAll((els) =>
+      els.map((el) => ({
+        top: el.getBoundingClientRect().top,
+        height: el.getBoundingClientRect().height,
+      })),
+    );
+  expect(controls[0]).toEqual(controls[1]);
+  const slider = page.locator("#history input[type=range]");
+  await slider.focus();
+  await page.keyboard.press("Home");
+  const cursor = page.locator("#history .cursor");
+  await expect(cursor).toHaveAttribute("x1", "0");
+  await page.keyboard.press("End");
+  await expect(cursor).not.toHaveAttribute("x1", "0");
+  const plot = page.locator("#history svg");
+  await plot.click({ position: { x: 64, y: 40 } });
+  await expect(cursor).toHaveAttribute("x1", "0");
+  await expect(page.locator("#history .selected-point")).toBeVisible();
+  const violations = await new AxeBuilder({ page }).analyze();
+  expect(violations.violations).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(opener).toBeFocused();
+  const details = page.getByRole("button", {
+    name: "Details for Device 1",
+    exact: true,
+  });
+  await details.click();
+  await page
+    .getByRole("button", {
+      name: "Inspect Battery history for Device 1",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+  await expect(dialog).toBeVisible();
+  await expect(page.locator("#history-context")).toContainText("Device 1");
+  const labels = await page.locator("#metric-select option").allTextContents();
+  expect(labels.sort()).toEqual(["Battery · V", "RSSI · dBm", "SNR · dB"]);
+  await page
+    .getByRole("button", { name: "Close history", exact: true })
+    .click();
+  await expect(details).toBeFocused();
+  await page.locator(".reading-button").nth(2).click();
+  await expect(page.locator("#metric-select option")).toHaveCount(1);
+  await expect(page.locator("#history-heading")).toContainText("Other sensor");
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+});
+
+test("history receipt times use the browser zone independently of UI language", async ({
+  browser,
+}) => {
+  for (const [timezoneId, time] of [
+    ["Asia/Tokyo", "21:00:00"],
+    ["UTC", "12:00:00"],
+  ]) {
+    const context = await browser.newContext({ timezoneId });
+    try {
+      const page = await context.newPage();
+      const { snapshot, serve } = await liveWorkspace(page, "pt-BR");
+      const next = structuredClone(snapshot);
+      next.generated_at = "2026-10-06T12:01:00Z";
+      next.samples.forEach((sample, index) => {
+        sample.received_at =
+          index === 0 ? "2026-10-06T12:00:00Z" : "2026-10-06T11:00:00Z";
+      });
+      for (const sensor of next.workspace.sensors)
+        for (const measurement of sensor.measurements)
+          measurement.received_at = "2026-10-06T12:00:00Z";
+      await serve(next);
+      await page.reload();
+      await page.locator(".reading-button").first().click();
+      await page.locator("#history summary").click();
+      await expect(page.locator("#history tbody tr").first()).toContainText(
+        time,
+      );
+      await expect(page.locator("#history th").first()).toHaveText(
+        "Recebido no Central",
+      );
+    } finally {
+      await context.close();
+    }
+  }
+});
+
+test("chart refresh follows latest until explicit inspection and preserves slider focus", async ({
+  page,
+}) => {
+  await liveWorkspace(page);
+  await page.locator(".reading-button").first().click();
+  const chart = page.locator("#history");
+  const slider = chart.locator("input[type=range]");
+  const append = () =>
+    chart.evaluate((el) => {
+      const points = [
+        ...el.data.points,
+        { time: el.data.points.at(-1).time + 60000, value: 27 },
+      ];
+      el.data = { ...el.data, points };
+    });
+  await slider.focus();
+  await append();
+  await expect(slider).toBeFocused();
+  expect(await slider.inputValue()).toBe(await slider.getAttribute("max"));
+  await page.keyboard.press("Home");
+  const pinned = await chart.locator(".chart-selection").textContent();
+  await append();
+  await expect(slider).toBeFocused();
+  await expect(chart.locator(".chart-selection")).toHaveText(pinned);
+  await chart.locator("summary").click();
+  await page.keyboard.press("Escape");
+  await page.locator(".reading-button").first().click();
+  await expect(chart.locator("details")).not.toHaveAttribute("open", "");
+  expect(await slider.inputValue()).toBe(await slider.getAttribute("max"));
+  await slider.focus();
+  await page.keyboard.press("Home");
+  await chart.locator("summary").click();
+  await page.locator("#metric-select").selectOption({ label: "Humidity · %" });
+  await expect(chart.locator("details")).not.toHaveAttribute("open", "");
+  expect(await slider.inputValue()).toBe(await slider.getAttribute("max"));
+});
+
+test("focused history selector keeps receiving fresh readings and exposes channel state", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const { snapshot, serve } = await liveWorkspace(page);
+  await page.locator(".reading-button").first().click();
+  await page.locator("#metric-select").focus();
+  const next = structuredClone(snapshot);
+  next.samples[0].readings[0].status = "error";
+  next.workspace.sensors[0].measurements[0].status = "error";
+  await serve(next);
+  await page.clock.fastForward(31000);
+  await expect(page.locator("#metric-select")).toBeFocused();
+  await expect(page.locator("#history-value")).toContainText("—");
+  await expect(page.locator("#history-state")).toHaveAttribute(
+    "state",
+    "error",
+  );
+  await expect(page.locator("#history-state")).toContainText("Reading error");
+  await expect(page.locator("#history-panel")).toHaveAccessibleName(
+    /Sensor 1.*Temperature history.*Device 1.*receiver/,
+  );
+});

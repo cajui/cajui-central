@@ -62,6 +62,11 @@ pt-BR:
     rssi: RSSI
     snr: SNR
   dashboard:
+    history_title: Histórico de %{measurement}
+    history_accessible: 'Histórico de %{measurement} · Transmissor %{device} · Origem %{source}'
+    received_time: Recebido no Central
+    latest_reading: Leitura mais recente
+    history_limit: Apenas leituras recentes carregadas; o período selecionado pode estar incompleto.
     description: As medições e os transmissores que você escolheu acompanhar.
     organize: Organizar painel
     export: Exportar leituras
@@ -80,6 +85,8 @@ pt-BR:
     retention: 'Histórico: últimas 100 amostras + 100 leituras HTTP · últimos valores conhecidos preservados'
     details: Detalhes do transmissor
     close_details: Fechar detalhes
+    close_history: Fechar histórico
+    device_diagnostics: Diagnóstico do transmissor
     last_report: 'Último envio: %{age}'
     inspect_history: Ver histórico de %{measurement} de %{device}
     no_items: Nenhum item corresponde ao filtro nesta seção.
@@ -89,10 +96,6 @@ pt-BR:
     manage_devices: Gerenciar transmissores
     manage_sensors: Gerenciar sensores
     inspect: 'Ver %{measurement}: %{value} %{unit}, %{status}, sensor %{sensor}, transmissor %{device}'
-    history_title: Histórico de %{measurement}
-    history_context: Transmissor %{device} · %{sensor} · Origem %{source}
-    radio: Enlace de rádio
-    sensor_context: Sensor %{sensor}
     device_id: ID do transmissor
     interval: Intervalo esperado
     not_reported: Não informado
@@ -235,6 +238,7 @@ pt-BR:
     full: Cheio
     binary: Sensor binário
   chart:
+    gaps: As interrupções indicam períodos sem leituras.
     empty: Nenhuma leitura neste período
     choose_period: Escolha um período maior ou aguarde uma nova amostra.
     description: '%{label} em %{unit}; %{observations}. Use o controle deslizante ou a tabela para ver os valores
