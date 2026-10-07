@@ -327,6 +327,10 @@ pre {
   .product-shell .topbar {
     display: none;
   }
+  /* Notices rise above the bar instead of covering its labels. */
+  .toast {
+    inset: auto auto calc(60px + env(safe-area-inset-bottom, 0px) + 12px) 50%;
+  }
   /* The last lines of a page stay readable above the bar. */
   .product-shell .content {
     padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 32px);
@@ -708,7 +712,25 @@ pre {
   transform: rotate(45deg);
 }
 /* Forced colours replace author backgrounds, which erased the filled shapes. */
+/* Without JavaScript there is no bottom bar: a phone shows the server-rendered menu. */
+@media (scripting: none) and (max-width: 1000px) {
+  .product-shell .sidebar {
+    display: flex;
+    position: static;
+    width: auto;
+    height: auto;
+    box-shadow: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
 @media (forced-colors: active) {
+  /* Backgrounds are replaced, so the current page keeps an outline instead. */
+  :is(.nav, .sheet-links) a[aria-current="page"],
+  .tab[aria-current] {
+    outline: 2px solid CanvasText;
+    outline-offset: -2px;
+  }
   .badge:is(
       [data-state="stale"],
       [data-state="warning"],
@@ -1329,6 +1351,8 @@ dialog::backdrop {
   .demo-banner,
   button,
   .toolbar,
+  .tabbar,
+  .nav-sheet,
   .toast {
     display: none;
   }

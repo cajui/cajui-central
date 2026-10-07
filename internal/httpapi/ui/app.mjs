@@ -29,9 +29,9 @@ const systemDark = matchMedia("(prefers-color-scheme: dark)");
 document.documentElement.dataset.theme =
   chosenTheme ?? (systemDark.matches ? "dark" : "light");
 const sidebar = document.querySelector("#sidebar");
-// The overview on its own, then areas (ADR 0002, grouped as the owner chose): the
-// equipment someone installs and the system it reports through. Places and events
-// join when their data exists.
+// The overview on its own, then areas (ADR 0002): the equipment someone installs,
+// sensors included, and the system it reports through, which is a service rather than
+// a device. Places and events join when their data exists.
 const overview = ["/", t("common.dashboard"), "overview"];
 const areas = [
   [
@@ -103,11 +103,18 @@ document
 const settings = document.querySelector("#settings");
 const phone = matchMedia("(max-width: 1000px)");
 function placeSettings() {
+  // Moving a focused control drops focus to the page; give it back when the control
+  // stays visible (a closed More sheet cannot hold focus).
+  const focused = settings.contains(document.activeElement)
+    ? document.activeElement
+    : null;
   if (phone.matches) more.append(settings);
   else {
-    if (more.matches(":popover-open")) more.hidePopover();
+    for (const open of document.querySelectorAll(".nav-sheet:popover-open"))
+      open.hidePopover();
     document.querySelector("#top-settings").append(settings);
   }
+  focused?.focus();
 }
 placeSettings();
 phone.addEventListener("change", placeSettings);

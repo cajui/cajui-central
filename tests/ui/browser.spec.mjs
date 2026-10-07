@@ -8,13 +8,17 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/ui-api/device-states/events", (route) => route.abort());
   await page.route("**/ui-api/device-states", async (route) => {
     // A request still in flight when the test navigates has no page left to read the
-    // snapshot from, and its answer no longer matters.
-    const snapshot = await page
-      .evaluate(() =>
+    // snapshot from, and its answer no longer matters. Any other error still fails.
+    let snapshot;
+    try {
+      snapshot = await page.evaluate(() =>
         JSON.parse(document.querySelector("#initial-state").textContent),
-      )
-      .catch(() => null);
-    if (!snapshot) return route.abort();
+      );
+    } catch (error) {
+      if (/context was destroyed|navigat/i.test(String(error)))
+        return route.abort();
+      throw error;
+    }
     await route.fulfill({
       json: {
         generated_at: snapshot.generated_at,
@@ -555,8 +559,15 @@ test("on a phone the menu sits at the bottom, with language and theme under More
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.keyboard.press("Escape");
   await expect(language).toBeHidden();
-  // The end of the page stays readable above the bar.
-  await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
+  // The end of the page stays readable above the bar, on a page short enough to scroll.
+  await page.setViewportSize({ width: 390, height: 480 });
+  await page.evaluate(() =>
+    scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: "instant",
+    }),
+  );
+  expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
   const bar = await tabs.boundingBox();
   const footer = await page.locator(".footer").boundingBox();
   expect(footer.y + footer.height).toBeLessThanOrEqual(bar.y);

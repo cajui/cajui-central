@@ -1,7 +1,8 @@
 # Localization
 
 Central supports Brazilian Portuguese (`pt-BR`) and US English (`en-US`). The
-language selector is in the application header. Menus, registration, dashboard
+language selector is in the application header, or under **More** on screens up to
+1000 px wide. Menus, registration, dashboard
 composition, reading states, chart controls, validation messages and accessible
 labels use the selected language. The server-rendered fallback is translated too.
 

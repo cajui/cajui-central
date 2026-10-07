@@ -350,7 +350,7 @@ or measurements. No frontend build or additional service is needed.
 
 1. Open **Equipment → Devices → Add device**. Pair a transmitter by radio or choose an observed
    device, name it, and optionally assign a location.
-2. Its sensors appear on **Sensors** and the dashboard by themselves, named after what
+2. Its sensors appear on **Sensors** and the overview by themselves, named after what
    they measure (for example "Temperature and humidity"); **Edit** renames one.
 3. Open **Overview → Organize overview**. Create named sections, select devices,
    complete sensors or individual measurements, and move sections/items up or down.
