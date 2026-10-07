@@ -481,6 +481,8 @@ for (const width of [390, 820, 1440]) {
       "trend of the last 3 h",
     );
     await expect(page.locator(".reading-button")).toHaveCount(2);
+    // A known measurement keeps its decimals: 24 °C reads "24.0", like "47.4 %".
+    await expect(page.locator(".row-value").first()).toContainText("24.0");
     await expect(page.locator("#summary")).toContainText("All clear");
     await expect(page.locator("#summary")).toContainText("1 device");
     await expect(page.locator("#attention")).toBeHidden();
@@ -502,7 +504,9 @@ for (const width of [390, 820, 1440]) {
       .getByRole("button", { name: "Details for Device 1", exact: true })
       .click();
     await expect(page.locator(".diagnostic-button")).toHaveCount(2);
-    await page.getByRole("button", { name: /Inspect RSSI history/ }).click();
+    await page
+      .getByRole("button", { name: /Inspect Signal strength \(RSSI\) history/ })
+      .click();
     await expect(page.locator("#metric-select option:checked")).toContainText(
       "RSSI",
     );
@@ -568,6 +572,108 @@ test("on a phone the menu sits at the bottom, with language and theme under More
       }),
   ).toHaveAttribute("aria-current", "page");
 });
+
+test("known measurements keep their decimals on every screen", async ({
+  page,
+}) => {
+  const { snapshot, serve } = await liveWorkspace(page);
+  const button = page.locator(".reading-button").first();
+  await expect(button).toHaveAccessibleName(/Inspect Temperature: 24\.0 °C/);
+  await button.click();
+  await expect(page.locator("#history-value")).toContainText("24.0");
+  await expect(page.locator("#history .chart-selection")).toHaveText(
+    /· 24\.0 °C$/,
+  );
+  await page.locator("#history summary").click();
+  await expect(page.locator("#history tbody td").nth(1)).toHaveText("24.0");
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("button", { name: "Details for Device 1", exact: true })
+    .click();
+  await expect(page.locator("#device-detail")).toContainText("12.0 dB");
+  await page.keyboard.press("Escape");
+  snapshot.samples[0].readings.push({
+    sensor_id: "battery",
+    metric: "voltage",
+    unit: "V",
+    value: 3.3,
+    status: "ok",
+  });
+  snapshot.workspace.layout.sections = [
+    { title: "Climate", items: [{ kind: "sensor", sensor_id: 1 }] },
+  ];
+  await serve(snapshot);
+  await page.goto("/");
+  await expect(page.locator("#attention")).toContainText(
+    "Device 1: battery at 3.30 V",
+  );
+  await expect(page.locator("#attention")).toContainText("Below 3.40 V");
+  await expect(page.locator("cj-reading .measurement").first()).toContainText(
+    "24.0",
+  );
+});
+test("devices and sensors pages keep the same decimals", async ({ page }) => {
+  const state = pairingSnapshot();
+  const at = new Date(Date.now() - 60000).toISOString();
+  state.samples.push({
+    source_id: "site",
+    device_id: "0000aa000000b002",
+    sample_id: "s1",
+    received_at: at,
+    expected_interval_seconds: 300,
+    readings: [
+      {
+        sensor_id: "battery",
+        metric: "voltage",
+        unit: "V",
+        value: 4,
+        status: "ok",
+      },
+      {
+        sensor_id: "radio",
+        metric: "rssi",
+        unit: "dBm",
+        value: -71,
+        status: "ok",
+      },
+      { sensor_id: "radio", metric: "snr", unit: "dB", value: 9, status: "ok" },
+    ],
+  });
+  state.workspace.devices.push({
+    id: 7,
+    transport: "mqtt",
+    source: "site",
+    device: "0000aa000000b002",
+    name: "Coop",
+    location: "",
+    revision: 1,
+    received_at: at,
+    interval: 300,
+  });
+  await liveDevices(page, state);
+  const row = page.getByRole("row").filter({ hasText: "Coop" });
+  await expect(row.locator('td[data-label="Battery"]')).toHaveText("4.00 V");
+  await expect(row.locator('td[data-label="Signal"]')).toHaveText(
+    "-71 dBm · SNR 9.0 dB",
+  );
+  const { snapshot } = await liveWorkspace(page);
+  const html = await (await page.request.get("/sensors?lang=en-US")).text();
+  await page.route("**/sensors", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: html.replace(
+        /(<script type="application\/json" id="initial-state">)[\s\S]*?(<\/script>)/,
+        `$1${JSON.stringify(snapshot).replaceAll("<", "\\u003c")}$2`,
+      ),
+    }),
+  );
+  await page.goto("/sensors");
+  await page.locator("html.ready").waitFor();
+  await expect(page.locator("#registry-list")).toContainText(
+    "Temperature: 24.0 °C · Humidity: 60.0 %",
+  );
+});
+
 test("product accessibility and isolated reference routes", async ({
   page,
 }) => {
@@ -1985,7 +2091,11 @@ test("history dialogs isolate sensor and device diagnostics and restore focus", 
   await expect(dialog).toBeVisible();
   await expect(page.locator("#history-context")).toContainText("Device 1");
   const labels = await page.locator("#metric-select option").allTextContents();
-  expect(labels.sort()).toEqual(["Battery · V", "RSSI · dBm", "SNR · dB"]);
+  expect(labels.sort()).toEqual([
+    "Battery · V",
+    "Signal strength (RSSI) · dBm",
+    "Signal-to-noise ratio (SNR) · dB",
+  ]);
   await page
     .getByRole("button", { name: "Close history", exact: true })
     .click();

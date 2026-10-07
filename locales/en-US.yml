@@ -60,8 +60,8 @@ en-US:
     soil_moisture: Soil moisture
     illuminance: Illuminance
     level: Level
-    rssi: RSSI
-    snr: SNR
+    rssi: Signal strength (RSSI)
+    snr: Signal-to-noise ratio (SNR)
   dashboard:
     history_title: '%{measurement} history'
     history_accessible: '%{measurement} history · Device %{device} · Source %{source}'

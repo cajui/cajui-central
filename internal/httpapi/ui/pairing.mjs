@@ -2,7 +2,7 @@ import { t } from "./i18n.mjs";
 import { icon } from "./icons.mjs";
 import {
   escapeHTML as e,
-  formatValue,
+  formatMeasurement,
   receiverLabel,
   receiverSummary,
 } from "./model.mjs";
@@ -196,7 +196,7 @@ export function pairingSection(snapshot, act, progress = new Map()) {
         t("registry.pairing.id", { id: shortID(request.node_id) }),
         typeof request.rssi_dbm === "number"
           ? t("registry.pairing.signal", {
-              value: formatValue(request.rssi_dbm, 0),
+              value: formatMeasurement(request.rssi_dbm, "rssi", "dBm"),
             })
           : "",
       ]
