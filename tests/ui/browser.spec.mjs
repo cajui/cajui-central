@@ -94,6 +94,32 @@ for (const viewport of [
     expect(requests.every((url) => url.startsWith(referenceURL))).toBeTruthy();
   });
 }
+test("the components reference draws the overview with the product's modules", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(referenceURL + "/design/components");
+  const section = page.locator("#overview");
+  await expect(section.locator(".overview-headline")).toHaveText("8 problems");
+  // Every severity of the vocabulary appears, most severe first.
+  await expect(section.locator("#reference-attention > li")).toHaveCount(8);
+  const severities = await section
+    .locator("#reference-attention > li")
+    .evaluateAll((items) => items.map((li) => li.dataset.severity));
+  expect(severities[0]).toBe("critical");
+  expect(severities.at(-1)).toBe("network");
+  await expect(section.locator(".place")).toHaveCount(4);
+  await expect(
+    section.locator('.place[data-severity="network"] h4'),
+  ).toHaveText("Water tank");
+  // Each row state the overview distinguishes has an example.
+  for (const state of ["ok", "error", "stale", "skipped"])
+    await expect(
+      section.locator(`.row-value[data-state="${state}"]`).first(),
+    ).toBeVisible();
+  expect(errors).toEqual([]);
+});
 test("component states, literal text and keyboard chart inspection", async ({
   page,
 }) => {

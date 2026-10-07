@@ -39,13 +39,14 @@ export function attentionItemHTML(item) {
   return `<li data-severity="${item.severity}"><span class="badge" data-state="${item.severity}">${e(states[item.severity])}</span><div class="attention-text"><strong>${item.href ? `<a href="${e(item.href)}">${e(item.title)}</a>` : e(item.title)}</strong>${item.detail ? `<span>${e(item.detail)}</span>` : ""}</div><span class="attention-since">${e(item.since)}</span></li>`;
 }
 
-// A place's heading and its own problems; the rows go between them.
-export function placeHTML(group, notes, now) {
-  return `<header class="place-head"><div><h3>${e(group.name)}</h3><p class="muted">${group.location ? `${e(group.location)} · ` : ""}${e(t("overview.last_reading", { age: age(group.at, now).toLowerCase() }))}</p></div><button class="text-button" data-details="${e(`${group.source}/${group.device}`)}" aria-label="${e(t("dashboard.details_for", { name: group.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></header><div class="place-rows"></div>${notes.length ? `<ul class="place-notes">${notes.map((item) => `<li><span class="badge" data-state="${item.severity}">${e(item.short)}</span></li>`).join("")}</ul>` : ""}`;
+// A place's heading and its own problems; the rows go between them. Heading levels
+// follow the page that embeds them.
+export function placeHTML(group, notes, now, level = 3) {
+  return `<header class="place-head"><div><h${level}>${e(group.name)}</h${level}><p class="muted">${group.location ? `${e(group.location)} · ` : ""}${e(t("overview.last_reading", { age: age(group.at, now).toLowerCase() }))}</p></div><button class="text-button" data-details="${e(`${group.source}/${group.device}`)}" aria-label="${e(t("dashboard.details_for", { name: group.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></header><div class="place-rows"></div>${notes.length ? `<ul class="place-notes">${notes.map((item) => `<li><span class="badge" data-state="${item.severity}">${e(item.short)}</span></li>`).join("")}</ul>` : ""}`;
 }
 
-export function placesHeadingHTML() {
-  return `<div class="places-heading"><h2>${t("overview.places_heading")}</h2><span>${e(t("overview.trend_window", { hours: TREND_HOURS }))}</span></div>`;
+export function placesHeadingHTML(level = 2) {
+  return `<div class="places-heading"><h${level}>${t("overview.places_heading")}</h${level}><span>${e(t("overview.trend_window", { hours: TREND_HOURS }))}</span></div>`;
 }
 
 // One measurement row: label, value and the trend of the last hours.

@@ -2952,8 +2952,8 @@ dialog.history-dialog {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--line);
 }
-.attention-head h2,
-.places-heading h2 {
+.attention-head :is(h2, h3),
+.places-heading :is(h2, h3) {
   margin: 0;
   font-size: var(--text-body);
 }
@@ -3052,7 +3052,7 @@ dialog.history-dialog {
 .place-head > div {
   min-width: 0;
 }
-.place-head h3 {
+.place-head :is(h3, h4) {
   margin: 0;
   font-size: var(--text-label);
   overflow-wrap: anywhere;
