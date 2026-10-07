@@ -473,7 +473,7 @@ pre {
   font-weight: 700;
 }
 .input {
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: var(--radius-sm);
   background: var(--surface);
   padding: 9px 12px;
@@ -486,7 +486,7 @@ pre {
   gap: 9px;
   align-items: center;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   padding: 0 12px;
   border-radius: var(--radius-sm);
   color: var(--muted);
@@ -1902,8 +1902,11 @@ cj-reading {
 .product-shell {
   min-height: 100vh;
 }
+/* A monitoring screen uses the width it has: content starts beside the menu instead of
+   centering in a 1280 px column, and more places fit side by side. */
 .product-shell .content {
-  max-width: 1280px;
+  max-width: 1920px;
+  margin: 0;
 }
 .product-shell .topbar {
   background: var(--surface);
@@ -1941,15 +1944,16 @@ cj-reading {
   display: block;
   color: var(--muted);
   margin-top: 6px;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .registry-table td {
   min-width: 96px;
 }
-/* Names and identifiers may be long; short values and badges never break inside a word. */
+/* Names and identifiers may be long, but a word only breaks when it cannot fit on a
+   line of its own ("anywhere" let the column shrink until a plain word split). */
 .registry-table td:first-child {
   min-width: 160px;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .registry-revoked {
   display: grid;
@@ -1962,6 +1966,15 @@ cj-reading {
 }
 .registry-revoked .registry-table {
   color: var(--muted);
+}
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.dialog-actions:empty {
+  display: none;
 }
 .button.danger-text {
   color: var(--danger);
@@ -2951,8 +2964,8 @@ dialog.history-dialog {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--line);
 }
-.attention-head h2,
-.places-heading h2 {
+.attention-head :is(h2, h3),
+.places-heading :is(h2, h3) {
   margin: 0;
   font-size: var(--text-body);
 }
@@ -3051,7 +3064,7 @@ dialog.history-dialog {
 .place-head > div {
   min-width: 0;
 }
-.place-head h3 {
+.place-head :is(h3, h4) {
   margin: 0;
   font-size: var(--text-label);
   overflow-wrap: anywhere;

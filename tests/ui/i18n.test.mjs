@@ -6,6 +6,7 @@ import {
   setLocale,
   locale,
   supportedLocales,
+  errorMessage,
 } from "../../internal/httpapi/ui/i18n.mjs";
 import catalogs from "../../internal/httpapi/ui/catalogs.mjs";
 import {
@@ -91,6 +92,29 @@ test("supported locales, fallback, CLDR plurals and literal interpolation", () =
   assert.equal(locale(), "en-US");
   assert.equal(t("counts.devices", { count: 0 }), "0 devices");
   assert.equal(t("counts.devices", { count: 1 }), "1 device");
+});
+
+test("counts are grouped and unreachable requests are explained in each language", () => {
+  for (const [lang, devices, offline] of [
+    ["en-US", "18,322 devices", "Could not reach Central"],
+    ["pt-BR", "18.322 transmissores", "Não foi possível falar com o Central"],
+  ]) {
+    setLocale(lang);
+    assert.equal(t("counts.devices", { count: 18322 }), devices);
+    // A failed fetch is worded by the browser; Central's own messages pass through.
+    assert.match(
+      errorMessage(new TypeError("Failed to fetch")),
+      new RegExp(`^${offline}`),
+    );
+    assert.equal(
+      errorMessage(new Error("Name already used")),
+      "Name already used",
+    );
+    assert.match(
+      errorMessage(new DOMException("signal timed out", "TimeoutError")),
+      new RegExp(`^${offline}`),
+    );
+  }
 });
 
 test("values, age, states and known metrics follow the chosen language", () => {

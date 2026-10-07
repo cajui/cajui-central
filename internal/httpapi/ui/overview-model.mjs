@@ -64,12 +64,18 @@ function interval(seconds) {
     ? t("counts.minutes", { count: seconds / 60 })
     : t("counts.seconds", { count: seconds });
 }
-function batteryOf(group) {
-  const channel = group.diagnostics.find(
+// The battery voltage to judge, shared by the overview and the devices page so both say
+// the same: a current, recorded or old value counts; a failed read does not.
+export function batteryVolts(group) {
+  const channel = group?.diagnostics.find(
     (c) => c.sensor === "battery" && c.metric === "voltage",
   );
   const value = numeric(channel?.value);
-  if (!channel || value === null || !["ok", "stale"].includes(channel.state))
+  if (
+    !channel ||
+    value === null ||
+    !["ok", "recorded", "stale"].includes(channel.state)
+  )
     return null;
   return value;
 }
@@ -211,7 +217,7 @@ export function attentionItems(groups, receivers, now) {
             at: start ?? (Date.parse(c.at) || 0),
           });
         }
-    const volts = batteryOf(g);
+    const volts = batteryVolts(g);
     if (volts !== null && volts < BATTERY_LOW_V) {
       const critical = volts < BATTERY_CRITICAL_V;
       const value = `${formatMeasurement(volts, "voltage", "V")} V`;

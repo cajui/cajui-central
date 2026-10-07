@@ -2,6 +2,19 @@ import { escapeHTML as e, contrast } from "/ui/model.mjs";
 import { mark, icon } from "/ui/icons.mjs";
 import { buildChannels } from "/ui/model.mjs";
 import { demoData } from "./demo.mjs";
+import {
+  attentionItems,
+  placeKey,
+  placeSeverity,
+  sensorLabel,
+} from "/ui/overview-model.mjs";
+import {
+  attentionItemHTML,
+  placeHTML,
+  placeRowHTML,
+  placesHeadingHTML,
+  summaryHTML,
+} from "/ui/overview-view.mjs";
 const intro = (number, title, text) =>
   `<div class="section-intro"><div><p class="eyebrow">${number}</p><h2>${title}</h2></div><p>${text}</p></div>`;
 const code = (source) =>
@@ -58,6 +71,9 @@ export function mountBrand(root, notify) {
       ["Critical label", "--danger", "--surface"],
       ["Attention notice", "--warning", "--warning-soft"],
       ["Network notice", "--info", "--info-soft"],
+      // Outlines of controls are not text: WCAG 1.4.11 asks 3:1.
+      ["Field outline", "--field-line", "--surface", 3],
+      ["Field outline on page", "--field-line", "--canvas", 3],
       ...["temperature", "humidity", "air", "soil", "light"].map((kind) => [
         `${kind} accent`,
         `--${kind}`,
@@ -65,12 +81,12 @@ export function mountBrand(root, notify) {
       ]),
     ];
     root.querySelector("#contrast-audit").innerHTML = pairs
-      .map(([name, fg, bg]) => {
+      .map(([name, fg, bg, target = 4.5]) => {
         const ratio = contrast(
           css.getPropertyValue(fg).trim(),
           css.getPropertyValue(bg).trim(),
         );
-        return `<tr><td>${name}</td><td><code>${fg} / ${bg}</code></td><td>${ratio.toFixed(2)}:1</td><td>${ratio >= 4.5 ? "Pass" : "Below target"} · 4.5:1</td></tr>`;
+        return `<tr><td>${name}</td><td><code>${fg} / ${bg}</code></td><td>${ratio.toFixed(2)}:1</td><td>${ratio >= target ? "Pass" : "Below target"} · ${target}:1</td></tr>`;
       })
       .join("");
   };
@@ -93,14 +109,15 @@ function wireCopy(root, notify) {
 export function mountComponents(root, notify) {
   const sensor =
     '<cj-sensor label="Temperature" metric="temperature" value="24.6" unit="degC" state="ok" context="Workspace · ambient" updated="Just now"></cj-sensor>';
-  root.innerHTML = `${heading("CAJUÍ / COMPONENT LIBRARY", "Built for what you measure.", "Reusable components, real states, one shared visual language.")}<div class="catalog-toolbar"><nav class="catalog-index" aria-label="Component categories"><a href="#measurements">Measurements</a><a href="#states">States</a><a href="#binary">Binary & level</a><a href="#history">History</a><a href="#device">Devices</a><a href="#foundations">Foundations</a></nav><cj-badge state="info" label="Interactive examples"></cj-badge></div>
+  root.innerHTML = `${heading("CAJUÍ / COMPONENT LIBRARY", "Built for what you measure.", "Reusable components, real states, one shared visual language.")}<div class="catalog-toolbar"><nav class="catalog-index" aria-label="Component categories"><a href="#measurements">Measurements</a><a href="#states">States</a><a href="#binary">Binary & level</a><a href="#history">History</a><a href="#overview">Overview</a><a href="#device">Devices</a><a href="#foundations">Foundations</a></nav><cj-badge state="info" label="Interactive examples"></cj-badge></div>
  <section class="design-section" id="measurements">${intro("01 / Measurement", "The sensor card", "Identify the quantity and location before reading the value. Names use 18 px, values 48 px, and source and freshness 16 px. The optional sparkline gives a short history; a missing reading stays missing. This component also works without a chart.")}<div class="component-demo"><div class="sensor-grid"><cj-sensor id="playground" label="Temperature" metric="temperature" value="24.6" unit="degC" state="ok" context="Workspace · ambient" updated="Just now"></cj-sensor><cj-sensor label="Humidity" metric="humidity" value="62" unit="%" state="ok" context="Greenhouse · ambient" updated="1 min ago"></cj-sensor><cj-sensor label="Illuminance" metric="illuminance" value="1240" unit="lx" state="ok" context="Terrace · light" updated="1 min ago"></cj-sensor><cj-sensor label="Carbon dioxide" metric="co2" value="684" unit="ppm" state="ok" context="Workspace · air" updated="2 min ago"></cj-sensor></div><div class="toolbar"><label class="small">Try a state <select id="play-state" class="input"><option value="ok">Updated</option><option value="stale">Stale</option><option value="error">Reading error</option><option value="skipped">Not sampled</option><option value="empty">No data</option><option value="loading">Loading</option></select></label><label class="small">Value <input id="play-value" class="input" type="number" value="24.6" step="0.1" min="-50" max="100"></label></div></div><div class="brand-caption"><h3>Inside a sensor group</h3><p class="muted">The product uses a compact reading tile inside its device → sensor hierarchy. The standalone cards above remain useful as component studies.</p><div class="reading-grid" id="grouped-reading-example"></div></div><div class="code-label"><code>&lt;cj-sensor&gt;</code><button class="button" data-copy="${e(sensor)}">${icon("copy")}Copy HTML</button></div>${code(sensor)}<p class="muted small brand-caption">Attributes: label, metric, value, unit, state, context, updated. The metric selects the icon and accent automatically; unknown metrics remain neutral. Category color never encodes a threshold. Set <code>element.data</code> for a full model with timestamped points. Live values never need to become HTML.</p></section>
  <section class="design-section" id="states">${intro("02 / Data quality", "Different reasons to pause.", "Stale is an old value. Error is an unsuccessful measurement. Empty is no observation. Loading is an operation in progress. Color reinforces the label; it never replaces it.")}<div class="state-grid"><cj-sensor label="Temperature" metric="temperature" value="21.8" unit="degC" state="stale" context="Last known measurement" updated="42 min ago"></cj-sensor><cj-sensor label="Temperature" metric="temperature" unit="degC" state="error" context="Device reported a failure" updated="Just now"></cj-sensor><cj-sensor label="Temperature" metric="temperature" unit="degC" state="empty" context="Awaiting the first sample"></cj-sensor><cj-sensor label="Temperature" metric="temperature" unit="degC" state="loading" context="Request in progress"></cj-sensor></div><div class="inline-demo brand-actions"><cj-badge state="ok"></cj-badge><cj-badge state="stale"></cj-badge><cj-badge state="error"></cj-badge><cj-badge state="skipped"></cj-badge><cj-badge state="empty"></cj-badge></div>${code('<cj-badge state="error"></cj-badge>')}</section>
  <section class="design-section" id="binary">${intro("03 / More than numbers", "Open, present, full.", "Binary sensors describe an observation, not a control. Percentages use a bounded meter; zero is a real value and an unknown level does not render as empty.")}<div class="three-grid"><cj-state label="Entry door" metric="contact" value="Closed" state="ok" context="Entryway · magnetic contact"></cj-state><cj-state label="Motion" metric="motion" value="Not detected" state="ok" context="Workspace · last observation"></cj-state><cj-level label="Water storage" value="72" context="Tank · reported fill level"></cj-level></div>${code('<cj-state label="Entry door" metric="contact" value="Closed" state="ok"></cj-state>\n<cj-level label="Water storage" value="72" context="Reported level"></cj-level>')}<p class="muted small brand-caption">These examples are display components. The current numeric telemetry contract does not define generic actuator commands or a binary-sensor schema.</p></section>
  <section class="design-section" id="history">${intro("04 / History", "A change, in context.", "A single series keeps its own unit. Inspect with the pointer or keyboard slider, or read the same observations in a table. Gaps are visible; no interpolation invents a missing value.")}<section class="panel"><div class="panel-heading"><div><h3>Temperature</h3><p>Simulated history · °C · local time</p></div><cj-badge state="info" label="Example"></cj-badge></div><cj-chart id="catalog-chart"></cj-chart></section>${code('const chart = document.querySelector("cj-chart");\nchart.data = {\n  label: "Temperature", metric: "temperature", unit: "degC", interval: 300,\n  points: [\n    { time: Date.parse("2026-01-01T12:00:00Z"), value: 24.6 },\n    { time: Date.parse("2026-01-01T12:05:00Z"), value: null },\n    { time: Date.parse("2026-01-01T12:10:00Z"), value: 24.8 }\n  ]\n};')}</section>
  <section class="design-section" id="device">${intro("05 / Device", "Context behind a reading", "Device identity, last report, battery and received signal strength belong together. Missing battery and signal data remain unknown. A signal reading alone is not a reliability score.")}<div class="three-grid"><cj-device label="Climate sensor" state="ok" battery="86" signal="-72" context="Greenhouse · 1 min ago"></cj-device><cj-device label="Entry sensor" state="stale" context="Entryway · 90 min ago"></cj-device><cj-device label="Soil sensor" state="error" battery="18" signal="-87" context="Greenhouse · reading unavailable"></cj-device></div><div class="inline-demo brand-actions"><cj-battery value="86"></cj-battery><cj-battery value="0"></cj-battery><cj-battery></cj-battery><cj-signal value="-72"></cj-signal><cj-signal></cj-signal></div>${code('<cj-device label="Climate sensor" state="ok" battery="86" signal="-72" context="1 min ago"></cj-device>')}</section>
- <section class="design-section" id="foundations">${intro("06 / Foundations", "The supporting pieces", "Controls use native HTML semantics. Every button in this reference has an action; future capabilities stay outside the product navigation until they exist.")}<div class="panel"><div class="inline-demo"><button id="example-action" class="button primary">${icon("check")}Example action</button><button class="button" data-copy="Cajuí">${icon("copy")}Copy text</button><button class="button" disabled>Unavailable action</button><cj-badge state="info" label="Example"></cj-badge></div><div class="notice brand-actions">${icon("alert")}<span><strong>Could not refresh.</strong> Showing the last loaded snapshot. Its readings may be out of date.</span></div><div class="empty">${icon("device")}<h3>No readings received yet</h3><p>Measurements will appear when a source sends its first sample.</p></div></div></section>
- <section class="design-section">${intro("07 / Integration", "Use the same components.", "Load one stylesheet and the component module. No npm installation, compilation or runtime CDN. The application embeds these files; component tests can use Node as a development tool.")} ${code('<link rel="stylesheet" href="/ui/ui.css">\n<script type="module" src="/ui/components.mjs"></script>\n\n<cj-sensor label="Temperature" metric="temperature"\n  value="24.6" unit="degC" state="ok"></cj-sensor>')}<p class="muted small brand-caption">CSS tokens are the public styling surface. Components use light DOM so the application’s styles and accessibility tools can inspect them. Text values are escaped; dynamic scripts and HTML from telemetry are not supported.</p></section>`;
+ <section class="design-section" id="overview">${intro("06 / Overview", "What needs attention, then each place.", "The overview's pieces as the product draws them, from the same modules, with fictional data. Normal readings stay quiet. Each problem keeps a shape and a word: an amber triangle for attention, a blue circle for a lost connection, a red diamond for critical. A place behind an offline receiver is explained once, by the receiver.")}<section class="overview-summary" id="reference-summary"></section><section class="panel attention-panel" aria-labelledby="reference-attention-heading"><div class="attention-head"><h3 id="reference-attention-heading">Needs attention</h3><span>most severe first</span></div><ul class="attention-list" id="reference-attention"></ul></section><div id="reference-places"></div></section>
+ <section class="design-section" id="foundations">${intro("07 / Foundations", "The supporting pieces", "Controls use native HTML semantics. Every button in this reference has an action; future capabilities stay outside the product navigation until they exist.")}<div class="panel"><div class="inline-demo"><button id="example-action" class="button primary">${icon("check")}Example action</button><button class="button" data-copy="Cajuí">${icon("copy")}Copy text</button><button class="button" disabled>Unavailable action</button><cj-badge state="info" label="Example"></cj-badge></div><div class="notice brand-actions">${icon("alert")}<span><strong>Could not refresh.</strong> Showing the last loaded snapshot. Its readings may be out of date.</span></div><div class="empty">${icon("device")}<h3>No readings received yet</h3><p>Measurements will appear when a source sends its first sample.</p></div></div></section>
+ <section class="design-section">${intro("08 / Integration", "Use the same components.", "Load one stylesheet and the component module. No npm installation, compilation or runtime CDN. The application embeds these files; component tests can use Node as a development tool.")} ${code('<link rel="stylesheet" href="/ui/ui.css">\n<script type="module" src="/ui/components.mjs"></script>\n\n<cj-sensor label="Temperature" metric="temperature"\n  value="24.6" unit="degC" state="ok"></cj-sensor>')}<p class="muted small brand-caption">CSS tokens are the public styling surface. Components use light DOM so the application’s styles and accessibility tools can inspect them. Text values are escaped; dynamic scripts and HTML from telemetry are not supported.</p></section>`;
   root
     .querySelector("#play-state")
     .addEventListener("change", (event) =>
@@ -119,6 +136,7 @@ export function mountComponents(root, notify) {
     .addEventListener("click", () =>
       notify("Example action completed. No device was controlled."),
     );
+  renderOverviewReference(root, notify);
   const channel = buildChannels(demoData())[0];
   channel.points[20].value = null;
   root.querySelector("#catalog-chart").data = {
@@ -183,4 +201,206 @@ export function mountResearch(root) {
    .join("")}</section>
  <section class="design-section">${intro("02 / First release", "What belongs in the interface.", "A component belongs here when it answers a monitoring question, remains useful without a complex configuration, and can describe its uncertainty.")}<div class="table-wrap"><table><thead><tr><th>Question</th><th>Component</th><th>Available now</th></tr></thead><tbody><tr><td>What is the latest value?</td><td>Sensor card, unit, source, freshness</td><td>Live + example</td></tr><tr><td>What changed?</td><td>History, period selection, exact-value inspection</td><td>Latest loaded observations</td></tr><tr><td>What needs attention?</td><td>Silence and measurement errors</td><td>Live + example</td></tr><tr><td>Which device reported it?</td><td>Device table and details</td><td>Live + example</td></tr><tr><td>Is it open, active or full?</td><td>Binary state and level meter</td><td>Component examples only</td></tr><tr><td>What if there is no reading?</td><td>Empty, loading, error, stale, skipped</td><td>Shared display states</td></tr><tr><td>Can I use it on my phone?</td><td>Responsive layout and compact navigation</td><td>All reference pages</td></tr></tbody></table></div></section>
  <section class="design-section">${intro("03 / Boundaries", "Leave room for the next step.", "This delivery establishes the visual system. It does not imply that every component example already has a matching server feature.")}<ul class="research-list"><li>Friendly names, areas and favorites need a persistent device registry.</li><li>Full-range historical analysis needs time-based queries and aggregation, beyond the latest 100 records.</li><li>Threshold alerts need explicit units, persistence and clear evaluation rules.</li><li>Controls and automations need authorization, confirmation and delivery state.</li><li>Remote access needs application authentication before the dashboard can leave loopback.</li><li>RSSI, battery and binary state require explicit reported data; the interface never invents them.</li></ul></section><footer class="footer"><span>Research informs the implementation; it does not prescribe a framework.</span><a href="/design/brand">Visual foundations →</a></footer>`;
+}
+
+// Fictional places in every state the overview distinguishes, drawn by the product's own
+// model and markup so the reference cannot drift from the page.
+function renderOverviewReference(root, notify) {
+  const now = Date.now();
+  const minutes = (n) => new Date(now - n * 60000).toISOString();
+  const series = (base, swing, until = 0) =>
+    Array.from({ length: 36 }, (_, i) => ({
+      time: now - (until + (35 - i) * 5) * 60000,
+      value: Number((base + swing * Math.sin(i / 5)).toFixed(1)),
+    }));
+  const channel = (key, title, metric, unit, value, state, extra = {}) => ({
+    key,
+    title,
+    metric,
+    unit,
+    value,
+    state,
+    at: minutes(2),
+    interval: 300,
+    points: series(value, unit === "%" ? 3 : 1.2),
+    ...extra,
+  });
+  const place = (device, name, location, sensors, extra = {}) => ({
+    transport: "mqtt",
+    source: "example",
+    device,
+    name,
+    location,
+    at: minutes(2),
+    interval: 300,
+    stale: false,
+    sensors,
+    diagnostics: [],
+    state: { receiver_id: "example-r1" },
+    ...extra,
+  });
+  const battery = (value) => [
+    { sensor: "battery", metric: "voltage", unit: "V", value, state: "ok" },
+  ];
+  const groups = [
+    place("garden", "Garden", "Beds", [
+      {
+        name: "Bed 1",
+        channels: [
+          channel("soil-1", "Soil moisture", "soil_moisture", "%", 41, "ok"),
+        ],
+      },
+      {
+        name: "Bed 2",
+        channels: [
+          channel(
+            "soil-2",
+            "Soil moisture",
+            "soil_moisture",
+            "%",
+            null,
+            "error",
+            {
+              at: minutes(4),
+              points: [
+                ...series(38, 2, 40),
+                { time: now - 35 * 60000, value: null },
+                { time: now - 4 * 60000, value: null },
+              ],
+            },
+          ),
+        ],
+      },
+      {
+        name: "Air",
+        named: true,
+        channels: [
+          channel("air", "Temperature", "temperature", "degC", 27.4, "stale", {
+            at: minutes(40),
+            points: series(27.4, 1.2, 40),
+          }),
+          channel("light", "Illuminance", "illuminance", "lx", null, "skipped"),
+        ],
+      },
+    ]),
+    place(
+      "coop",
+      "Coop",
+      "Back yard",
+      [
+        {
+          name: "Climate",
+          channels: [
+            channel("coop-t", "Temperature", "temperature", "degC", 24, "ok"),
+            channel("coop-h", "Humidity", "humidity", "%", 61.8, "ok"),
+          ],
+        },
+      ],
+      { diagnostics: battery(3.12) },
+    ),
+    place(
+      "tank",
+      "Water tank",
+      "Hill",
+      [
+        {
+          name: "Level",
+          channels: [
+            channel(
+              "tank-t",
+              "Temperature",
+              "temperature",
+              "degC",
+              21.3,
+              "stale",
+              {
+                at: minutes(50),
+                points: series(21.3, 0.6, 50),
+              },
+            ),
+          ],
+        },
+      ],
+      {
+        stale: true,
+        at: minutes(50),
+        state: { receiver_id: "example-r2" },
+      },
+    ),
+    place(
+      "compost",
+      "Compost",
+      "Pile 2",
+      [
+        {
+          name: "Pile",
+          channels: [
+            channel(
+              "pile",
+              "Temperature",
+              "temperature",
+              "degC",
+              63.1,
+              "stale",
+              {
+                at: minutes(190),
+                points: [],
+              },
+            ),
+          ],
+        },
+      ],
+      { stale: true, at: minutes(190), diagnostics: battery(3.35) },
+    ),
+  ];
+  const receivers = [
+    {
+      source_id: "example",
+      device_id: "example-r1",
+      availability: "online",
+      queue: { depth: 0, dropped: 4 },
+    },
+    {
+      source_id: "example",
+      device_id: "example-r2",
+      availability: "offline",
+      availability_at: minutes(48),
+    },
+  ];
+  const items = attentionItems(groups, receivers, now);
+  root.querySelector("#reference-summary").innerHTML = summaryHTML(
+    items,
+    groups.length,
+  );
+  root.querySelector("#reference-attention").innerHTML = items
+    .map(attentionItemHTML)
+    .join("");
+  const target = root.querySelector("#reference-places");
+  target.innerHTML = `${placesHeadingHTML(3)}<div class="places"></div>`;
+  for (const group of groups) {
+    const key = placeKey(group);
+    const notes = items.filter((item) => item.places.includes(key));
+    const article = document.createElement("article");
+    article.className = "panel place";
+    article.dataset.severity = placeSeverity(key, items);
+    article.innerHTML = placeHTML(group, notes, now, 4);
+    const rows = article.querySelector(".place-rows");
+    for (const sensor of group.sensors)
+      for (const c of sensor.channels) {
+        const row = document.createElement("div");
+        row.className = "reading-button place-row";
+        row.innerHTML = placeRowHTML(
+          c,
+          group,
+          sensorLabel(group, sensor, c),
+          now,
+        );
+        rows.append(row);
+      }
+    target.querySelector(".places").append(article);
+  }
+  for (const button of target.querySelectorAll("[data-details]"))
+    button.addEventListener("click", () =>
+      notify("In the product, Details opens this device's diagnostics."),
+    );
 }

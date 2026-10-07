@@ -18,6 +18,11 @@ import {
 } from "./workspace-api.mjs";
 import { icon } from "./icons.mjs";
 import { fetchSnapshot } from "./snapshot-api.mjs";
+import {
+  BATTERY_CRITICAL_V,
+  BATTERY_LOW_V,
+  batteryVolts,
+} from "./overview-model.mjs";
 import { commandRunner } from "./command-api.mjs";
 import {
   offers,
@@ -66,9 +71,16 @@ export function mountRegistry(root, { state, kind, notify }) {
       : null;
     return { device, group, sensor };
   }
-  // Battery, radio link and receiver of a device, from its diagnostics and state. A
-  // value keeps its own state: an old one says so and a failed read is not "missing".
-  function health(entry, group) {
+  // Last contact, battery, radio link and receiver of a device, each judged where it
+  // is shown with the overview's marks: late or low is attention, a battery where the
+  // device stops transmitting is critical, a receiver without connection is network.
+  // Signal has no agreed limits, so it stays neutral. A failed read is not "missing".
+  function health(entry, group, judged) {
+    const node = deviceStateFor(
+      snapshot.device_states ?? [],
+      entry.source,
+      entry.device,
+    );
     const none = t("dashboard.not_reported");
     const channel = (metric) =>
       group?.diagnostics.find(
@@ -82,23 +94,40 @@ export function mountRegistry(root, { state, kind, notify }) {
           : c.state === "stale"
             ? `${text(c)} · ${states.stale}`
             : (states[c.state] ?? c.state);
+    const mark = (state, text) =>
+      `<span class="badge" data-state="${state}">${e(text)}</span>`;
     const battery = channel("voltage");
+    // A revoked device no longer reports: its values are history, not problems.
+    const volts = judged ? batteryVolts(group) : null;
+    const batteryText = shown(
+      battery,
+      (c) => `${formatMeasurement(c.value, c.metric, c.unit)} V`,
+    );
+    const receiver = node?.receiver_id
+      ? deviceStateFor(
+          snapshot.device_states ?? [],
+          entry.source,
+          node.receiver_id,
+        )
+      : null;
+    const lastContact = age(
+      entry.received_at,
+      Date.parse(snapshot.generated_at),
+    );
     const rssi = channel("rssi");
     const snr = channel("snr");
-    const node = deviceStateFor(
-      snapshot.device_states ?? [],
-      entry.source,
-      entry.device,
-    );
     return [
       [
+        t("common.last_report"),
+        judged && group?.stale ? mark("stale", lastContact) : e(lastContact),
+      ],
+      [
         t("metrics.battery"),
-        e(
-          shown(
-            battery,
-            (c) => `${formatMeasurement(c.value, c.metric, c.unit)} V`,
-          ),
-        ),
+        volts !== null && volts < BATTERY_CRITICAL_V
+          ? mark("critical", batteryText)
+          : volts !== null && volts < BATTERY_LOW_V
+            ? mark("warning", batteryText)
+            : e(batteryText),
       ],
       [
         t("registry.signal"),
@@ -117,18 +146,23 @@ export function mountRegistry(root, { state, kind, notify }) {
       ],
       [
         t("receivers.receiver"),
-        e(
-          node?.receiver_id
-            ? [
-                receiverLabel(node.receiver_id),
-                node.binding === "revoked"
-                  ? t("receivers.binding_revoked")
-                  : "",
-              ]
-                .filter(Boolean)
-                .join(" · ")
-            : none,
-        ),
+        judged && receiver?.availability === "offline"
+          ? mark(
+              "network",
+              `${receiverLabel(node.receiver_id)} · ${t("receivers.offline")}`,
+            )
+          : e(
+              node?.receiver_id
+                ? [
+                    receiverLabel(node.receiver_id),
+                    node.binding === "revoked"
+                      ? t("receivers.binding_revoked")
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                : none,
+            ),
       ],
     ];
   }
@@ -174,28 +208,37 @@ export function mountRegistry(root, { state, kind, notify }) {
         const cells = [
           [
             t("registry.name_location"),
-            `<strong>${e(entry.name)}</strong><span class="registry-secondary">${e(entry.location || t("common.no_location"))}</span>`,
+            `<strong>${e(entry.name)}</strong><span class="registry-secondary">${e(
+              [
+                entry.location || t("common.no_location"),
+                ...(sensors
+                  ? []
+                  : [
+                      t("counts.sensors", {
+                        count: group?.sensors.length ?? 0,
+                      }),
+                    ]),
+              ].join(" · "),
+            )}</span>`,
           ],
-          [
-            sensors ? t("common.device") : t("common.sensors"),
-            sensors
-              ? `<a href="/devices">${e(device.name || device.device)}</a>`
-              : e(t("counts.sensors", { count: group?.sensors.length ?? 0 })),
-          ],
-          [
-            sensors ? t("common.measurements") : t("common.last_report"),
-            e(detail),
-          ],
-          ...(sensors ? [] : health(entry, group)),
-          [
-            t("common.status"),
-            revoked(entry)
-              ? `<span class="badge" data-state="empty">${e(t("receivers.binding_revoked"))}</span>`
-              : `<cj-badge state="${status}"></cj-badge>`,
-          ],
+          ...(sensors
+            ? [
+                [
+                  t("common.device"),
+                  `<a href="/devices">${e(device.name || device.device)}</a>`,
+                ],
+                [t("common.measurements"), e(detail)],
+                [
+                  t("common.status"),
+                  revoked(entry)
+                    ? `<span class="badge" data-state="empty">${e(t("receivers.binding_revoked"))}</span>`
+                    : `<cj-badge state="${status}"></cj-badge>`,
+                ],
+              ]
+            : health(entry, group, !revoked(entry))),
           [
             t("common.actions"),
-            `<span class="row-actions"><button class="button" data-edit="${entry.id}" aria-label="${e(t("registry.edit_name", { name: entry.name }))}">${t("common.edit")}</button>${revoked(entry) && !sensors ? `<button class="button" data-repair="${entry.id}" aria-label="${e(t("registry.pairing.repair_name", { name: entry.name }))}">${t("registry.pairing.repair")}</button>` : ""}${!sensors && !revoked(entry) ? `<span data-revocation="${entry.id}"></span>` : ""}<button class="button danger-text" data-archive="${entry.id}" aria-label="${e(t("registry.archive_name", { name: entry.name }))}">${t("registry.archive")}</button></span>`,
+            `<span class="row-actions"><button class="button" data-edit="${entry.id}" aria-label="${e(t("registry.edit_name", { name: entry.name }))}">${t("common.edit")}</button>${revoked(entry) && !sensors ? `<button class="button" data-repair="${entry.id}" aria-label="${e(t("registry.pairing.repair_name", { name: entry.name }))}">${t("registry.pairing.repair")}</button>` : ""}</span>`,
           ],
         ];
         return cells;
@@ -213,20 +256,6 @@ export function mountRegistry(root, { state, kind, notify }) {
     const gone = registered.filter(revoked);
     // Revoked devices keep their name and history but sit apart, below the working ones.
     list.innerHTML = `${active.length ? table(active, message("registered")) : ""}${gone.length ? `<section class="registry-revoked" aria-labelledby="revoked-heading"><h2 id="revoked-heading">${e(t("registry.pairing.revoked_heading"))}</h2><p class="muted">${e(t(sensors ? "registry.pairing.revoked_sensors_note" : "registry.pairing.revoked_note"))}</p>${table(gone, t("registry.pairing.revoked_heading"))}</section>` : ""}`;
-    for (const holder of list.querySelectorAll("[data-revocation]")) {
-      const entry = entries.find(
-        (d) => d.id === Number(holder.dataset.revocation),
-      );
-      const button = revokeButton(entry, null);
-      if (button) holder.append(button);
-    }
-    for (const b of list.querySelectorAll("[data-archive]"))
-      b.addEventListener("click", () =>
-        archive(
-          entries.find((d) => d.id === Number(b.dataset.archive)),
-          b,
-        ),
-      );
     for (const b of list.querySelectorAll("[data-repair]"))
       b.addEventListener("click", () =>
         openAdd(`[data-repair="${CSS.escape(b.dataset.repair)}"]`),
@@ -270,17 +299,34 @@ export function mountRegistry(root, { state, kind, notify }) {
       }
     });
     const revoke = sensors ? null : revokeButton(entry, dialog);
-    if (revoke) body.append(revoke);
+    // Rare, consequential actions sit together below the form, apart from Save.
+    const actions = document.createElement("div");
+    actions.className = "dialog-actions";
+    body.append(actions);
+    if (revoke) actions.append(revoke);
     else if (!sensors && bindingOf(entry)?.binding === "revoked")
       body.insertAdjacentHTML(
         "beforeend",
         `<p class="notice">${e(t("registry.pairing.revoked"))}</p>`,
       );
+    // Removing from the list is rare and keeps history; it lives here, not on every row.
+    if (entry.name) {
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "button danger-text";
+      remove.textContent = t("registry.archive");
+      remove.setAttribute(
+        "aria-label",
+        t("registry.archive_name", { name: entry.name }),
+      );
+      remove.addEventListener("click", () => archive(entry, remove, dialog));
+      actions.append(remove);
+    }
     if (!dialog.open) dialog.showModal();
     form.elements.name.focus();
   }
   // Removal hides the item until fresh telemetry arrives; history stays.
-  async function archive(entry, button) {
+  async function archive(entry, button, dialog) {
     if (!window.confirm(t("registry.archive_confirm", { name: entry.name })))
       return;
     button.disabled = true;
@@ -291,11 +337,17 @@ export function mountRegistry(root, { state, kind, notify }) {
         { revision: entry.revision },
         "POST",
       );
+      dialog?.close();
       notify(t("registry.archived", { name: entry.name }));
       await refresh();
+      // The row is gone; continue from the search above the list.
+      root.querySelector('input[type="search"]').focus();
     } catch (error) {
-      notify(error.message);
+      const alert = dialog?.querySelector('[role="alert"]');
+      if (alert) alert.textContent = error.message;
+      else notify(error.message);
       button.disabled = false;
+      button.focus();
     }
   }
   // Revocation is management, not monitoring: it lives with the device's name.

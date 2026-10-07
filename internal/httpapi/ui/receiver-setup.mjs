@@ -1,4 +1,4 @@
-import { t } from "./i18n.mjs";
+import { t, errorMessage } from "./i18n.mjs";
 import { escapeHTML as e, receiverLabel } from "./model.mjs";
 import { createDialog, localizeValidation } from "./workspace-api.mjs";
 import {
@@ -273,6 +273,6 @@ export async function openReceiverSetup(root, state, onDone) {
     }
     render(false);
   } catch (err) {
-    if (alive()) body.textContent = err.message;
+    if (alive()) body.textContent = errorMessage(err);
   }
 }

@@ -416,7 +416,10 @@ summary gives the number of problems by severity, or says all is clear with the 
 of registered devices.
 
 A device block on the overview, or a device card in an organized dashboard, shows its
-identity and last arrival with one **Details** action. Radio diagnostics and links to their histories live in that dialog. The
+identity and last arrival with one **Details** action. The devices page judges each health value where it is
+shown: a late last report and a low battery are marked as attention, a battery where the
+device stops transmitting as critical, and a receiver without connection as network.
+Signal has no agreed limits and stays neutral. Radio diagnostics and links to their histories live in that dialog. The
 version 1 convention recognized here is `sensor_id: "radio"` with `rssi` in `dBm`
 or `snr` in `dB`. These exact channels are excluded from environmental sensor counts
 and the sensor CSV. Their values, data quality and histories remain available.
@@ -524,7 +527,7 @@ accessibility audit covers selected WCAG A/AA rules, not a complete conformance 
 The Go suite checks asset routing, CSP, escaped snapshot data and API compatibility.
 These tests run in CI. Prettier is a development formatter, not a compilation step.
 
-Devices and sensors offer **Remove from list** next to **Edit**; receivers offer it on
+Devices and sensors offer **Remove from list** in their **Edit** dialog; receivers offer it on
 their cards. Transmitter revocation is shown for MQTT devices only and requires an online
 receiver advertising that capability. Receiver and sensor removal preserves history.
 `POST /ui-api/sensors/{id}/archive` takes `{"revision":n}`;

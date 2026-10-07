@@ -94,6 +94,32 @@ for (const viewport of [
     expect(requests.every((url) => url.startsWith(referenceURL))).toBeTruthy();
   });
 }
+test("the components reference draws the overview with the product's modules", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(referenceURL + "/design/components");
+  const section = page.locator("#overview");
+  await expect(section.locator(".overview-headline")).toHaveText("8 problems");
+  // Every severity of the vocabulary appears, most severe first.
+  await expect(section.locator("#reference-attention > li")).toHaveCount(8);
+  const severities = await section
+    .locator("#reference-attention > li")
+    .evaluateAll((items) => items.map((li) => li.dataset.severity));
+  expect(severities[0]).toBe("critical");
+  expect(severities.at(-1)).toBe("network");
+  await expect(section.locator(".place")).toHaveCount(4);
+  await expect(
+    section.locator('.place[data-severity="network"] h4'),
+  ).toHaveText("Water tank");
+  // Each row state the overview distinguishes has an example.
+  for (const state of ["ok", "error", "stale", "skipped"])
+    await expect(
+      section.locator(`.row-value[data-state="${state}"]`).first(),
+    ).toBeVisible();
+  expect(errors).toEqual([]);
+});
 test("component states, literal text and keyboard chart inspection", async ({
   page,
 }) => {
@@ -129,7 +155,7 @@ test("brand contrast audit updates with theme and navigation works", async ({
   page,
 }) => {
   await page.goto(referenceURL + "/design/brand");
-  await expect(page.locator("#contrast-audit tr")).toHaveCount(14);
+  await expect(page.locator("#contrast-audit tr")).toHaveCount(16);
   await expect(page.locator("#contrast-audit")).not.toContainText(
     "Below target",
   );
@@ -1198,6 +1224,66 @@ function pairingSnapshot() {
     },
   };
 }
+test("the devices page judges each health value where it is shown", async ({
+  page,
+}) => {
+  const state = pairingSnapshot();
+  state.device_states[0].availability = "offline";
+  state.device_states.push({
+    source_id: "site",
+    device_id: "0000aa000000b002",
+    role: "transmitter",
+    receiver_id: "0000aa000000a001",
+    binding: "active",
+    received_at: state.generated_at,
+  });
+  const at = new Date(Date.now() - 3 * 3600000).toISOString();
+  state.samples.push({
+    source_id: "site",
+    device_id: "0000aa000000b002",
+    sample_id: "s1",
+    received_at: at,
+    expected_interval_seconds: 300,
+    readings: [
+      {
+        sensor_id: "battery",
+        metric: "voltage",
+        unit: "V",
+        value: 3.1,
+        status: "ok",
+      },
+      {
+        sensor_id: "radio",
+        metric: "rssi",
+        unit: "dBm",
+        value: -71,
+        status: "ok",
+      },
+    ],
+  });
+  state.workspace.devices.push({
+    id: 7,
+    transport: "mqtt",
+    source: "site",
+    device: "0000aa000000b002",
+    name: "Coop",
+    location: "",
+    revision: 1,
+    received_at: at,
+    interval: 300,
+  });
+  await liveDevices(page, state);
+  const row = page.getByRole("row").filter({ hasText: "Coop" });
+  const mark = (column) => row.locator(`td[data-label="${column}"] .badge`);
+  await expect(mark("Last report")).toHaveAttribute("data-state", "stale");
+  await expect(mark("Battery")).toHaveAttribute("data-state", "critical");
+  await expect(mark("Battery")).toHaveText("3.10 V · Stale");
+  await expect(mark("Receiver")).toHaveAttribute("data-state", "network");
+  await expect(mark("Receiver")).toHaveText("Receiver A001 · Offline");
+  // Signal has no agreed limits: it stays neutral.
+  await expect(mark("Signal")).toHaveCount(0);
+  await expect(row.locator('td[data-label="Status"]')).toHaveCount(0);
+});
 test("one dialog pairs a transmitter by radio and names it as it appears", async ({
   page,
 }) => {
@@ -1334,17 +1420,18 @@ test("revocation lives with the device name, not on the dashboard", async ({
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBeTruthy();
-  await expect(
-    row.getByRole("button", { name: "Revoke transmitter", exact: true }),
-  ).toBeVisible();
-  await expect(
-    row.getByRole("button", { name: "Remove Coop from the list", exact: true }),
-  ).toBeVisible();
+  // The row keeps only Edit; revoking and removing live in its dialog.
+  await expect(row.getByRole("button")).toHaveText(["Edit"]);
   await edit.click();
   await expect(
     page
       .getByRole("dialog")
       .getByRole("button", { name: "Revoke transmitter", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Remove Coop from the list", exact: true }),
   ).toBeVisible();
   const home = await (await page.request.get("/?lang=en-US")).text();
   await page.route("**/", (route) =>
@@ -1580,7 +1667,6 @@ test("a revoked transmitter says so instead of offering Revoke", async ({
   await expect(
     section.getByRole("row").filter({ hasText: "Coop" }),
   ).toHaveCount(1);
-  await expect(row.locator('td[data-label="Status"]')).toHaveText("Revoked");
   await page.getByRole("button", { name: "Edit Coop", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText("Revoked: the receiver");
   await expect(
@@ -1592,21 +1678,41 @@ test("a revoked transmitter says so instead of offering Revoke", async ({
     .click();
   await expect(page.getByRole("dialog")).toContainText("Pair a transmitter");
   await page.keyboard.press("Escape");
+  // A revoked device's values are history: none of them is marked as a problem.
+  await expect(
+    page.getByRole("row").filter({ hasText: "Coop" }).locator(".badge"),
+  ).toHaveCount(0);
   let archived = null;
+  let attempts = 0;
   await page.route("**/ui-api/devices/7/archive", (route) => {
+    attempts += 1;
     archived = JSON.parse(route.request().postData());
-    return route.fulfill({ status: 204 });
+    return attempts === 1
+      ? route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "revision conflict" }),
+        })
+      : route.fulfill({ status: 204 });
   });
-  page.once("dialog", (d) => d.accept());
+  page.on("dialog", (d) => d.accept());
   const gone = structuredClone(state);
   gone.workspace.devices = [];
+  await page.getByRole("button", { name: "Edit Coop", exact: true }).click();
+  const remove = page.getByRole("button", {
+    name: "Remove Coop from the list",
+    exact: true,
+  });
+  // A failed removal keeps the dialog, says why in it and keeps focus on the action.
+  await remove.click();
+  await expect(page.getByRole("dialog").getByRole("alert")).not.toBeEmpty();
+  await expect(remove).toBeFocused();
   await serve(gone);
-  await page
-    .getByRole("button", { name: "Remove Coop from the list", exact: true })
-    .click();
+  await remove.click();
   await expect(page.locator("#toast")).toHaveText(
     "Coop removed from the list.",
   );
+  await expect(page.getByRole("searchbox")).toBeFocused();
   expect(archived).toEqual({ revision: 1 });
   await expect(page.getByRole("region", { name: "Revoked" })).toHaveCount(0);
 });

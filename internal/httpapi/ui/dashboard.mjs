@@ -6,7 +6,6 @@ import {
   age,
   formatMeasurement,
   formatUnit,
-  plotGeometry,
   csvRows,
   states,
   receiverLabel,
@@ -30,11 +29,13 @@ import {
   sensorLabel,
 } from "./overview-model.mjs";
 import { fetchSnapshot } from "./snapshot-api.mjs";
-
-// The page holds only the latest 100 samples (about 1 h 40 min each for five devices
-// reporting every 5 min), so a longer trend would be mostly empty until history queries
-// exist (ADR 0002). One window for every row keeps their trends comparable.
-const TREND_HOURS = 3;
+import {
+  attentionItemHTML,
+  placeHTML,
+  placeRowHTML,
+  placesHeadingHTML,
+  summaryHTML,
+} from "./overview-view.mjs";
 
 // A value the firmware reported that this version has no text for.
 function known(key, fallback) {
@@ -216,7 +217,7 @@ export function mountDashboard(root, { state = {}, notify }) {
       place.className = "panel place";
       place.dataset.severity = severity;
       const notes = attention.filter((item) => item.places.includes(key));
-      place.innerHTML = `<header class="place-head"><div><h3>${e(g.name)}</h3><p class="muted">${g.location ? `${e(g.location)} · ` : ""}${e(t("overview.last_reading", { age: age(g.at, now).toLowerCase() }))}</p></div><button class="text-button" data-details="${e(`${g.source}/${g.device}`)}" aria-label="${e(t("dashboard.details_for", { name: g.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></header><div class="place-rows"></div>${notes.length ? `<ul class="place-notes">${notes.map((item) => `<li><span class="badge" data-state="${item.severity}">${e(item.short)}</span></li>`).join("")}</ul>` : ""}`;
+      place.innerHTML = placeHTML(g, notes, now);
       const rows = place.querySelector(".place-rows");
       for (const sensor of g.sensors)
         for (const c of sensor.channels)
@@ -230,62 +231,35 @@ export function mountDashboard(root, { state = {}, notify }) {
     }
     const section = document.createElement("div");
     section.className = "places-section";
-    section.innerHTML = `<div class="places-heading"><h2>${t("overview.places_heading")}</h2><span>${e(t("overview.trend_window", { hours: TREND_HOURS }))}</span></div>`;
+    section.innerHTML = placesHeadingHTML();
     section.append(list);
     target.append(section);
   }
   function placeRow(c, g, sensorName) {
     const button = readingButton(c, g);
     button.classList.add("place-row");
-    const value = ["ok", "recorded", "stale"].includes(c.state)
-      ? c.value
-      : null;
-    const now = Date.parse(snapshot.generated_at);
-    const spark = plotGeometry(
-      c.points,
-      96,
-      24,
-      c.interval ? c.interval * 3000 : Infinity,
-      [now - TREND_HOURS * 3600000, now],
+    button.innerHTML = placeRowHTML(
+      c,
+      g,
+      sensorName,
+      Date.parse(snapshot.generated_at),
     );
-    // A silent place says so once in its note; its rows do not repeat it.
-    const quiet =
-      c.state === "ok" ||
-      c.state === "recorded" ||
-      (g.stale && c.state === "stale");
-    button.innerHTML = `<span class="row-label"><span class="row-title">${e(c.title)}</span>${sensorName ? `<span class="row-sub">${e(sensorName)}</span>` : ""}${quiet ? "" : `<cj-badge state="${e(c.state)}"></cj-badge>`}</span><span class="row-value" data-state="${e(c.state)}">${formatMeasurement(value, c.metric, c.unit)}<span class="unit">${e(formatUnit(c.unit))}</span></span><span class="row-trend">${spark ? `<svg class="spark" viewBox="0 0 96 28" preserveAspectRatio="none" aria-hidden="true"><path d="${spark.path}" transform="translate(0 2)"/></svg>` : ""}</span>`;
     return button;
   }
   function renderAttention() {
     const panel = root.querySelector("#attention");
     panel.hidden = !attention.length;
-    const html = attention
-      .map(
-        (item) =>
-          `<li data-severity="${item.severity}"><span class="badge" data-state="${item.severity}">${e(states[item.severity])}</span><div class="attention-text"><strong>${item.href ? `<a href="${e(item.href)}">${e(item.title)}</a>` : e(item.title)}</strong>${item.detail ? `<span>${e(item.detail)}</span>` : ""}</div><span class="attention-since">${e(item.since)}</span></li>`,
-      )
-      .join("");
+    const html = attention.map(attentionItemHTML).join("");
     // Rewriting an unchanged list on every refresh would drop focus from its links.
     if (html === shownAttention) return;
     panel.querySelector(".attention-list").innerHTML = html;
     shownAttention = html;
   }
   function renderSummary() {
-    const count = (severity) =>
-      attention.filter((item) => item.severity === severity).length;
-    root.querySelector("#summary").innerHTML = attention.length
-      ? `<p class="overview-headline">${t("overview.problems", { count: attention.length })}</p><span class="overview-counts">${[
-          "critical",
-          "warning",
-          "network",
-        ]
-          .filter(count)
-          .map(
-            (severity) =>
-              `<span class="badge" data-state="${severity}">${e(states[severity])} · ${count(severity)}</span>`,
-          )
-          .join("")}</span>`
-      : `<p class="overview-headline">${groups.length ? t("overview.all_clear") : t("common.waiting")}</p><span class="muted">${t("counts.devices", { count: groups.length })}</span>`;
+    root.querySelector("#summary").innerHTML = summaryHTML(
+      attention,
+      groups.length,
+    );
   }
   function readingButton(c, g) {
     const button = document.createElement("button");

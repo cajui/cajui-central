@@ -9,6 +9,7 @@ pt-BR:
     measurement: Medição
     measurements: Medições
     refresh: Atualizar
+    network_error: Não foi possível falar com o Central. Verifique a conexão e tente de novo.
     history: Histórico
     cancel: Cancelar
     unknown: Desconhecido
