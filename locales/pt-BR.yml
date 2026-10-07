@@ -1,7 +1,7 @@
 # Plain-text messages. Interpolation uses Rails-style %{name} placeholders.
 pt-BR:
   common:
-    dashboard: Painel
+    dashboard: Visão geral
     devices: Transmissores
     receivers: Receptores
     sensors: Sensores
@@ -24,11 +24,11 @@ pt-BR:
     no_location: Sem localização
     waiting: Aguardando dados
   nav:
-    connections: Conexões
-    workspace: Área de trabalho
+    main: Navegação principal
+    equipment: Equipamentos
+    system: Sistema
     home: Página inicial do Cajuí Central
-    open: Abrir navegação
-    theme: Alterar tema de cores
+    more: Mais
     light: Usar tema claro
     dark: Usar tema escuro
     skip: Pular para o conteúdo
@@ -69,7 +69,7 @@ pt-BR:
     received_time: Recebido no Central
     latest_reading: Leitura mais recente
     history_limit: Apenas leituras recentes carregadas; o período selecionado pode estar incompleto.
-    organize: Organizar painel
+    organize: Organizar visão geral
     export: Exportar leituras
     summary: Resumo da área de trabalho
     filter: Filtrar transmissores
@@ -92,7 +92,7 @@ pt-BR:
     inspect_history: Ver histórico de %{measurement} de %{device}
     no_items: Nenhum item corresponde ao filtro nesta seção.
     section_empty: Nada para mostrar nesta seção.
-    make_yours: Personalize seu painel
+    make_yours: Personalize sua visão geral
     get_started: Adicione seus transmissores e escolha o que mostrar aqui.
     manage_devices: Gerenciar transmissores
     manage_sensors: Gerenciar sensores
@@ -230,9 +230,9 @@ pt-BR:
       preserva seu nome e histórico.
     add_section: Adicionar seção
     automatic: Usar organização automática
-    save: Salvar painel
+    save: Salvar visão geral
     automatic_note: 'Organização automática: a visão geral mostra um bloco por transmissor, depois do que precisa de atenção.'
-    empty: Ainda não há seções. Adicione uma para começar ou salve um painel vazio.
+    empty: Ainda não há seções. Adicione uma para começar ou salve uma visão geral vazia.
     section: Seção %{number}
     title: Título da seção
     section_up: Mover seção %{number} para cima

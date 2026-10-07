@@ -7,9 +7,18 @@ const referenceURL = "http://127.0.0.1:8092";
 test.beforeEach(async ({ page }) => {
   await page.route("**/ui-api/device-states/events", (route) => route.abort());
   await page.route("**/ui-api/device-states", async (route) => {
-    const snapshot = await page.evaluate(() =>
-      JSON.parse(document.querySelector("#initial-state").textContent),
-    );
+    // A request still in flight when the test navigates has no page left to read the
+    // snapshot from, and its answer no longer matters. Any other error still fails.
+    let snapshot;
+    try {
+      snapshot = await page.evaluate(() =>
+        JSON.parse(document.querySelector("#initial-state").textContent),
+      );
+    } catch (error) {
+      if (/context was destroyed|navigat/i.test(String(error)))
+        return route.abort();
+      throw error;
+    }
     await route.fulfill({
       json: {
         generated_at: snapshot.generated_at,
@@ -140,7 +149,7 @@ test("live view refresh preserves data after a network failure", async ({
 }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Dashboard", exact: true }),
+    page.getByRole("heading", { name: "Overview", exact: true }),
   ).toBeVisible();
   await page.route("**/", (route) => route.abort());
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
@@ -529,6 +538,67 @@ for (const width of [390, 820, 1440]) {
     ).toBeTruthy();
   });
 }
+test("on a phone the menu sits at the bottom, with language and theme under More", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await liveWorkspace(page);
+  const tabs = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(tabs).toBeVisible();
+  await expect(page.locator("#sidebar")).toBeHidden();
+  await expect(tabs.getByRole("link", { name: "Overview" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  const language = page.getByRole("combobox", { name: "Language" });
+  await expect(language).toBeHidden();
+  const more = tabs.getByRole("button", { name: "More" });
+  await more.click();
+  await expect(language).toBeVisible();
+  await page.getByRole("button", { name: "Switch to dark theme" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.keyboard.press("Escape");
+  await expect(language).toBeHidden();
+  // The end of the page stays readable above the bar, on a page short enough to scroll.
+  await page.setViewportSize({ width: 390, height: 480 });
+  await page.evaluate(() =>
+    scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: "instant",
+    }),
+  );
+  expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
+  const bar = await tabs.boundingBox();
+  const footer = await page.locator(".footer").boundingBox();
+  expect(footer.y + footer.height).toBeLessThanOrEqual(bar.y);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  // Each area opens a sheet with its pages, and the area stays marked on them.
+  await tabs.getByRole("button", { name: "Equipment" }).click();
+  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  await expect(equipment.getByRole("link")).toHaveText([
+    "Devices",
+    "Receivers",
+    "Sensors",
+  ]);
+  await equipment.getByRole("link", { name: "Devices" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Devices", exact: true, level: 1 }),
+  ).toBeVisible();
+  const menu = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(menu.getByRole("button", { name: "Equipment" })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await menu.getByRole("button", { name: "System" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "System" }).getByRole("link"),
+  ).toHaveText(["MQTT broker"]);
+});
+
 test("known measurements keep their decimals on every screen", async ({
   page,
 }) => {
@@ -770,7 +840,7 @@ test("persistent registration, independent dashboard composition and safe edits"
   await other.close();
   await page.goto("/");
   await page
-    .getByRole("button", { name: "Organize dashboard", exact: true })
+    .getByRole("button", { name: "Organize overview", exact: true })
     .click();
   // Start with a deliberately empty composition, preserving all registrations.
   while (
@@ -805,7 +875,7 @@ test("persistent registration, independent dashboard composition and safe edits"
     .getByRole("button", { name: "Move section 2 up", exact: true })
     .click();
   await page
-    .getByRole("button", { name: "Save dashboard", exact: true })
+    .getByRole("button", { name: "Save overview", exact: true })
     .click();
   await expect(page.locator(".dashboard-section > h2")).toHaveText([
     "Equipment",
@@ -843,7 +913,7 @@ test("persistent registration, independent dashboard composition and safe edits"
     ).toEqual([]);
   }
   await page
-    .getByRole("button", { name: "Organize dashboard", exact: true })
+    .getByRole("button", { name: "Organize overview", exact: true })
     .click();
   // Select a single measurement independently of its physical sensor.
   const climate = page.getByRole("group", { name: "Section 2", exact: true });
@@ -859,19 +929,19 @@ test("persistent registration, independent dashboard composition and safe edits"
     .analyze();
   expect(editorAudit.violations.map((v) => v.id)).toEqual([]);
   await page
-    .getByRole("button", { name: "Save dashboard", exact: true })
+    .getByRole("button", { name: "Save overview", exact: true })
     .click();
   await expect(page.locator("cj-reading")).toHaveCount(1);
   await expect(page.locator("cj-reading")).toContainText("Temperature");
   await page
-    .getByRole("button", { name: "Organize dashboard", exact: true })
+    .getByRole("button", { name: "Organize overview", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Remove section", exact: true })
     .last()
     .click();
   await page
-    .getByRole("button", { name: "Save dashboard", exact: true })
+    .getByRole("button", { name: "Save overview", exact: true })
     .click();
   await expect(page.locator("cj-reading")).toHaveCount(0);
   await page.goto("/sensors");
@@ -905,15 +975,24 @@ test("language selection persists across navigation and server-rendered pages", 
     .selectOption("pt-BR");
   await expect(page.locator("html")).toHaveAttribute("lang", "pt-BR");
   await expect(
-    page.getByRole("heading", { name: "Painel", exact: true }),
+    page.getByRole("heading", { name: "Visão geral", exact: true }),
   ).toBeVisible();
+  // The equipment pages are an area of the menu, the broker another.
   await page
-    .getByRole("navigation")
+    .getByRole("group", { name: "Equipamentos" })
     .getByRole("link", { name: "Transmissores", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "Transmissores", exact: true }),
   ).toBeVisible();
+  await expect(
+    page
+      .getByRole("group", { name: "Equipamentos" })
+      .getByRole("link", { name: "Transmissores", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("group", { name: "Sistema" }).getByRole("link"),
+  ).toHaveText(["Broker MQTT"]);
   await page
     .getByRole("button", { name: "Adicionar transmissor", exact: true })
     .click();
@@ -979,7 +1058,7 @@ for (const language of ["pt-BR", "en-US"]) {
       .click();
     await page
       .getByRole("button", {
-        name: pt ? "Organizar painel" : "Organize dashboard",
+        name: pt ? "Organizar visão geral" : "Organize overview",
         exact: true,
       })
       .click();

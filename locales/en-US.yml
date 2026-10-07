@@ -1,7 +1,7 @@
 # Plain-text messages. Interpolation uses Rails-style %{name} placeholders.
 en-US:
   common:
-    dashboard: Dashboard
+    dashboard: Overview
     devices: Devices
     receivers: Receivers
     sensors: Sensors
@@ -24,11 +24,11 @@ en-US:
     no_location: No location
     waiting: Waiting for data
   nav:
-    connections: Connections
-    workspace: Workspace
+    main: Main navigation
+    equipment: Equipment
+    system: System
     home: Cajuí Central home
-    open: Open navigation
-    theme: Switch color theme
+    more: More
     light: Switch to light theme
     dark: Switch to dark theme
     skip: Skip to content
@@ -69,7 +69,7 @@ en-US:
     received_time: Received at Central
     latest_reading: Latest reading
     history_limit: Recent loaded readings only; the selected period may be incomplete.
-    organize: Organize dashboard
+    organize: Organize overview
     export: Export readings
     summary: Workspace summary
     filter: Filter devices
@@ -92,7 +92,7 @@ en-US:
     inspect_history: Inspect %{measurement} history for %{device}
     no_items: No matching items in this section.
     section_empty: Nothing to show in this section.
-    make_yours: Make this dashboard yours
+    make_yours: Make this overview yours
     get_started: Add your devices, then choose what to show here.
     manage_devices: Manage devices
     manage_sensors: Manage sensors
@@ -230,9 +230,9 @@ en-US:
       keeps its name and history.
     add_section: Add section
     automatic: Use automatic layout
-    save: Save dashboard
+    save: Save overview
     automatic_note: 'Automatic layout: the overview shows one block per device, after what needs attention.'
-    empty: No sections yet. Add one to start, or save an empty dashboard.
+    empty: No sections yet. Add one to start, or save an empty overview.
     section: Section %{number}
     title: Section title
     section_up: Move section %{number} up

@@ -149,6 +149,17 @@ pre {
   display: grid;
   gap: 5px;
 }
+.wordmark + .nav {
+  margin-top: 44px;
+}
+/* Areas inside the product menu: equipment and system. */
+.nav .sidebar-label {
+  margin: var(--space-6) 12px var(--space-1);
+}
+.nav-group {
+  display: grid;
+  gap: 5px;
+}
 .nav a {
   display: flex;
   align-items: center;
@@ -167,6 +178,163 @@ pre {
 .nav a[aria-current="page"] {
   background: var(--brand-soft);
   color: var(--brand);
+}
+/* Phone navigation: the tasks at the bottom, language and theme under More. */
+.tabbar {
+  display: none;
+}
+.settings-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.shell-settings {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 60px;
+  padding: var(--space-1) 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  /* "Equipamentos" fits a quarter of a 320 px screen at 11 px and of 390 px at 13 px. */
+  font-size: clamp(11px, 3.3vw, 13px);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.tab span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab svg {
+  width: 22px;
+  height: 22px;
+  padding: 2px 14px;
+  border-radius: 999px;
+  box-sizing: content-box;
+}
+.tab[aria-current] {
+  color: var(--brand);
+}
+.tab[aria-current] svg {
+  background: var(--brand-soft);
+}
+.tab:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+.nav-sheet {
+  position: fixed;
+  inset: auto 0 calc(60px + env(safe-area-inset-bottom, 0px)) 0;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 -12px 40px #0002;
+}
+.nav-sheet .shell-settings {
+  display: grid;
+  gap: var(--space-4);
+}
+.nav-sheet .settings-label {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+.nav-sheet .locale-picker {
+  display: grid;
+  gap: var(--space-1);
+  font-weight: 600;
+}
+.nav-sheet .locale-picker .input {
+  width: 100%;
+}
+.nav-sheet .theme-button {
+  display: flex;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  height: auto;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 600;
+}
+.sheet-links {
+  display: grid;
+  gap: var(--space-1);
+}
+.sheet-links a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+.sheet-links a[aria-current="page"] {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.sheet-links svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+@media (max-width: 1000px) {
+  .tabbar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
+  /* The page heading names the page; the bar and More hold the rest. */
+  .product-shell .topbar {
+    display: none;
+  }
+  /* Notices rise above the bar instead of covering its labels. */
+  .toast {
+    inset: auto auto calc(60px + env(safe-area-inset-bottom, 0px) + 12px) 50%;
+  }
+  /* The last lines of a page stay readable above the bar. */
+  .product-shell .content {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 32px);
+  }
 }
 .sidebar-bottom {
   margin-top: auto;
@@ -544,7 +712,25 @@ pre {
   transform: rotate(45deg);
 }
 /* Forced colours replace author backgrounds, which erased the filled shapes. */
+/* Without JavaScript there is no bottom bar: a phone shows the server-rendered menu. */
+@media (scripting: none) and (max-width: 1000px) {
+  .product-shell .sidebar {
+    display: flex;
+    position: static;
+    width: auto;
+    height: auto;
+    box-shadow: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
 @media (forced-colors: active) {
+  /* Backgrounds are replaced, so the current page keeps an outline instead. */
+  :is(.nav, .sheet-links) a[aria-current="page"],
+  .tab[aria-current] {
+    outline: 2px solid CanvasText;
+    outline-offset: -2px;
+  }
   .badge:is(
       [data-state="stale"],
       [data-state="warning"],
@@ -1026,7 +1212,8 @@ dialog::backdrop {
   .sidebar[data-open="true"] {
     display: flex;
   }
-  .sidebar-label {
+  .sidebar-label,
+  .wordmark + .nav {
     margin-top: 22px;
   }
   .topbar {
@@ -1164,6 +1351,8 @@ dialog::backdrop {
   .demo-banner,
   button,
   .toolbar,
+  .tabbar,
+  .nav-sheet,
   .toast {
     display: none;
   }

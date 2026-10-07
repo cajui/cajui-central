@@ -341,15 +341,18 @@ repository.
 
 ## Interface
 
-The sidebar separates **Dashboard**, **Devices**, **Receivers** and **Sensors**. Setup and display
+The menu starts with **Overview**, then two areas: **Equipment** (**Devices**,
+**Receivers** and **Sensors**) and **System** (**MQTT broker**). On screens up to 1000 px
+wide it sits at the bottom: each area opens a sheet with its pages, and **More** holds
+language and theme. Without JavaScript, the server-rendered menu links every page. Setup and display
 are independent: a dashboard item references a registration, not a copy of its name
 or measurements. No frontend build or additional service is needed.
 
-1. Open **Devices → Add device**. Pair a transmitter by radio or choose an observed
+1. Open **Equipment → Devices → Add device**. Pair a transmitter by radio or choose an observed
    device, name it, and optionally assign a location.
-2. Its sensors appear on **Sensors** and the dashboard by themselves, named after what
+2. Its sensors appear on **Sensors** and the overview by themselves, named after what
    they measure (for example "Temperature and humidity"); **Edit** renames one.
-3. Open **Dashboard → Organize dashboard**. Create named sections, select devices,
+3. Open **Overview → Organize overview**. Create named sections, select devices,
    complete sensors or individual measurements, and move sections/items up or down.
    Save to persist the arrangement, or cancel to discard the draft.
 
@@ -533,7 +536,7 @@ visible, keeping its original timestamp, availability and retained status.
 
 ### Receiver setup and MQTT diagnostics
 
-**Connections → Receivers → Add receiver** guides the first connection in three steps:
+**Equipment → Receivers → Add receiver** guides the first connection in three steps:
 connect to the receiver and save Wi-Fi, transfer MQTT connection details, then find
 and confirm the receiver. Known values are selectable text with copy actions; the
 password is retrieved only when Show password is selected. An optional address editor
@@ -571,7 +574,7 @@ Optional server settings:
 Central does not infer the receiver address from its own broker connection URL:
 an address reachable inside a container may not resolve on the receiver's network.
 
-**Connections → MQTT broker** shows connection status, subscriptions and read-only
+**System → MQTT broker** shows connection status, subscriptions and read-only
 connection settings. It keeps the last 100 inbound observations in memory, newest
 first, with filters, pause and normalized JSON for accepted messages. Only topics
 subscribed to by Central are visible. Invalid payloads are omitted. Counters and
