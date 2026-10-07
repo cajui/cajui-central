@@ -506,7 +506,7 @@ test("layout references registrations and excludes diagnostics", () => {
 
 test("receiver state keeps unknown values unknown and names actionable notices", () => {
   setLocale("en-US");
-  assert.equal(receiverLabel("000048ca433c5e10"), "Receiver 5E10");
+  assert.equal(receiverLabel("0000aa000000a001"), "Receiver A001");
   const states = [
     { source_id: "r", device_id: "a", role: "receiver" },
     { source_id: "r", device_id: "b", role: "transmitter" },
@@ -565,7 +565,7 @@ test("receiver state keeps unknown values unknown and names actionable notices",
   assert.equal(linkText({ rssi_dbm: -82, snr_db: 9.5 }), "-82 dBm · 9.5 dB");
   assert.equal(linkText({ snr_db: -2 }), "-2 dB");
   setLocale("pt-BR");
-  assert.equal(receiverLabel("000048ca433c5e10"), "Receptor 5E10");
+  assert.equal(receiverLabel("0000aa000000a001"), "Receptor A001");
   assert.match(
     receiverSummary({ availability: "offline" }).notices[0].text,
     /Wi-Fi do receptor/,
@@ -619,7 +619,7 @@ test("pairing window time and transmitters still waiting for a first reading", a
   );
   assert.equal(clockText(70), "1:10");
   assert.equal(clockText(5), "0:05");
-  assert.equal(shortID("000048ca433c776c"), "776C");
+  assert.equal(shortID("0000aa000000b002"), "B002");
   const snapshot = {
     workspace: {
       devices: [{ transport: "mqtt", source: "site", device: "a" }],
