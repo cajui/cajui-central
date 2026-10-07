@@ -28,6 +28,12 @@ export const states = Object.freeze({
   get info() {
     return t("states.info");
   },
+  get network() {
+    return t("states.network");
+  },
+  get critical() {
+    return t("states.critical");
+  },
 });
 export const escapeHTML = (value) =>
   String(value ?? "").replace(
@@ -368,12 +374,14 @@ export function receiverSummary(state) {
   if (online && depth)
     notices.push({
       level: "warning",
+      kind: "queue",
       text: t("receivers.queue_notice", { count: depth }),
     });
   const dropped = numeric(state.queue?.dropped);
   if (dropped)
     notices.push({
       level: "warning",
+      kind: "dropped",
       text: t("receivers.dropped_notice", { count: dropped }),
     });
   if (state.pairing?.open)

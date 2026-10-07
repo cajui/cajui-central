@@ -6,6 +6,7 @@ import {
   age,
   formatValue,
   formatUnit,
+  plotGeometry,
   csvRows,
   states,
   receiverLabel,
@@ -22,8 +23,8 @@ import {
   resolveItem,
 } from "./workspace-model.mjs";
 import { openLayoutEditor } from "./layout-editor.mjs";
+import { attentionItems, placeKey, placeSeverity } from "./overview-model.mjs";
 import { fetchSnapshot } from "./snapshot-api.mjs";
-import { receiverStatusLine } from "./receivers.mjs";
 
 // A value the firmware reported that this version has no text for.
 function known(key, fallback) {
@@ -40,15 +41,16 @@ export function mountDashboard(root, { state = {}, notify }) {
     hours = 24,
     pending = false,
     dialogOpener = null,
+    attention = [],
     historyOpener = null;
-  root.innerHTML = `<header class="page-heading"><div><h1>${t("common.dashboard")}</h1><p>${t("dashboard.description")}</p></div><div class="top-actions"><button class="button" id="organize">${t("dashboard.organize")}</button><button class="button" id="export">${icon("download")}${t("dashboard.export")}</button><button class="button primary" id="refresh">${icon("refresh")}${t("common.refresh")}</button></div></header>
+  root.innerHTML = `<header class="page-heading overview-heading"><div><h1>${t("common.dashboard")}</h1><p class="live-line"><span class="live-dot" aria-hidden="true"></span><span id="snapshot-time"></span></p></div><div class="top-actions"><button class="button" id="organize">${t("dashboard.organize")}</button><button class="button" id="export">${icon("download")}${t("dashboard.export")}</button><button class="button" id="refresh">${icon("refresh")}${t("common.refresh")}</button></div></header>
     <div id="fetch-error" class="notice hidden" role="status"></div>
-    <section id="summary" class="device-summary" aria-label="${t("dashboard.summary")}"></section>
-    <nav id="receivers" class="receiver-status-list" aria-label="${t("receivers.heading")}" hidden></nav>
-    <div class="toolbar"><div class="segmented" aria-label="${t("dashboard.filter")}"><button data-filter="all" aria-pressed="true">${t("dashboard.all")}</button><button data-filter="attention" aria-pressed="false">${t("dashboard.attention")}</button></div><label class="search">${icon("search")}<span class="sr-only">${t("dashboard.search_label")}</span><input id="search" type="search" placeholder="${t("dashboard.search")}" autocomplete="off"></label></div>
+    <section id="summary" class="overview-summary" aria-label="${t("dashboard.summary")}"></section>
+    <section id="attention" class="panel attention-panel" aria-labelledby="attention-heading" hidden><h2 id="attention-heading">${t("overview.attention_heading")}<span>${t("overview.attention_order")}</span></h2><ul class="attention-list"></ul></section>
+    <div class="toolbar" id="toolbar"><div class="segmented" aria-label="${t("dashboard.filter")}"><button data-filter="all" aria-pressed="true">${t("dashboard.all")}</button><button data-filter="attention" aria-pressed="false">${t("dashboard.attention")}</button></div><label class="search">${icon("search")}<span class="sr-only">${t("dashboard.search_label")}</span><input id="search" type="search" placeholder="${t("dashboard.search")}" autocomplete="off"></label></div>
     <section id="devices" class="device-groups" aria-label="${t("dashboard.items")}"></section>
     <dialog class="history-dialog" id="history-panel" aria-labelledby="history-heading history-accessible" aria-describedby="history-context"><div class="dialog-head"><div><h2 id="history-heading" tabindex="-1">${t("common.history")}</h2><p id="history-context"></p><span class="sr-only" id="history-accessible"></span></div><button class="icon-button" id="close-history" aria-label="${t("dashboard.close_history")}">${icon("close")}</button></div><div class="history-summary"><div><span class="small muted">${t("dashboard.latest_reading")}</span><p class="measurement" id="history-value"></p><cj-badge id="history-state"></cj-badge></div><p class="small muted" id="history-time"></p></div><div class="history-controls"><label for="metric-select">${t("common.measurement")}<select id="metric-select" class="input"></select></label><label for="period">${t("dashboard.period")}<select id="period" class="input"><option value="24">${t("dashboard.hours24")}</option><option value="6">${t("dashboard.hours6")}</option><option value="1">${t("dashboard.hour")}</option><option value="0">${t("dashboard.all_data")}</option></select></label></div><cj-chart id="history"></cj-chart><div class="plot-footer"><div><span id="history-limit"></span></div><span id="plot-count"></span></div></dialog>
-    <footer class="footer"><span id="snapshot-time"></span><span>${t("dashboard.retention")}</span></footer>
+    <footer class="footer"><span>${t("dashboard.retention")}</span></footer>
     <dialog id="device-dialog" aria-labelledby="device-dialog-title"><div class="dialog-head"><h2 id="device-dialog-title">${t("dashboard.details")}</h2><button class="icon-button" id="close-dialog" aria-label="${t("dashboard.close_details")}">${icon("close")}</button></div><div id="device-detail"></div></dialog>`;
 
   function rebuild() {
@@ -107,12 +109,6 @@ export function mountDashboard(root, { state = {}, notify }) {
   function receivers() {
     return (snapshot.device_states ?? []).filter((s) => s.role === "receiver");
   }
-  function renderReceivers() {
-    const target = root.querySelector("#receivers");
-    const list = receivers();
-    target.hidden = !list.length;
-    target.replaceChildren(...list.map(receiverStatusLine));
-  }
   function matchingGroups() {
     const search = query.trim().toLowerCase();
     return groups.filter(
@@ -148,6 +144,10 @@ export function mountDashboard(root, { state = {}, notify }) {
     renderSections(target);
   }
   function renderSections(target) {
+    if (!snapshot.workspace.layout.sections && groups.length) {
+      renderPlaces(target);
+      return;
+    }
     const sections =
       snapshot.workspace.layout.sections ??
       automaticSections(withoutRevoked(snapshot));
@@ -191,6 +191,90 @@ export function mountDashboard(root, { state = {}, notify }) {
       ).length;
       target.innerHTML = `<div class="empty">${icon("overview")}<h2>${t("dashboard.make_yours")}</h2><p>${available ? t("counts.detected", { count: available }) + " " : ""}${t("dashboard.get_started")}</p><div class="top-actions"><a class="button primary" href="/devices">${t("dashboard.manage_devices")}</a><a class="button" href="/sensors">${t("dashboard.manage_sensors")}</a></div></div>`;
     }
+  }
+  // One block per place (a transmitter, until places exist as records): its readings as
+  // compact rows, and any problem of its own underneath.
+  function renderPlaces(target) {
+    const now = Date.parse(snapshot.generated_at);
+    const list = document.createElement("div");
+    list.className = "places";
+    for (const g of groups) {
+      const key = placeKey(g);
+      const severity = placeSeverity(key, attention);
+      const place = document.createElement("article");
+      place.className = "panel place";
+      place.dataset.severity = severity;
+      const notes = attention.filter((item) => item.places.includes(key));
+      place.innerHTML = `<header class="place-head"><div><h3>${e(g.name)}</h3><p class="muted">${g.location ? `${e(g.location)} · ` : ""}${e(t("overview.last_reading", { age: age(g.at, now).toLowerCase() }))}</p></div><button class="text-button" data-details="${e(`${g.source}/${g.device}`)}" aria-label="${e(t("dashboard.details_for", { name: g.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></header><div class="place-rows"></div>${notes.length ? `<ul class="place-notes">${notes.map((item) => `<li><span class="badge" data-state="${item.severity}">${e(item.short)}</span></li>`).join("")}</ul>` : ""}`;
+      const rows = place.querySelector(".place-rows");
+      for (const sensor of g.sensors)
+        for (const c of sensor.channels)
+          rows.append(
+            placeRow(
+              c,
+              g,
+              // A typed sensor name adds context unless it only repeats the measurement.
+              sensor.named &&
+                sensor.name.toLocaleLowerCase() !== c.title.toLocaleLowerCase()
+                ? sensor.name
+                : "",
+            ),
+          );
+      place
+        .querySelector("[data-details]")
+        .addEventListener("click", (event) =>
+          showDevice(g, event.currentTarget),
+        );
+      list.append(place);
+    }
+    target.append(list);
+  }
+  function placeRow(c, g, sensorName) {
+    const button = readingButton(c, g);
+    button.classList.add("place-row");
+    const value = ["ok", "recorded", "stale"].includes(c.state)
+      ? c.value
+      : null;
+    const spark = plotGeometry(
+      c.points,
+      96,
+      24,
+      c.interval ? c.interval * 3000 : Infinity,
+    );
+    // A silent place says so once in its note; its rows do not repeat it.
+    const quiet =
+      c.state === "ok" ||
+      c.state === "recorded" ||
+      (g.stale && c.state === "stale");
+    button.innerHTML = `<span class="row-label"><span class="row-title">${e(c.title)}</span>${sensorName ? `<span class="row-sub">${e(sensorName)}</span>` : ""}${quiet ? "" : `<cj-badge state="${e(c.state)}"></cj-badge>`}</span><span class="row-value" data-state="${e(c.state)}">${formatValue(value)}<span class="unit">${e(formatUnit(c.unit))}</span></span><span class="row-trend">${spark ? `<svg class="spark" viewBox="0 0 96 28" preserveAspectRatio="none" aria-hidden="true"><path d="${spark.path}" transform="translate(0 2)"/></svg>` : ""}</span>`;
+    return button;
+  }
+  function renderAttention() {
+    const panel = root.querySelector("#attention");
+    panel.hidden = !attention.length;
+    panel.querySelector(".attention-list").innerHTML = attention
+      .map(
+        (item) =>
+          `<li data-severity="${item.severity}"><span class="badge" data-state="${item.severity}">${e(states[item.severity])}</span><div class="attention-text"><strong>${item.href ? `<a href="${e(item.href)}">${e(item.title)}</a>` : e(item.title)}</strong>${item.detail ? `<span>${e(item.detail)}</span>` : ""}</div><span class="attention-since">${e(item.since)}</span></li>`,
+      )
+      .join("");
+  }
+  function renderSummary() {
+    const count = (severity) =>
+      attention.filter((item) => item.severity === severity).length;
+    root.querySelector("#summary").innerHTML = attention.length
+      ? `<p class="overview-headline">${t("overview.problems", { count: attention.length })}</p><span class="overview-counts">${[
+          "critical",
+          "warning",
+          "network",
+        ]
+          .filter(count)
+          .map(
+            (severity) =>
+              `<span class="badge" data-state="${severity}">${e(states[severity])} · ${count(severity)}</span>`,
+          )
+          .join("")}</span>`
+      : `<p class="overview-headline">${groups.length ? t("overview.all_clear") : t("common.waiting")}</p><span class="muted">${t("counts.devices", { count: groups.length })}</span>`;
   }
   function readingButton(c, g) {
     const button = document.createElement("button");
@@ -385,30 +469,15 @@ export function mountDashboard(root, { state = {}, notify }) {
   }
   function render() {
     rebuild();
-    const sensorCount = groups.reduce((n, g) => n + g.sensors.length, 0);
-    const measurements = groups.reduce(
-      (n, g) => n + g.sensors.reduce((sum, s) => sum + s.channels.length, 0),
-      0,
+    attention = attentionItems(
+      groups,
+      receivers(),
+      Date.parse(snapshot.generated_at),
     );
-    // Transmitters and receivers are counted apart: a receiver is not a transmitter, and
-    // a transmitter that is silent only because its receiver is offline is that receiver's.
-    const transmitterIssues = groups.filter(
-      (g) => g.attention && !g.receiverOffline,
-    ).length;
-    const receiversOffline = receivers().filter(
-      (r) => r.availability === "offline",
-    ).length;
-    const problems = [
-      transmitterIssues
-        ? `<span class="badge" data-state="warning">${t("counts.issues", { count: transmitterIssues })}</span>`
-        : "",
-      receiversOffline
-        ? `<span class="badge" data-state="network">${t("counts.receivers_offline", { count: receiversOffline })}</span>`
-        : "",
-    ].join("");
-    root.querySelector("#summary").innerHTML =
-      `<p>${t("counts.devices", { count: groups.length })}<span aria-hidden="true"> / </span>${t("counts.sensors", { count: sensorCount })}<span aria-hidden="true"> / </span>${t("counts.measurements", { count: measurements })}</p>${problems ? `<span class="workspace-attention">${problems}</span>` : `<span class="muted">${groups.length ? t("dashboard.no_issues") : t("common.waiting")}</span>`}`;
-    renderReceivers();
+    renderSummary();
+    renderAttention();
+    root.querySelector("#toolbar").hidden =
+      !snapshot.workspace?.layout.sections;
     renderGroups();
     renderChart();
     root.querySelector("#snapshot-time").textContent = t("dashboard.updated", {

@@ -43,6 +43,8 @@ en-US:
     loading: Loading
     warning: Attention
     info: Example
+    network: Network
+    critical: Critical
   age:
     unknown: Time unknown
     now: Just now
@@ -102,7 +104,6 @@ en-US:
     registered_sensors: Named sensors
     arrival_status: Arrival status
     identity_note: Names are local labels. A recent report does not guarantee that the device is online now.
-    no_issues: No reported issues
     updated: Updated %{time} · Refreshes every 30 s
     refresh_error: Could not refresh. Showing the last loaded snapshot; its readings may be out of date.
     exported: Exported the visible sensor measurements.
@@ -189,13 +190,41 @@ en-US:
       done_name: Paired and sending readings. Give it a name.
       finish: Done
     send: Devices and sensors appear here after their first measurement.
+  overview:
+    all_clear: All clear
+    problems:
+      one: '%{count} problem'
+      other: '%{count} problems'
+      zero: '%{count} problems'
+    attention_heading: Needs attention
+    attention_order: most severe first
+    since: 'since %{time}'
+    since_yesterday: 'since yesterday %{time}'
+    receiver_offline: '%{receiver} offline'
+    receiver_offline_detail: 'No readings from %{places} until it reconnects.'
+    receiver_offline_alone: No device depends on it right now.
+    receiver_queue: '%{receiver} has readings waiting'
+    receiver_dropped: '%{receiver} gave up readings'
+    silent: '%{place} stopped reporting'
+    silent_detail: 'Last reading at %{time}. It reports every %{interval}.'
+    sensor_failed: '%{place}: no %{measurement} reading'
+    error_detail: The sensor did not respond in the last reading.
+    skipped_detail: The measurement was skipped in the last reading.
+    battery: '%{place}: battery at %{value}'
+    battery_low_detail: 'Below %{limit} the device saves energy and reports less often.'
+    battery_critical_detail: 'Below %{limit} the device stops transmitting. Replace or recharge the battery.'
+    short_receiver: '%{receiver} offline'
+    short_silent: 'No readings since %{time}'
+    short_sensor: 'No %{measurement} reading'
+    short_battery: 'Battery at %{value}'
+    last_reading: 'Last reading: %{age}'
   layout:
     help: Create sections and choose devices, complete sensors or individual measurements. Removing an item here
       keeps its name and history.
     add_section: Add section
     automatic: Use automatic layout
     save: Save dashboard
-    automatic_note: 'Automatic layout: named sensors and devices will appear in separate sections.'
+    automatic_note: 'Automatic layout: the overview shows one block per device, after what needs attention.'
     empty: No sections yet. Add one to start, or save an empty dashboard.
     section: Section %{number}
     title: Section title
@@ -278,10 +307,6 @@ en-US:
       one: '%{count} sensor'
       other: '%{count} sensors'
       zero: '%{count} sensors'
-    measurements:
-      one: '%{count} measurement'
-      other: '%{count} measurements'
-      zero: '%{count} measurements'
     observations:
       one: '%{count} observation'
       other: '%{count} observations'
@@ -294,14 +319,10 @@ en-US:
       one: '%{count} detected device is ready to name.'
       other: '%{count} detected devices are ready to name.'
       zero: '%{count} detected devices are ready to name.'
-    issues:
-      one: '%{count} device needs attention'
-      other: '%{count} devices need attention'
-      zero: '%{count} devices need attention'
-    receivers_offline:
-      one: '%{count} receiver offline'
-      other: '%{count} receivers offline'
-      zero: '%{count} receivers offline'
+    minutes:
+      one: '%{count} minute'
+      other: '%{count} minutes'
+      zero: '%{count} minutes'
     seconds:
       one: '%{count} second'
       other: '%{count} seconds'

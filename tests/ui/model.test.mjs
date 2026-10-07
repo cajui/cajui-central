@@ -724,3 +724,107 @@ test("an unnamed sensor of an added device is shown with a name from its reading
     .map((s) => s.name);
   assert.equal(new Set(names).size, 2);
 });
+
+test("attention lists problems with a reason, most severe first", async () => {
+  const { attentionItems, placeSeverity, placeKey, sinceText } = await import(
+    "../../internal/httpapi/ui/overview-model.mjs"
+  );
+  setLocale("en-US");
+  const now = Date.parse("2026-10-07T12:00:00Z");
+  const iso = (minutesAgo) => new Date(now - minutesAgo * 60000).toISOString();
+  const group = (device, name, extra = {}) => ({
+    transport: "mqtt",
+    source: "site",
+    device,
+    name,
+    at: iso(2),
+    interval: 300,
+    stale: false,
+    sensors: [],
+    diagnostics: [],
+    state: { receiver_id: "r1" },
+    ...extra,
+  });
+  const battery = (value) => [
+    { sensor: "battery", metric: "voltage", value, state: "ok" },
+  ];
+  const groups = [
+    group("a", "Coop", { diagnostics: battery(3.35) }),
+    group("b", "Garden", {
+      sensors: [
+        {
+          channels: [
+            {
+              key: "k1",
+              title: "Soil moisture",
+              state: "error",
+              at: iso(4),
+            },
+          ],
+        },
+      ],
+      diagnostics: battery(3.1),
+    }),
+    group("c", "Compost", {
+      stale: true,
+      at: iso(180),
+      state: { receiver_id: "r2" },
+    }),
+    group("d", "Tank", {
+      stale: true,
+      at: iso(60),
+      receiverOffline: true,
+      state: { receiver_id: "r3" },
+    }),
+    group("e", "Station", { diagnostics: battery(4.1) }),
+  ];
+  const receivers = [
+    {
+      source_id: "site",
+      device_id: "000048ca433c0001",
+      availability: "online",
+    },
+    {
+      source_id: "site",
+      device_id: "r3",
+      availability: "offline",
+      availability_at: iso(50),
+      // An offline receiver's last queue is old news; the connection is the problem.
+      queue: { depth: 4, dropped: 2 },
+    },
+    {
+      source_id: "site",
+      device_id: "r4",
+      availability: "online",
+      queue: { depth: 0, dropped: 3 },
+    },
+  ];
+  const items = attentionItems(groups, receivers, now);
+  assert.deepEqual(
+    items.map((i) => [i.severity, i.key]),
+    [
+      ["critical", "battery/mqtt/site/b"],
+      ["warning", "reading/k1"],
+      ["warning", "silent/mqtt/site/c"],
+      // Untimed warnings keep their order: a receiver can affect several places.
+      ["warning", "receiver/site/r4/dropped"],
+      ["warning", "battery/mqtt/site/a"],
+      ["network", "receiver/site/r3"],
+    ],
+  );
+  const dropped = items.find((i) => i.key === "receiver/site/r4/dropped");
+  assert.equal(dropped.title, "Receiver R4 gave up readings");
+  assert.match(dropped.detail, /3 old readings were given up/);
+  assert.equal(dropped.href, "/receivers");
+  const offline = items.find((i) => i.severity === "network");
+  assert.match(offline.detail, /No readings from Tank/);
+  assert.deepEqual(offline.places, ["mqtt/site/d"]);
+  // A silent place behind an offline receiver is explained by the receiver, once.
+  assert.equal(items.filter((i) => i.key === "silent/mqtt/site/d").length, 0);
+  assert.match(items[0].detail, /Below 3\.2 V the device stops transmitting/);
+  assert.equal(placeSeverity(placeKey(groups[1]), items), "critical");
+  assert.equal(placeSeverity(placeKey(groups[4]), items), "normal");
+  assert.equal(attentionItems([group("e", "Station")], [], now).length, 0);
+  assert.match(sinceText(iso(30), now), /^since /);
+  assert.match(sinceText(iso(60 * 24), now), /^since yesterday /);
+});

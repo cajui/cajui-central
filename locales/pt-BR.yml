@@ -43,6 +43,8 @@ pt-BR:
     loading: Carregando
     warning: Atenção
     info: Exemplo
+    network: Rede
+    critical: Crítico
   age:
     unknown: Horário desconhecido
     now: Agora
@@ -102,7 +104,6 @@ pt-BR:
     registered_sensors: Sensores com nome
     arrival_status: Estado de recebimento
     identity_note: Os nomes são rótulos locais. Um envio recente não garante que o transmissor esteja no ar agora.
-    no_issues: Nenhum problema informado
     updated: Atualizado às %{time} · Atualiza a cada 30 s
     refresh_error: Não foi possível atualizar. Exibindo os últimos dados carregados; as leituras podem estar desatualizadas.
     exported: Medições dos sensores visíveis exportadas.
@@ -189,13 +190,41 @@ pt-BR:
       done_name: Pareado e enviando leituras. Dê um nome a ele.
       finish: Concluir
     send: Transmissores e sensores aparecem aqui após a primeira medição.
+  overview:
+    all_clear: Tudo normal
+    problems:
+      one: '%{count} problema'
+      other: '%{count} problemas'
+      zero: '%{count} problemas'
+    attention_heading: Precisa de atenção
+    attention_order: mais grave primeiro
+    since: 'desde %{time}'
+    since_yesterday: 'desde ontem %{time}'
+    receiver_offline: '%{receiver} sem conexão'
+    receiver_offline_detail: 'Sem leituras de %{places} até a conexão voltar.'
+    receiver_offline_alone: Nenhum transmissor depende dele agora.
+    receiver_queue: '%{receiver} com leituras na fila'
+    receiver_dropped: '%{receiver} descartou leituras'
+    silent: '%{place} sem leituras'
+    silent_detail: 'Última leitura às %{time}. O transmissor envia a cada %{interval}.'
+    sensor_failed: '%{place}: %{measurement} sem leitura'
+    error_detail: O sensor não respondeu na última leitura.
+    skipped_detail: A medição não foi feita na última leitura.
+    battery: '%{place}: bateria em %{value}'
+    battery_low_detail: 'Abaixo de %{limit} o transmissor economiza energia e envia leituras com menos frequência.'
+    battery_critical_detail: 'Abaixo de %{limit} o transmissor para de enviar. Troque ou recarregue a bateria.'
+    short_receiver: '%{receiver} sem conexão'
+    short_silent: 'Sem leituras desde %{time}'
+    short_sensor: '%{measurement} sem leitura'
+    short_battery: 'Bateria em %{value}'
+    last_reading: 'Última leitura: %{age}'
   layout:
     help: Crie seções e escolha transmissores, sensores completos ou medições individuais. Remover um item daqui
       preserva seu nome e histórico.
     add_section: Adicionar seção
     automatic: Usar organização automática
     save: Salvar painel
-    automatic_note: 'Organização automática: sensores e transmissores com nome aparecerão em seções separadas.'
+    automatic_note: 'Organização automática: a visão geral mostra um bloco por transmissor, depois do que precisa de atenção.'
     empty: Ainda não há seções. Adicione uma para começar ou salve um painel vazio.
     section: Seção %{number}
     title: Título da seção
@@ -280,10 +309,6 @@ pt-BR:
       one: '%{count} sensor'
       other: '%{count} sensores'
       zero: '%{count} sensores'
-    measurements:
-      one: '%{count} medição'
-      other: '%{count} medições'
-      zero: '%{count} medições'
     observations:
       one: '%{count} observação'
       other: '%{count} observações'
@@ -296,14 +321,10 @@ pt-BR:
       one: '%{count} transmissor detectado está pronto para receber um nome.'
       other: '%{count} transmissores detectados estão prontos para receber um nome.'
       zero: '%{count} transmissores detectados estão prontos para receber um nome.'
-    issues:
-      one: '%{count} transmissor precisa de atenção'
-      other: '%{count} transmissores precisam de atenção'
-      zero: '%{count} transmissores precisam de atenção'
-    receivers_offline:
-      one: '%{count} receptor sem conexão'
-      other: '%{count} receptores sem conexão'
-      zero: '%{count} receptores sem conexão'
+    minutes:
+      one: '%{count} minuto'
+      other: '%{count} minutos'
+      zero: '%{count} minutos'
     seconds:
       one: '%{count} segundo'
       other: '%{count} segundos'

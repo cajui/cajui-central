@@ -1535,16 +1535,6 @@ summary {
 .device-summary strong {
   font-size: 24px;
 }
-.workspace-attention {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  align-items: center;
-}
-.workspace-attention .badge {
-  font-size: var(--text-body);
-  font-weight: 700;
-}
 .device-groups {
   display: grid;
   gap: 24px;
@@ -2091,50 +2081,6 @@ cj-reading {
 }
 
 /* Receivers: cajui-firmware management state (connection, queue, firmware). */
-/* On the dashboard a receiver is one line; its card lives on the receivers page. */
-.receiver-status-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-}
-.receiver-status {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 44px;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--ink);
-  text-decoration: none;
-  font-size: var(--text-detail);
-}
-.receiver-status:hover {
-  border-color: var(--muted);
-}
-.receiver-status svg {
-  width: 18px;
-  height: 18px;
-  flex: none;
-}
-.receiver-status[data-status="error"],
-.receiver-status[data-status="offline"] {
-  flex-basis: 100%;
-  background: var(--info-soft);
-  border-color: var(--info);
-  color: var(--info);
-}
-.receiver-status[data-status="warning"] {
-  flex-basis: 100%;
-  background: var(--warning-soft);
-  color: var(--warning);
-}
-.receiver-status-note {
-  flex-basis: 100%;
-  overflow-wrap: anywhere;
-}
 .receiver-items {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
@@ -2786,4 +2732,232 @@ dialog.history-dialog {
 .history-dialog .plot-footer > div {
   flex: 1;
   min-width: 0;
+}
+
+/* Overview (ADR 0002): a status line, the problems with their reasons, then one block per
+   place with its readings as compact rows. */
+.overview-heading .live-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-detail);
+}
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--plot);
+  flex: none;
+}
+.overview-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-6);
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.overview-headline {
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+.overview-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+.attention-panel {
+  margin-top: var(--space-4);
+  padding: 0;
+  overflow: hidden;
+}
+.attention-panel > h2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-body);
+}
+.attention-panel > h2 span {
+  color: var(--muted);
+  font-size: var(--text-detail);
+  font-weight: 500;
+}
+.attention-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.attention-list li {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr) auto;
+  gap: var(--space-1) var(--space-4);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+}
+.attention-list li + li {
+  border-top: 1px solid var(--line);
+}
+.attention-list li[data-severity="critical"] {
+  background: var(--danger-soft);
+}
+.attention-list li[data-severity="warning"] {
+  background: var(--warning-soft);
+}
+.attention-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.attention-text span {
+  color: var(--muted);
+  font-size: var(--text-detail);
+}
+.attention-since {
+  color: var(--muted);
+  font-size: var(--text-detail);
+  text-align: right;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .attention-list li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .attention-text {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+/* Columns rather than a grid: places differ in height, and rows of a grid would leave
+   gaps under the shorter ones. */
+.places {
+  columns: 320px;
+  column-gap: var(--space-3);
+}
+.place {
+  padding: 0;
+  overflow: hidden;
+  break-inside: avoid;
+  margin-bottom: var(--space-3);
+}
+.place[data-severity="critical"] {
+  border-color: var(--danger);
+}
+.place[data-severity="warning"] {
+  border-color: var(--warning);
+}
+.place[data-severity="network"] {
+  border-color: var(--info);
+}
+.place-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-2);
+}
+.place-head h3 {
+  margin: 0;
+  font-size: var(--text-label);
+  overflow-wrap: anywhere;
+}
+.place-head p {
+  margin: 2px 0 0;
+  font-size: var(--text-detail);
+}
+.place-head .text-button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.place-head .text-button svg {
+  width: 16px;
+  height: 16px;
+}
+.place-rows {
+  display: grid;
+}
+.reading-button.place-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 96px;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.reading-button.place-row:hover {
+  background: var(--surface-alt);
+}
+.reading-button.place-row:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+.row-label {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  justify-items: start;
+}
+.row-title {
+  font-weight: 600;
+}
+.row-sub {
+  color: var(--muted);
+  font-size: var(--text-detail);
+}
+.row-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+.row-value .unit {
+  margin-left: 2px;
+  color: var(--muted);
+  font-size: var(--text-detail);
+  font-weight: 500;
+}
+.row-value:is(
+  [data-state="stale"],
+  [data-state="error"],
+  [data-state="skipped"],
+  [data-state="empty"]
+) {
+  color: var(--muted);
+}
+.row-trend {
+  color: var(--plot);
+  height: 28px;
+}
+.row-trend .spark {
+  width: 96px;
+  height: 28px;
+}
+.place-notes {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: var(--space-1);
 }
