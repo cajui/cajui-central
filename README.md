@@ -354,12 +354,13 @@ or measurements. No frontend build or additional service is needed.
    Save to persist the arrangement, or cancel to discard the draft.
 
 The automatic arrangement is an overview. It starts with what needs attention, most
-severe first, each with its reason and since when: a receiver problem, a device that
-stopped reporting, a failed reading, or a battery below the
+severe first, each with its reason and, when known, since when: a receiver problem, a
+device that stopped reporting, a failed or late reading, or a battery below the
 [cajui-firmware](https://github.com/cajui/cajui-firmware) power-mode limits (low under
 3.4 V, critical under 3.2 V; both provisional). Below it, each added device is one
 block, standing in for its place, with a row per measurement: value, unit and a trend
-of the loaded readings. Values themselves raise nothing until measurement ranges exist.
+of the last 3 hours on a time axis shared by every row. Values themselves raise nothing
+until measurement ranges exist.
 An explicitly empty arrangement remains empty. Removing a dashboard item or section
 never deletes its registration or history. Names and locations can be edited; their
 stable identities remain unchanged. There is no registration deletion or telemetry
