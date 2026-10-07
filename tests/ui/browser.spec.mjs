@@ -2009,3 +2009,27 @@ test("focused history selector keeps receiving fresh readings and exposes channe
     /Sensor 1.*Temperature history.*Device 1.*receiver/,
   );
 });
+
+test("normal readings stay quiet and an offline receiver is counted apart", async ({
+  page,
+}) => {
+  const { snapshot, serve } = await liveWorkspace(page);
+  await expect(page.locator(".reading-button")).toHaveCount(2);
+  await expect(page.locator(".reading-button .badge")).toHaveCount(0);
+  await expect(page.locator(".reading-age").first()).toBeVisible();
+  snapshot.device_states = [
+    {
+      source_id: "receiver",
+      device_id: "000048ca433c5e10",
+      role: "receiver",
+      availability: "offline",
+      received_at: snapshot.generated_at,
+    },
+  ];
+  await serve(snapshot);
+  await page.goto("/");
+  const summary = page.locator("#summary");
+  await expect(summary).toContainText("1 receiver offline");
+  await expect(summary).not.toContainText("need attention");
+  await expect(summary.locator('.badge[data-state="network"]')).toHaveCount(1);
+});

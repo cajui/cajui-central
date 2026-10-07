@@ -1526,9 +1526,12 @@ summary {
 }
 .workspace-attention {
   display: inline-flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px 16px;
   align-items: center;
-  color: var(--warning);
+}
+.workspace-attention .badge {
+  font-size: var(--text-body);
   font-weight: 700;
 }
 .device-groups {

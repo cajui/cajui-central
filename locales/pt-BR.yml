@@ -300,6 +300,10 @@ pt-BR:
       one: '%{count} transmissor precisa de atenção'
       other: '%{count} transmissores precisam de atenção'
       zero: '%{count} transmissores precisam de atenção'
+    receivers_offline:
+      one: '%{count} receptor sem conexão'
+      other: '%{count} receptores sem conexão'
+      zero: '%{count} receptores sem conexão'
     seconds:
       one: '%{count} segundo'
       other: '%{count} segundos'

@@ -390,11 +390,21 @@ export function mountDashboard(root, { state = {}, notify }) {
       (n, g) => n + g.sensors.reduce((sum, s) => sum + s.channels.length, 0),
       0,
     );
-    const issues =
-      groups.filter((g) => g.attention).length +
-      receivers().filter((r) => r.availability === "offline").length;
+    // Transmitters and receivers are counted apart: a receiver is not a transmitter.
+    const transmitterIssues = groups.filter((g) => g.attention).length;
+    const receiversOffline = receivers().filter(
+      (r) => r.availability === "offline",
+    ).length;
+    const problems = [
+      transmitterIssues
+        ? `<span class="badge" data-state="warning">${t("counts.issues", { count: transmitterIssues })}</span>`
+        : "",
+      receiversOffline
+        ? `<span class="badge" data-state="network">${t("counts.receivers_offline", { count: receiversOffline })}</span>`
+        : "",
+    ].join("");
     root.querySelector("#summary").innerHTML =
-      `<p>${t("counts.devices", { count: groups.length })}<span aria-hidden="true"> / </span>${t("counts.sensors", { count: sensorCount })}<span aria-hidden="true"> / </span>${t("counts.measurements", { count: measurements })}</p>${issues ? `<span class="workspace-attention">${icon("alert")}${t("counts.issues", { count: issues })}</span>` : `<span class="muted">${groups.length ? t("dashboard.no_issues") : t("common.waiting")}</span>`}`;
+      `<p>${t("counts.devices", { count: groups.length })}<span aria-hidden="true"> / </span>${t("counts.sensors", { count: sensorCount })}<span aria-hidden="true"> / </span>${t("counts.measurements", { count: measurements })}</p>${problems ? `<span class="workspace-attention">${problems}</span>` : `<span class="muted">${groups.length ? t("dashboard.no_issues") : t("common.waiting")}</span>`}`;
     renderReceivers();
     renderGroups();
     renderChart();
