@@ -998,7 +998,7 @@ function pairingSnapshot() {
     device_states: [
       {
         source_id: "site",
-        device_id: "000048ca433c5e10",
+        device_id: "0000aa000000a001",
         role: "receiver",
         retained: false,
         availability: "online",
@@ -1052,7 +1052,7 @@ test("one dialog pairs a transmitter by radio and names it as it appears", async
   receiver.pairing = {
     open: true,
     remaining_s: 120,
-    requests: [{ node_id: "000048ca433c776c", rssi_dbm: -60, conflict: false }],
+    requests: [{ node_id: "0000aa000000b002", rssi_dbm: -60, conflict: false }],
   };
   await serve(state);
   await dialog
@@ -1069,14 +1069,14 @@ test("one dialog pairs a transmitter by radio and names it as it appears", async
   await expect(dialog).toContainText("2:00 left");
   const request = dialog.locator(".pairing-item");
   await expect(request).toContainText("New transmitter");
-  await expect(request).toContainText("ID 776C · Signal -60 dBm");
+  await expect(request).toContainText("ID B002 · Signal -60 dBm");
   await request.getByRole("button", { name: "Add", exact: true }).click();
   await expect(request).toContainText("waiting for the transmitter to confirm");
   await expect(request.getByRole("button")).toHaveCount(0);
   receiver.pairing = { open: false, requests: [] };
   state.device_states.push({
     source_id: "site",
-    device_id: "000048ca433c776c",
+    device_id: "0000aa000000b002",
     role: "transmitter",
     receiver_id: receiver.device_id,
     binding: "pending",
@@ -1094,7 +1094,7 @@ test("one dialog pairs a transmitter by radio and names it as it appears", async
     id: 7,
     transport: "mqtt",
     source: "site",
-    device: "000048ca433c776c",
+    device: "0000aa000000b002",
     name: "",
     location: "",
     revision: 0,
@@ -1118,9 +1118,9 @@ test("revocation lives with the device name, not on the dashboard", async ({
   const state = pairingSnapshot();
   state.device_states.push({
     source_id: "site",
-    device_id: "000048ca433c776c",
+    device_id: "0000aa000000b002",
     role: "transmitter",
-    receiver_id: "000048ca433c5e10",
+    receiver_id: "0000aa000000a001",
     binding: "active",
     received_at: state.generated_at,
   });
@@ -1128,7 +1128,7 @@ test("revocation lives with the device name, not on the dashboard", async ({
     id: 7,
     transport: "mqtt",
     source: "site",
-    device: "000048ca433c776c",
+    device: "0000aa000000b002",
     name: "Coop",
     location: "",
     revision: 1,
@@ -1138,7 +1138,7 @@ test("revocation lives with the device name, not on the dashboard", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await liveDevices(page, state);
   const row = page.getByRole("row").filter({ hasText: "Coop" });
-  await expect(row).toContainText("Receiver 5E10");
+  await expect(row).toContainText("Receiver A001");
   await expect(row.locator('td[data-label="Battery"]')).toHaveText(
     "Not reported",
   );
@@ -1207,11 +1207,11 @@ test("receivers have their own page and one status line on the dashboard", async
   await expect(
     page.getByRole("link", { name: "Receivers" }).first(),
   ).toHaveAttribute("aria-current", "page");
-  await expect(page.locator(".receiver-card")).toContainText("Receiver 5E10");
+  await expect(page.locator(".receiver-card")).toContainText("Receiver A001");
   await expect(page.locator(".receiver-card")).toContainText("0 of 128");
   let removal = null;
   await page.route(
-    "**/ui-api/receivers/site/000048ca433c5e10/archive",
+    "**/ui-api/receivers/site/0000aa000000a001/archive",
     (route) => {
       removal = JSON.parse(route.request().postData());
       return route.fulfill({ status: 204 });
@@ -1220,7 +1220,7 @@ test("receivers have their own page and one status line on the dashboard", async
   page.once("dialog", (dialog) => dialog.accept());
   await page
     .getByRole("button", {
-      name: "Remove Receiver 5E10 from the list",
+      name: "Remove Receiver A001 from the list",
       exact: true,
     })
     .click();
@@ -1232,7 +1232,7 @@ test("receivers have their own page and one status line on the dashboard", async
   await page.goto("/");
   const line = page.locator("#attention li");
   await expect(line).toHaveCount(1);
-  await expect(line).toContainText("Receiver 5E10 offline");
+  await expect(line).toContainText("Receiver A001 offline");
   await expect(line).toContainText("No device depends on it right now.");
   await expect(line.locator('a[href="/receivers"]')).toHaveCount(1);
   await expect(page.locator(".receiver-card")).toHaveCount(0);
@@ -1250,7 +1250,7 @@ test("device health shows current, old and failed diagnostics honestly", async (
   const at = new Date(Date.now() - 60000).toISOString();
   state.samples.push({
     source_id: "site",
-    device_id: "000048ca433c776c",
+    device_id: "0000aa000000b002",
     sample_id: "s1",
     received_at: at,
     expected_interval_seconds: 300,
@@ -1289,7 +1289,7 @@ test("device health shows current, old and failed diagnostics honestly", async (
     id: 7,
     transport: "mqtt",
     source: "site",
-    device: "000048ca433c776c",
+    device: "0000aa000000b002",
     name: "Coop",
     location: "",
     revision: 1,
@@ -1335,13 +1335,13 @@ test("a known transmitter asking again shows its name, not a new device", async 
   state.device_states[0].pairing = {
     open: true,
     remaining_s: 90,
-    requests: [{ node_id: "000048ca433c776c", rssi_dbm: -82, conflict: false }],
+    requests: [{ node_id: "0000aa000000b002", rssi_dbm: -82, conflict: false }],
   };
   state.workspace.devices.push({
     id: 7,
     transport: "mqtt",
     source: "site",
-    device: "000048ca433c776c",
+    device: "0000aa000000b002",
     name: "Coop",
     location: "",
     revision: 1,
@@ -1370,9 +1370,9 @@ test("a revoked transmitter says so instead of offering Revoke", async ({
   const state = pairingSnapshot();
   state.device_states.push({
     source_id: "site",
-    device_id: "000048ca433c776c",
+    device_id: "0000aa000000b002",
     role: "transmitter",
-    receiver_id: "000048ca433c5e10",
+    receiver_id: "0000aa000000a001",
     binding: "revoked",
     received_at: state.generated_at,
   });
@@ -1380,7 +1380,7 @@ test("a revoked transmitter says so instead of offering Revoke", async ({
     id: 7,
     transport: "mqtt",
     source: "site",
-    device: "000048ca433c776c",
+    device: "0000aa000000b002",
     name: "Coop",
     location: "",
     revision: 1,
@@ -1390,7 +1390,7 @@ test("a revoked transmitter says so instead of offering Revoke", async ({
   const serve = await liveDevices(page, state);
   const row = page.getByRole("row").filter({ hasText: "Coop" });
   await expect(row.locator('td[data-label="Receiver"]')).toHaveText(
-    "Receiver 5E10 · Revoked",
+    "Receiver A001 · Revoked",
   );
   const section = page.getByRole("region", { name: "Revoked" });
   await expect(
@@ -1433,7 +1433,7 @@ test("a revoked transmitter leaves the dashboard", async ({ page }) => {
       source_id: "receiver",
       device_id: "device-1",
       role: "transmitter",
-      receiver_id: "000048ca433c5e10",
+      receiver_id: "0000aa000000a001",
       binding: "revoked",
       received_at: snapshot.generated_at,
     },
@@ -1569,7 +1569,7 @@ test("receiver wizard retrieves secrets explicitly and waits for new connections
   const state = pairingSnapshot();
   state.device_states.push({
     ...state.device_states[0],
-    device_id: "000048ca433c7777",
+    device_id: "0000aa000000c003",
   });
   state.device_states[0].availability = "offline";
   state.device_states[0].received_at = "2020-01-01T00:00:00Z";
@@ -1654,13 +1654,13 @@ test("receiver wizard retrieves secrets explicitly and waits for new connections
   await expect(page.locator("#setup-result button")).toBeVisible({
     timeout: 10000,
   });
-  const second = { ...state.device_states[0], device_id: "000048ca433c8888" };
+  const second = { ...state.device_states[0], device_id: "0000aa000000d004" };
   state.device_states.push(second);
   await expect(page.locator("#setup-result button")).toHaveCount(2);
   await expect(page.locator("#setup-result")).toContainText(
     "More than one receiver connected",
   );
-  expect(await page.locator("#setup-result").innerText()).not.toContain("7777");
+  expect(await page.locator("#setup-result").innerText()).not.toContain("C003");
   second.availability = "offline";
   await expect(page.locator("#setup-result button")).toHaveCount(1);
   await page.locator("#setup-result button").click();
@@ -1800,7 +1800,7 @@ for (const path of ["/receivers", "/"]) {
       .first();
     const offline = () =>
       expect(indicator).toContainText(
-        path === "/" ? "Receiver 5E10 offline" : "Offline",
+        path === "/" ? "Receiver A001 offline" : "Offline",
       );
     const online = () =>
       path === "/"
@@ -2110,7 +2110,7 @@ test("normal readings stay quiet and an offline receiver is counted apart", asyn
   snapshot.device_states = [
     {
       source_id: "receiver",
-      device_id: "000048ca433c5e10",
+      device_id: "0000aa000000a001",
       role: "receiver",
       availability: "offline",
       received_at: snapshot.generated_at,
@@ -2119,7 +2119,7 @@ test("normal readings stay quiet and an offline receiver is counted apart", asyn
       source_id: "receiver",
       device_id: "device-1",
       role: "transmitter",
-      receiver_id: "000048ca433c5e10",
+      receiver_id: "0000aa000000a001",
       binding: "active",
       received_at: snapshot.generated_at,
     },
@@ -2132,7 +2132,7 @@ test("normal readings stay quiet and an offline receiver is counted apart", asyn
   await expect(summary.locator('.badge[data-state="network"]')).toHaveCount(1);
   await expect(summary.locator('.badge[data-state="warning"]')).toHaveCount(0);
   await expect(page.locator("#attention")).toContainText(
-    "Receiver 5E10 offline",
+    "Receiver A001 offline",
   );
   // Its place says why it is quiet, with the network shape.
   await expect(
