@@ -120,7 +120,9 @@ export function pairingSection(snapshot, act, progress = new Map()) {
   receivers.forEach((r, index) => {
     const headingID = index ? `pairing-heading-${index}` : "pairing-heading";
     const status = receiverSummary(r).status;
-    const badge = { online: "ok", offline: "error", unknown: "empty" }[status];
+    const badge = { online: "ok", offline: "network", unknown: "empty" }[
+      status
+    ];
     section.insertAdjacentHTML(
       "beforeend",
       `<p class="pairing-via">${e(t("registry.pairing.via", { receiver: receiverLabel(r.device_id) }))}<span class="badge" data-state="${badge}">${e(t(`receivers.${status}`))}</span></p>`,

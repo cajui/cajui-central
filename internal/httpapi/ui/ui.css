@@ -486,40 +486,74 @@ pre {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* Status vocabulary (ADR 0002): normal is quiet text; attention, network and critical
+   each pair a colour with a shape and a word, so colour is never the only signal. */
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: var(--text-detail);
-  font-weight: 650;
-  padding: 3px 8px;
-  border-radius: 30px;
+  font-weight: 600;
   white-space: normal;
   line-height: 1.5;
-  background: var(--surface-alt);
   color: var(--muted);
 }
-.badge svg {
-  width: 18px;
-  height: 18px;
-  stroke-width: 2;
+.badge::before {
+  flex: none;
 }
-.badge[data-state="ok"] {
-  color: var(--good);
-  background: var(--good-soft);
-}
-.badge[data-state="stale"],
-.badge[data-state="warning"] {
+.badge:is(
+  [data-state="stale"],
+  [data-state="warning"],
+  [data-state="error"],
+  [data-state="skipped"]
+) {
   color: var(--warning);
-  background: var(--warning-soft);
 }
-.badge[data-state="error"] {
-  color: var(--danger);
-  background: var(--danger-soft);
+.badge:is(
+    [data-state="stale"],
+    [data-state="warning"],
+    [data-state="error"],
+    [data-state="skipped"]
+  )::before {
+  content: "";
+  width: 0.8em;
+  height: 0.7em;
+  background: currentColor;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
-.badge[data-state="info"] {
+.badge[data-state="network"] {
   color: var(--info);
-  background: var(--info-soft);
+}
+.badge[data-state="network"]::before {
+  content: "";
+  box-sizing: border-box;
+  width: 0.72em;
+  height: 0.72em;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+.badge[data-state="critical"] {
+  color: var(--danger);
+}
+.badge[data-state="critical"]::before {
+  content: "";
+  width: 0.55em;
+  height: 0.55em;
+  margin-inline: 0.1em;
+  background: currentColor;
+  transform: rotate(45deg);
+}
+/* Forced colours replace author backgrounds, which erased the filled shapes. */
+@media (forced-colors: active) {
+  .badge:is(
+      [data-state="stale"],
+      [data-state="warning"],
+      [data-state="error"],
+      [data-state="skipped"],
+      [data-state="critical"]
+    )::before {
+    background: CanvasText;
+  }
 }
 .main-grid {
   display: grid;
@@ -1284,7 +1318,6 @@ dialog::backdrop {
 }
 .sensor-status .badge {
   font-size: var(--text-body);
-  padding: 5px 10px;
 }
 .reading-age {
   font-size: var(--text-body);
@@ -1296,7 +1329,7 @@ dialog::backdrop {
   color: var(--muted);
 }
 .sensor-card[data-state="error"] .reading-note {
-  color: var(--danger);
+  color: var(--warning);
   font-weight: 700;
 }
 .sensor-card[data-state="stale"] .reading-note {
@@ -1504,9 +1537,12 @@ summary {
 }
 .workspace-attention {
   display: inline-flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px 16px;
   align-items: center;
-  color: var(--warning);
+}
+.workspace-attention .badge {
+  font-size: var(--text-body);
   font-weight: 700;
 }
 .device-groups {
@@ -1660,7 +1696,7 @@ cj-reading {
   margin-top: 20px;
 }
 .reading-tile[data-state="error"] .reading-note {
-  color: var(--danger);
+  color: var(--warning);
   font-weight: 700;
 }
 .diagnostic-readings {
@@ -2086,9 +2122,9 @@ cj-reading {
 .receiver-status[data-status="error"],
 .receiver-status[data-status="offline"] {
   flex-basis: 100%;
-  background: var(--danger-soft);
-  border-color: var(--danger);
-  color: var(--danger);
+  background: var(--info-soft);
+  border-color: var(--info);
+  color: var(--info);
 }
 .receiver-status[data-status="warning"] {
   flex-basis: 100%;
@@ -2135,27 +2171,26 @@ cj-reading {
   align-items: flex-start;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: var(--info-soft);
-  color: var(--info);
+  color: var(--muted);
   font-size: var(--text-body);
   overflow-wrap: anywhere;
 }
+/* Information stays neutral. A problem is tinted and its badge carries the shape: a
+   receiver without a connection is a network state, not a critical value. */
 .receiver-notices li[data-level="error"],
 .device-alert {
-  background: var(--danger-soft);
-  color: var(--danger);
+  border-color: transparent;
+  background: var(--info-soft);
 }
 .receiver-notices li[data-level="warning"] {
+  border-color: transparent;
   background: var(--warning-soft);
-  color: var(--warning);
 }
-.receiver-notices svg,
-.device-alert svg {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  margin-top: 2px;
+.receiver-notices .badge,
+.device-alert .badge {
+  font-size: inherit;
 }
 
 /* Adding a device: radio pairing first, then naming, both in one dialog. */

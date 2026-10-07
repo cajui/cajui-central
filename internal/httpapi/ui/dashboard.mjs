@@ -166,7 +166,7 @@ export function mountDashboard(root, { state = {}, notify }) {
         card.className = "panel dashboard-item";
         if (item.kind === "device") {
           card.classList.add("transmitter-card");
-          card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("device")}</span><div><h3>${e(g.name)}</h3><p class="muted">${e(t("counts.registered", { count: g.sensors.length }))}${g.location ? ` · ${e(g.location)}` : ""}</p></div></div><p class="device-last-report">${e(t("dashboard.last_report", { age: age(g.at, Date.parse(snapshot.generated_at)) }))}</p>${g.receiverOffline ? `<p class="device-alert">${icon("alert")}<span>${e(t("receivers.receiver_offline"))}</span></p>` : ""}<div class="transmitter-footer"><cj-badge state="${deviceStatus(g)}"></cj-badge><button class="text-button" data-details="${e(`${g.source}/${g.device}`)}" aria-label="${e(t("dashboard.details_for", { name: g.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></div>`;
+          card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("device")}</span><div><h3>${e(g.name)}</h3><p class="muted">${e(t("counts.registered", { count: g.sensors.length }))}${g.location ? ` · ${e(g.location)}` : ""}</p></div></div><p class="device-last-report">${e(t("dashboard.last_report", { age: age(g.at, Date.parse(snapshot.generated_at)) }))}</p>${g.receiverOffline ? `<p class="device-alert"><span class="badge" data-state="network">${e(t("receivers.receiver_offline"))}</span></p>` : ""}<div class="transmitter-footer">${["ok", "recorded"].includes(deviceStatus(g)) ? "<span></span>" : `<cj-badge state="${deviceStatus(g)}"></cj-badge>`}<button class="text-button" data-details="${e(`${g.source}/${g.device}`)}" aria-label="${e(t("dashboard.details_for", { name: g.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></div>`;
           card
             .querySelector("[data-details]")
             .addEventListener("click", (event) =>
@@ -390,11 +390,24 @@ export function mountDashboard(root, { state = {}, notify }) {
       (n, g) => n + g.sensors.reduce((sum, s) => sum + s.channels.length, 0),
       0,
     );
-    const issues =
-      groups.filter((g) => g.attention).length +
-      receivers().filter((r) => r.availability === "offline").length;
+    // Transmitters and receivers are counted apart: a receiver is not a transmitter, and
+    // a transmitter that is silent only because its receiver is offline is that receiver's.
+    const transmitterIssues = groups.filter(
+      (g) => g.attention && !g.receiverOffline,
+    ).length;
+    const receiversOffline = receivers().filter(
+      (r) => r.availability === "offline",
+    ).length;
+    const problems = [
+      transmitterIssues
+        ? `<span class="badge" data-state="warning">${t("counts.issues", { count: transmitterIssues })}</span>`
+        : "",
+      receiversOffline
+        ? `<span class="badge" data-state="network">${t("counts.receivers_offline", { count: receiversOffline })}</span>`
+        : "",
+    ].join("");
     root.querySelector("#summary").innerHTML =
-      `<p>${t("counts.devices", { count: groups.length })}<span aria-hidden="true"> / </span>${t("counts.sensors", { count: sensorCount })}<span aria-hidden="true"> / </span>${t("counts.measurements", { count: measurements })}</p>${issues ? `<span class="workspace-attention">${icon("alert")}${t("counts.issues", { count: issues })}</span>` : `<span class="muted">${groups.length ? t("dashboard.no_issues") : t("common.waiting")}</span>`}`;
+      `<p>${t("counts.devices", { count: groups.length })}<span aria-hidden="true"> / </span>${t("counts.sensors", { count: sensorCount })}<span aria-hidden="true"> / </span>${t("counts.measurements", { count: measurements })}</p>${problems ? `<span class="workspace-attention">${problems}</span>` : `<span class="muted">${groups.length ? t("dashboard.no_issues") : t("common.waiting")}</span>`}`;
     renderReceivers();
     renderGroups();
     renderChart();

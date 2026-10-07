@@ -41,7 +41,7 @@ export function mountBrand(root, notify) {
    )
    .join(
      "",
-   )}</div><p class="brand-caption muted">Status has its own symbol and label: a clock for an old reading, a warning triangle for a failed one. A successful report does not mean the measured value is safe.</p></section>
+   )}</div><p class="brand-caption muted">Status has its own shape and label, and normal states stay quiet: an amber triangle for an old or failed reading, a blue circle for a lost connection, a red diamond for a critical value. A successful report does not mean the measured value is safe.</p></section>
  <section class="design-section" id="contrast">${intro("04 / Accessibility", "Contrast is measurable.", "These ratios are calculated from the active CSS tokens, including the dark theme. Body text targets at least 4.5:1. Labels, icons, patterns and words provide meaning alongside color.")}<div class="table-wrap"><table><thead><tr><th>Pair</th><th>Sample</th><th>Contrast</th><th>Text target</th></tr></thead><tbody id="contrast-audit"></tbody></table></div></section>
  <section class="design-section" id="type">${intro("05 / Typography", "Friendly forms. Precise figures.", "Manrope brings open shapes and a restrained geometric rhythm. Variable weights provide hierarchy in one local font file. Measurements use tabular figures; technical identifiers use the system monospace.")}<div class="type-specimen"><small>Display · 52–76 px</small><p class="display">A clearer picture.</p></div><div class="type-specimen"><small>Heading · 28–40 px</small><h1>Your connected space</h1></div><div class="type-specimen"><small>Measurement · 48 px</small><p class="measurement">24.6 <span class="unit">°C</span></p></div><div class="type-specimen"><small>Body · 16 px / 1.5</small><p>Keep the value, unit and time together. Make a gap in the data visible.</p></div><div class="type-specimen"><small>Technical · 14 px</small><code>temperature · ambient · sensor-01</code></div><p class="muted small brand-caption">Manrope by the Manrope Project Authors. Bundled under the SIL Open Font License. No font requests leave the application.</p></section>
  <section class="design-section" id="form">${intro("06 / Shape & rhythm", "A consistent frame.", "A four-pixel spacing scale, restrained corners and clear boundaries keep information readable. Space separates sections; a surface groups related measurements. Motion is optional and respects reduced-motion preferences.")}<dl class="token-list"><div class="panel"><dt>Spacing</dt><dd>4 · 8 · 12 · 16 · 24 · 32 · 48</dd></div><div class="panel"><dt>Control radius</dt><dd>8 px</dd></div><div class="panel"><dt>Card / feature radius</dt><dd>14 px / 22 px</dd></div><div class="panel"><dt>Touch target</dt><dd>48 px for primary controls</dd></div><div class="panel"><dt>Icon grid</dt><dd>24 × 24 · enlarged quantity icons</dd></div><div class="panel"><dt>Focus</dt><dd>3 px ring · 4 px offset</dd></div></dl></section>
@@ -53,8 +53,11 @@ export function mountBrand(root, notify) {
       ["Secondary text", "--muted", "--surface"],
       ["Primary button", "--on-brand", "--brand"],
       ["Success label", "--good", "--good-soft"],
-      ["Warning label", "--warning", "--warning-soft"],
-      ["Error label", "--danger", "--danger-soft"],
+      ["Attention label", "--warning", "--surface"],
+      ["Network label", "--info", "--surface"],
+      ["Critical label", "--danger", "--surface"],
+      ["Attention notice", "--warning", "--warning-soft"],
+      ["Network notice", "--info", "--info-soft"],
       ...["temperature", "humidity", "air", "soil", "light"].map((kind) => [
         `${kind} accent`,
         `--${kind}`,

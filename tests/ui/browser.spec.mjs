@@ -120,7 +120,7 @@ test("brand contrast audit updates with theme and navigation works", async ({
   page,
 }) => {
   await page.goto(referenceURL + "/design/brand");
-  await expect(page.locator("#contrast-audit tr")).toHaveCount(11);
+  await expect(page.locator("#contrast-audit tr")).toHaveCount(14);
   await expect(page.locator("#contrast-audit")).not.toContainText(
     "Below target",
   );
@@ -273,7 +273,26 @@ test("measurement identity survives failures and unknown metric names stay neutr
       .evaluate((el) => getComputedStyle(el).color),
   ).toBe(before);
   await expect(card.locator(".reading-note")).toHaveText("Value unavailable");
-  await expect(card.locator(".badge svg")).toHaveCount(1);
+  // An abnormal state carries a shape besides colour and text (ADR 0002).
+  const shape = (state) =>
+    card
+      .locator(`.badge[data-state="${state}"]`)
+      .evaluate((el) => getComputedStyle(el, "::before").content);
+  expect(await shape("error")).not.toBe("none");
+  // Forced colours replace author backgrounds; the shape must still be drawn.
+  await page.emulateMedia({ forcedColors: "active" });
+  const [fill, canvas] = await card
+    .locator('.badge[data-state="error"]')
+    .evaluate((el) => {
+      const probe = document.createElement("div");
+      probe.style.background = "Canvas";
+      document.body.append(probe);
+      const ground = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return [getComputedStyle(el, "::before").backgroundColor, ground];
+    });
+  expect(fill).not.toBe(canvas);
+  await page.emulateMedia({ forcedColors: "none" });
   for (const metric of [
     "custom_metric",
     "__proto__",
@@ -2003,4 +2022,40 @@ test("focused history selector keeps receiving fresh readings and exposes channe
   await expect(page.locator("#history-panel")).toHaveAccessibleName(
     /Sensor 1.*Temperature history.*Device 1.*receiver/,
   );
+});
+
+test("normal readings stay quiet and an offline receiver is counted apart", async ({
+  page,
+}) => {
+  const { snapshot, serve } = await liveWorkspace(page);
+  await expect(page.locator(".reading-button")).toHaveCount(2);
+  await expect(page.locator(".reading-button .badge")).toHaveCount(0);
+  await expect(page.locator(".reading-age").first()).toBeVisible();
+  snapshot.device_states = [
+    {
+      source_id: "receiver",
+      device_id: "000048ca433c5e10",
+      role: "receiver",
+      availability: "offline",
+      received_at: snapshot.generated_at,
+    },
+    {
+      source_id: "receiver",
+      device_id: "device-1",
+      role: "transmitter",
+      receiver_id: "000048ca433c5e10",
+      binding: "active",
+      received_at: snapshot.generated_at,
+    },
+  ];
+  await serve(snapshot);
+  await page.goto("/");
+  // The transmitter behind it is the receiver's problem, counted once.
+  const summary = page.locator("#summary");
+  await expect(summary).toContainText("1 receiver offline");
+  await expect(summary.locator('.badge[data-state="network"]')).toHaveCount(1);
+  await expect(summary.locator('.badge[data-state="warning"]')).toHaveCount(0);
+  await expect(
+    page.locator('.device-alert .badge[data-state="network"]'),
+  ).toHaveCount(1);
 });

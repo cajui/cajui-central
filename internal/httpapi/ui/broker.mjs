@@ -50,7 +50,7 @@ export function mountBroker(root, { state }) {
     if (!snapshot) return;
     const d = snapshot;
     root.querySelector("#broker-summary").innerHTML =
-      `<div class="broker-stats"><article class="panel"><h2>${t("broker.connection")}</h2><p class="badge" data-state="${d.connected ? "ok" : "error"}">${t(!d.configured ? "broker.disabled" : d.connected ? "broker.connected" : "broker.disconnected")}</p>${d.problem ? `<p>${t(problemKeys[d.problem] || "broker.problem_connection")}</p>` : ""}</article><article class="panel"><h2>${t("broker.received")}</h2><strong>${e(d.total ?? 0)}</strong><p>${t("broker.since_start")}</p></article><article class="panel"><h2>${t("broker.rejected")}</h2><strong>${e(d.rejected ?? 0)}</strong><p>${t("broker.rejected_note")}</p></article></div>`;
+      `<div class="broker-stats"><article class="panel"><h2>${t("broker.connection")}</h2><p class="badge" data-state="${!d.configured ? "empty" : d.connected ? "ok" : "network"}">${t(!d.configured ? "broker.disabled" : d.connected ? "broker.connected" : "broker.disconnected")}</p>${d.problem ? `<p>${t(problemKeys[d.problem] || "broker.problem_connection")}</p>` : ""}</article><article class="panel"><h2>${t("broker.received")}</h2><strong>${e(d.total ?? 0)}</strong><p>${t("broker.since_start")}</p></article><article class="panel"><h2>${t("broker.rejected")}</h2><strong>${e(d.rejected ?? 0)}</strong><p>${t("broker.rejected_note")}</p></article></div>`;
     const settings = [
       [t("broker.address"), d.host || "—"],
       [t("broker.port"), d.port || "—"],
