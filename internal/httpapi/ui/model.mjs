@@ -50,27 +50,27 @@ export function formatValue(value, digits = 1, minimum = 0) {
   return numeric(value) === null
     ? "—"
     : new Intl.NumberFormat(locale(), {
-        minimumFractionDigits: minimum,
+        minimumFractionDigits: Math.min(minimum, digits),
         maximumFractionDigits: digits,
         notation: Math.abs(value) >= 1e7 ? "scientific" : "standard",
       }).format(value);
 }
-// Decimals of each measurement cajui-firmware sends; any other metric stays generic. A
-// fixed count keeps 25.0 °C from reading "25 °C" next to "47.4 %".
+// Decimals of each measurement cajui-firmware sends, by metric and unit, since units are
+// free text in the contract: a voltage in mV is not the battery's volts. Anything else
+// stays generic. A fixed count keeps 25.0 °C from reading "25 °C" next to "47.4 %".
 const measurementDecimals = {
-  temperature: 1,
-  humidity: 1,
-  voltage: 2,
-  rssi: 0,
-  snr: 1,
+  temperature: { degC: 1 },
+  humidity: { "%": 1 },
+  voltage: { V: 2 },
+  rssi: { dBm: 0 },
+  snr: { dB: 1 },
 };
-export function formatMeasurement(value, metric) {
-  return Object.hasOwn(measurementDecimals, metric)
-    ? formatValue(
-        value,
-        measurementDecimals[metric],
-        measurementDecimals[metric],
-      )
+export function formatMeasurement(value, metric, unit) {
+  const units = Object.hasOwn(measurementDecimals, metric)
+    ? measurementDecimals[metric]
+    : {};
+  return Object.hasOwn(units, unit)
+    ? formatValue(value, units[unit], units[unit])
     : formatValue(value);
 }
 export function formatUnit(unit) {
@@ -431,8 +431,8 @@ export function linkText(frame) {
     snr = numeric(frame.snr_db);
   if (rssi === null && snr === null) return t("common.unknown");
   return [
-    rssi === null ? null : `${formatMeasurement(rssi, "rssi")} dBm`,
-    snr === null ? null : `${formatMeasurement(snr, "snr")} dB`,
+    rssi === null ? null : `${formatMeasurement(rssi, "rssi", "dBm")} dBm`,
+    snr === null ? null : `${formatMeasurement(snr, "snr", "dB")} dB`,
   ]
     .filter(Boolean)
     .join(" · ");

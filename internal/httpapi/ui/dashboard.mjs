@@ -1,5 +1,5 @@
 import { watchDeviceStates } from "./state-events.mjs";
-import { t, locale, metricLabel } from "./i18n.mjs";
+import { t, locale } from "./i18n.mjs";
 import {
   escapeHTML as e,
   isLinkDiagnostic,
@@ -90,11 +90,9 @@ export function mountDashboard(root, { state = {}, notify }) {
     for (const c of channels) {
       c.updated = age(c.at, now);
       if (c.metric === "co2") c.title = t("metrics.co2");
-      if (isLinkDiagnostic(c))
-        c.title =
-          c.sensor === "battery"
-            ? t("metrics.battery")
-            : metricLabel(c.metric, c.metric.toUpperCase());
+      // The battery reports a voltage, but it is read as the battery.
+      if (isLinkDiagnostic(c) && c.sensor === "battery")
+        c.title = t("metrics.battery");
     }
     if (!channels.some((c) => c.key === selected)) selected = "";
   }
@@ -255,7 +253,7 @@ export function mountDashboard(root, { state = {}, notify }) {
       c.state === "ok" ||
       c.state === "recorded" ||
       (g.stale && c.state === "stale");
-    button.innerHTML = `<span class="row-label"><span class="row-title">${e(c.title)}</span>${sensorName ? `<span class="row-sub">${e(sensorName)}</span>` : ""}${quiet ? "" : `<cj-badge state="${e(c.state)}"></cj-badge>`}</span><span class="row-value" data-state="${e(c.state)}">${formatMeasurement(value, c.metric)}<span class="unit">${e(formatUnit(c.unit))}</span></span><span class="row-trend">${spark ? `<svg class="spark" viewBox="0 0 96 28" preserveAspectRatio="none" aria-hidden="true"><path d="${spark.path}" transform="translate(0 2)"/></svg>` : ""}</span>`;
+    button.innerHTML = `<span class="row-label"><span class="row-title">${e(c.title)}</span>${sensorName ? `<span class="row-sub">${e(sensorName)}</span>` : ""}${quiet ? "" : `<cj-badge state="${e(c.state)}"></cj-badge>`}</span><span class="row-value" data-state="${e(c.state)}">${formatMeasurement(value, c.metric, c.unit)}<span class="unit">${e(formatUnit(c.unit))}</span></span><span class="row-trend">${spark ? `<svg class="spark" viewBox="0 0 96 28" preserveAspectRatio="none" aria-hidden="true"><path d="${spark.path}" transform="translate(0 2)"/></svg>` : ""}</span>`;
     return button;
   }
   function renderAttention() {
@@ -300,6 +298,7 @@ export function mountDashboard(root, { state = {}, notify }) {
         value: formatMeasurement(
           ["ok", "recorded", "stale"].includes(c.state) ? c.value : null,
           c.metric,
+          c.unit,
         ),
         unit: formatUnit(c.unit),
         status: states[c.state],
@@ -402,7 +401,7 @@ export function mountDashboard(root, { state = {}, notify }) {
     root.querySelector("#history-state").setAttribute("state", c.state);
     const latest = c.points.at(-1);
     root.querySelector("#history-value").innerHTML =
-      `${formatMeasurement(latest?.value, c.metric)}<span class="unit">${e(formatUnit(c.unit))}</span>`;
+      `${formatMeasurement(latest?.value, c.metric, c.unit)}<span class="unit">${e(formatUnit(c.unit))}</span>`;
     root.querySelector("#history-time").textContent = latest
       ? new Date(latest.time).toLocaleString(locale())
       : t("common.waiting");
@@ -450,7 +449,7 @@ export function mountDashboard(root, { state = {}, notify }) {
         : []),
       ...g.diagnostics.map((c) => [
         c.title,
-        `${formatMeasurement(["ok", "recorded", "stale"].includes(c.state) ? c.value : null, c.metric)} ${formatUnit(c.unit)} · ${states[c.state]}`,
+        `${formatMeasurement(["ok", "recorded", "stale"].includes(c.state) ? c.value : null, c.metric, c.unit)} ${formatUnit(c.unit)} · ${states[c.state]}`,
       ]),
     ];
     root.querySelector("#device-detail").innerHTML =

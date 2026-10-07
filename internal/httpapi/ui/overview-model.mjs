@@ -1,6 +1,5 @@
 import { t, locale } from "./i18n.mjs";
 import {
-  formatValue,
   formatMeasurement,
   numeric,
   receiverLabel,
@@ -215,7 +214,7 @@ export function attentionItems(groups, receivers, now) {
     const volts = batteryOf(g);
     if (volts !== null && volts < BATTERY_LOW_V) {
       const critical = volts < BATTERY_CRITICAL_V;
-      const value = `${formatMeasurement(volts, "voltage")} V`;
+      const value = `${formatMeasurement(volts, "voltage", "V")} V`;
       items.push({
         severity: critical ? "critical" : "warning",
         key: `battery/${placeKey(g)}`,
@@ -227,7 +226,7 @@ export function attentionItems(groups, receivers, now) {
             ? "overview.battery_critical_detail"
             : "overview.battery_low_detail",
           {
-            limit: `${formatValue(critical ? BATTERY_CRITICAL_V : BATTERY_LOW_V, 1)} V`,
+            limit: `${formatMeasurement(critical ? BATTERY_CRITICAL_V : BATTERY_LOW_V, "voltage", "V")} V`,
           },
         ),
         since: "",
