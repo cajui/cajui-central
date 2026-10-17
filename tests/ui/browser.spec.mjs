@@ -2755,6 +2755,8 @@ test("history ignores a slow result after changing measurement", async ({
 test("HTTP history loads persisted records beyond the overview's 100 readings", async ({
   page,
 }) => {
+  const { randomUUID } = await import("node:crypto");
+  const identity = `history-${randomUUID()}`;
   const { readFile } = await import("node:fs/promises");
   const token = (
     await readFile(
@@ -2766,7 +2768,7 @@ test("HTTP history loads persisted records beyond the overview's 100 readings", 
     const response = await page.request.post("/api/v1/readings", {
       headers: { Authorization: `Bearer ${token}` },
       data: {
-        node_id: "history-integration",
+        node_id: identity,
         sensor_id: "probe",
         session_id: "boot",
         sequence: i,
@@ -2785,9 +2787,7 @@ test("HTTP history loads persisted records beyond the overview's 100 readings", 
     )[1],
   );
   expect(state.readings.length).toBe(100);
-  const device = state.workspace.devices.find(
-    (d) => d.device === "history-integration",
-  );
+  const device = state.workspace.devices.find((d) => d.device === identity);
   const saved = await page.request.put(`/ui-api/devices/${device.id}`, {
     headers: {
       Origin: new URL(response.url()).origin,
@@ -2800,28 +2800,50 @@ test("HTTP history loads persisted records beyond the overview's 100 readings", 
     },
   });
   expect(saved.ok()).toBeTruthy();
-  const layout = await page.request.put("/ui-api/dashboard/layout", {
-    headers: {
-      Origin: new URL(response.url()).origin,
-      "X-Cajui-Workspace": state.ui_token,
-    },
-    data: { revision: state.workspace.layout.revision, sections: null },
+  await page.route("**/?lang=en-US", async (route) => {
+    const response = await route.fetch();
+    const html = await response.text();
+    const pattern =
+      /(<script type="application\/json" id="initial-state">)([\s\S]*?)(<\/script>)/;
+    await route.fulfill({
+      response,
+      body: html.replace(pattern, (_, begin, json, end) => {
+        const snapshot = JSON.parse(json);
+        snapshot.workspace.layout.sections = null;
+        return (
+          begin + JSON.stringify(snapshot).replaceAll("<", "\\u003c") + end
+        );
+      }),
+    });
   });
-  expect(layout.ok()).toBeTruthy();
-  await page.goto("/?lang=en-US");
-  const place = page
-    .locator(".place")
-    .filter({ hasText: "History integration" });
-  await place.locator(".reading-button").first().click();
-  await expect(page.locator("#plot-count")).toHaveText("115 observations");
-  await page.locator("#history-table summary").click();
-  await expect(page.locator("#history-table tbody tr")).toHaveCount(100);
-  await page.locator("#history-older").click();
-  await expect(page.locator("#history-table tbody tr")).toHaveCount(15);
-  await expect(page.locator("#history-table tbody tr").last()).toContainText(
-    "0.0",
-  );
-  await expect(page.locator("#history-older")).toBeDisabled();
+  try {
+    await page.goto("/?lang=en-US");
+    const place = page
+      .locator(".place")
+      .filter({ hasText: "History integration" });
+    await place.locator(".reading-button").first().click();
+    await expect(page.locator("#plot-count")).toHaveText("115 observations");
+    await page.locator("#history-table summary").click();
+    await expect(page.locator("#history-table tbody tr")).toHaveCount(100);
+    await page.locator("#history-older").click();
+    await expect(page.locator("#history-table tbody tr")).toHaveCount(15);
+    await expect(page.locator("#history-table tbody tr").last()).toContainText(
+      "0.0",
+    );
+    await expect(page.locator("#history-older")).toBeDisabled();
+  } finally {
+    const cleanup = await page.request.post(
+      `/ui-api/devices/${device.id}/archive`,
+      {
+        headers: {
+          Origin: new URL(response.url()).origin,
+          "X-Cajui-Workspace": state.ui_token,
+        },
+        data: { revision: device.revision + 1 },
+      },
+    );
+    expect(cleanup.ok()).toBeTruthy();
+  }
 });
 
 test("history works without signal composition and translates network failures", async ({
