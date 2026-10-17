@@ -1,6 +1,7 @@
 package history
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
@@ -80,5 +81,24 @@ func TestQueryBounds(t *testing.T) {
 		if q.Validate() == nil {
 			t.Fatal(q)
 		}
+	}
+}
+
+func TestSummaryBucketsRemainAlignedWhenWindowMoves(t *testing.T) {
+	from := time.Unix(1000, 0)
+	to := from.Add(120 * time.Second)
+	a := NewSummary(from, to)
+	b := NewSummary(from.Add(500*time.Millisecond), to.Add(500*time.Millisecond))
+	for i := 0; i < 1000; i++ {
+		v := float64(i % 7)
+		at := from.Add(time.Duration(i+20) * 100 * time.Millisecond)
+		p := Point{ID: int64(i + 1), Time: at.UnixMilli(), Value: &v, Status: "ok"}
+		a.Add(p)
+		b.Add(p)
+	}
+	ap, _ := a.Points()
+	bp, _ := b.Points()
+	if !reflect.DeepEqual(ap, bp) {
+		t.Fatal("moving the window changed interior buckets")
 	}
 }

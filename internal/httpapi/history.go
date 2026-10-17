@@ -77,7 +77,9 @@ func (s *server) measurementHistory(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	result, err := s.repo.History(ctx, q, view != "rows")
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
+		if errors.Is(err, context.Canceled) || r.Context().Err() != nil {
+			return
+		} else if errors.Is(err, context.DeadlineExceeded) {
 			http.Error(w, "choose a shorter period", http.StatusServiceUnavailable)
 		} else {
 			s.fail(w, err)

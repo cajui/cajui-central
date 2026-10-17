@@ -46,8 +46,8 @@ type Point struct {
 type Result struct {
 	Points  []Point `json:"points"`
 	Rows    []Point `json:"rows"`
-	Count   int     `json:"count"`
-	Sampled bool    `json:"sampled"`
+	Count   *int    `json:"count"`
+	Sampled *bool   `json:"sampled"`
 	Anchor  int64   `json:"anchor"`
 	Next    string  `json:"next"`
 }
@@ -66,7 +66,8 @@ type Summary struct {
 }
 
 func NewSummary(from, to time.Time) *Summary {
-	return &Summary{from: from.UnixMilli(), width: max(1, (to.UnixMilli()-from.UnixMilli()+Buckets-1)/Buckets)}
+	width := max(1, (to.UnixMilli()-from.UnixMilli()+Buckets-2)/(Buckets-1))
+	return &Summary{from: from.UnixMilli() / width * width, width: width}
 }
 
 func (s *Summary) Add(p Point) {

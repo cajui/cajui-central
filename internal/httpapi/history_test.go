@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -61,7 +62,7 @@ func TestHistoryAccessAndValidation(t *testing.T) {
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	var result history.Result
-	if err = json.Unmarshal(w.Body.Bytes(), &result); err != nil || result.Count != 1 || result.Points[0].Value == nil || *result.Points[0].Value != 0 {
+	if err = json.Unmarshal(w.Body.Bytes(), &result); err != nil || (result.Count == nil || *result.Count != 1) || result.Points[0].Value == nil || *result.Points[0].Value != 0 {
 		t.Fatal(result, err)
 	}
 }
@@ -82,5 +83,22 @@ func TestHistoryStorageFailureAndBusy(t *testing.T) {
 	s.measurementHistory(w, r)
 	if w.Code != 500 {
 		t.Fatal(w.Code)
+	}
+}
+
+type canceledHistoryRepo struct{ brokenRepo }
+
+func (canceledHistoryRepo) History(context.Context, history.Query, bool) (history.Result, error) {
+	return history.Result{}, context.Canceled
+}
+func TestHistoryCancellationDoesNotLogServerFailure(t *testing.T) {
+	var logs bytes.Buffer
+	s := &server{repo: canceledHistoryRepo{}, uiToken: "test", historyRequests: make(chan struct{}, 2), logger: slog.New(slog.NewTextHandler(&logs, nil))}
+	r := httptest.NewRequest("GET", "http://localhost/ui-api/history?sensor=1&metric=t&unit=C&from=2026-01-01T00:00:00Z&to=2026-01-02T00:00:00Z", nil)
+	r.Header.Set("X-Cajui-Workspace", "test")
+	w := httptest.NewRecorder()
+	s.measurementHistory(w, r)
+	if w.Code >= 500 || w.Body.Len() != 0 || logs.Len() != 0 {
+		t.Fatal(w.Code, w.Body, logs.String())
 	}
 }

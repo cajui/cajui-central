@@ -437,13 +437,18 @@ Custom dates use the browser's time zone; timestamps represent **arrival at Cent
 not acquisition at the device. There is no automatic age-based deletion: older data
 remains available through custom intervals while the database volume is preserved.
 
-The chart returns all observations up to 600. Larger series are reduced into 120
-time buckets, retaining actual first, last, minimum, maximum and an invalid reading
+The chart returns all observations up to 600. Larger series are reduced into at most 120
+time buckets aligned to absolute time, retaining actual first, last, minimum, maximum and an invalid reading
 per bucket (at most 600 points). Values are never averaged or interpolated. Buckets
 containing errors or gaps beyond three expected intervals are drawn conservatively
 as disconnected points, so compression cannot hide an outage with a continuous line.
 The interface explicitly labels simplified charts. The table always contains original
 readings, including errors and skipped measurements, newest first in pages of 100.
+The axis covers the requested period, including silence at its edges. Closed custom
+periods do not poll; submit the date form again to refresh them. An inspected original
+point remains available within the range even if simplification omits it later; moving
+outside the range is reported explicitly. Sensor errors and skipped measurements are
+distinguished from an empty period.
 An open table keeps its snapshot and position during live chart updates; reopen the
 history or reapply the period to start a new table snapshot. The overview CSV export
 continues to export recent loaded readings only.
@@ -453,19 +458,28 @@ a loopback host, just like the other private UI endpoints. Parameters are `senso
 (the workspace sensor ID), `metric`, `unit`, and RFC3339 `from`/`to` boundaries
 (inclusive/exclusive, millisecond resolution). Sources and transports have distinct
 sensor IDs. The response contains `points`, `rows`, the original `count`, `sampled`,
-an `anchor` and a `next` cursor. For table pages, repeat the same channel and dates
+an `anchor` and a `next` cursor. In `view=rows`, `count` and `sampled` are null: chart
+statistics are not recalculated for pagination. For table pages, repeat the same channel and dates
 with `view=rows`, `anchor`, and optionally `before=next`. Ordering uses receipt time
 and a unique row ID, and the anchor excludes later inserts, including late arrivals.
 Unknown channels return an empty series. At most two history requests run concurrently;
-each has a five-second database deadline. A timeout asks the user to narrow the period
+file databases use a separate read-only connection pool so history does not occupy the
+ingestion connection. In-memory test stores share their original connection. Each request
+has a five-second database deadline. A timeout asks the user to narrow the period
 rather than silently returning an incomplete chart.
 
-Schema version 8 adds an indexed measurement history projection. Migration backfills
+Schema version 9 adds source references, uniqueness and status/value constraints to the
+indexed history projection. Schema 8 projections are rebuilt transactionally from original
+telemetry with IDs above the previous maximum; reopen history after upgrading because
+old pagination anchors no longer select those records. Earlier schemas backfill directly.
+Migration backfills
 existing HTTP and MQTT data transactionally; future projection inserts share the
 original ingestion transaction, including deduplication. Original payloads and
 inventory remain intact. The projection consumes additional disk space; back up the
 database before upgrading, and restore that backup if rolling back to a binary that
-only supports schema 7. Large histories may make the first startup take longer.
+only supports an earlier schema. Large histories may make the first startup take longer.
+See [ADR 0003](docs/adr/0003-persisted-measurement-history.md) for the storage, isolation
+and chart decisions.
 
 The dashboard refreshes every 30 seconds while visible and not being interacted
 with. Inventory pages have an explicit Refresh button. A failed dashboard refresh
