@@ -29,7 +29,7 @@ docker run --rm --network "${project}_default" \
   -e CAJUI_TEST_MQTT_URL=tcp://broker:1883 -e CAJUI_TEST_SECRETS=/secrets \
   -v "$secrets":/secrets:ro -v "$PWD":/src -w /src \
   -v cajui-go-mod:/go/pkg/mod -v cajui-go-build:/root/.cache/go-build \
-  golang:1.27 make check
+  golang:1.27.2 make check
 # Central's non-root UID can read the setup account, but not arbitrary producers.
 docker run --rm --user 65532:65532 -v "$secrets":/secrets:ro --entrypoint sh eclipse-mosquitto:2.0.22 -c '
   test -r /secrets/producers/receiver-1 && test ! -r /secrets/demo-source

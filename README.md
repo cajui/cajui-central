@@ -39,7 +39,7 @@ every interface so devices on the network can publish; see
 
 ### Go
 
-Requires Go 1.27+ and Make. `go test -race` also needs a C toolchain.
+Requires Go 1.27.2+ and Make. `go test -race` also needs a C toolchain.
 
 ```sh
 export CAJUI_API_TOKEN="$(openssl rand -hex 32)"
