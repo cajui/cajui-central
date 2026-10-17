@@ -34,19 +34,31 @@ export function createHistoryView(root) {
     signature = "",
     customRange = null;
 
-  function close() {
+  function cancelRequests() {
     generation++;
     request?.abort();
     pageRequest?.abort();
+    request = pageRequest = null;
+    chart.removeAttribute("aria-busy");
+  }
+  function fixedRange() {
+    return (
+      period.value === "custom" &&
+      customRange &&
+      Date.parse(customRange[1]) <= Date.now()
+    );
+  }
+  function close() {
+    cancelRequests();
     channel = null;
     signature = "";
   }
-  function clear() {
+  function clear(state = "loading") {
     result = null;
     pageIndex = 0;
     cursors = [null];
     chart.resetInspection();
-    chart.data = { ...channel, points: [], showTable: false };
+    chart.data = { ...channel, points: [], showTable: false, loadState: state };
     table.querySelector("tbody").replaceChildren();
     table.open = false;
     older.disabled = newer.disabled = true;
@@ -74,14 +86,23 @@ export function createHistoryView(root) {
     )?.id;
   }
   async function fetchHistory(query, controller) {
-    const response = await fetch(`/ui-api/history?${query}`, {
-      headers: { "X-Cajui-Workspace": snapshot.ui_token },
-      cache: "no-store",
-      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]),
-    });
-    if (!response.ok) throw new Error(t("history.load_error"));
-    return response.json();
+    const timer = setTimeout(() => {
+      controller.timedOut = true;
+      controller.abort();
+    }, 10000);
+    try {
+      const response = await fetch(`/ui-api/history?${query}`, {
+        headers: { "X-Cajui-Workspace": snapshot.ui_token },
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(t("history.load_error"));
+      return await response.json();
+    } finally {
+      clearTimeout(timer);
+    }
   }
+
   function renderRows(data, index) {
     root.querySelector("#history-unit").textContent = t("chart.value", {
       unit: formatUnit(channel.unit),
@@ -132,6 +153,7 @@ export function createHistoryView(root) {
         ...channel,
         label: channel.title,
         points: data.points,
+        span: [Date.parse(from), Date.parse(to)],
         interval: 0,
         plotHeight: 240,
         showTable: false,
@@ -156,8 +178,19 @@ export function createHistoryView(root) {
       }
       message.textContent = "";
     } catch (error) {
-      if (controller.signal.aborted || current !== generation) return;
-      message.textContent = error.message;
+      if (
+        (controller.signal.aborted && !controller.timedOut) ||
+        current !== generation
+      )
+        return;
+      message.textContent = t("history.load_error");
+      if (reset)
+        chart.data = {
+          ...channel,
+          points: [],
+          showTable: false,
+          loadState: "error",
+        };
       retry.hidden = false;
     } finally {
       if (current === generation && request === controller) {
@@ -185,8 +218,12 @@ export function createHistoryView(root) {
       renderRows(data, index);
       message.textContent = "";
     } catch (error) {
-      if (controller.signal.aborted || current !== generation) return;
-      message.textContent = error.message;
+      if (
+        (controller.signal.aborted && !controller.timedOut) ||
+        current !== generation
+      )
+        return;
+      message.textContent = t("history.load_error");
       older.disabled = !cursors[pageIndex + 1];
       newer.disabled = pageIndex === 0;
     } finally {
@@ -194,10 +231,8 @@ export function createHistoryView(root) {
     }
   }
   period.addEventListener("change", () => {
-    request?.abort();
-    pageRequest?.abort();
-    generation++;
-    clear();
+    cancelRequests();
+    clear(period.value === "custom" ? "range" : "loading");
     customRange = null;
     form.hidden = period.value !== "custom";
     message.textContent = "";
@@ -237,7 +272,7 @@ export function createHistoryView(root) {
   return {
     close,
     refresh() {
-      if (channel && !request) void load(false);
+      if (channel && !request && !fixedRange()) void load(false);
     },
     show(next, state) {
       if (!root.querySelector("#history-panel").open) return;
@@ -247,7 +282,7 @@ export function createHistoryView(root) {
       const nextSignature = `${next.key}/${next.at}/${next.state}/${next.value}`;
       if (changed || signature !== nextSignature) {
         signature = nextSignature;
-        void load(changed);
+        if (changed || !fixedRange()) void load(changed);
       }
     },
   };

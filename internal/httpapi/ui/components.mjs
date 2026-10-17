@@ -153,6 +153,8 @@ class Device extends Component {
 class Chart extends Component {
   resetInspection() {
     this.inspectedTime = undefined;
+    this.inspectedPoint = undefined;
+    this.inspectionExpired = false;
     this.tableOpen = false;
     const table = this.querySelector("details");
     if (table) table.open = false;
@@ -192,14 +194,61 @@ class Chart extends Component {
       interval = 0,
       timeLabel = t("chart.time"),
     } = this.data;
+    if (this.data.loadState) {
+      this.innerHTML =
+        this.data.loadState === "range"
+          ? `<div class="empty">${t("history.choose_range")}</div>`
+          : `<div class="empty" aria-hidden="true"></div>`;
+      return;
+    }
+    if (
+      this.inspectedPoint &&
+      this.data.span &&
+      (this.inspectedPoint.time < this.data.span[0] ||
+        this.inspectedPoint.time >= this.data.span[1])
+    ) {
+      this.inspectedPoint = undefined;
+      this.inspectedTime = undefined;
+      this.inspectionExpired = true;
+    }
+    let plotted = points;
+    const samePoint = (p) =>
+      this.inspectedPoint?.id != null
+        ? p.id === this.inspectedPoint.id
+        : p.time === this.inspectedTime;
+    if (this.inspectedPoint && !points.some(samePoint)) {
+      const span = this.data.span ?? [points[0]?.time, points.at(-1)?.time];
+      if (
+        this.inspectedPoint.time >= span[0] &&
+        this.inspectedPoint.time < span[1]
+      ) {
+        plotted = [
+          ...points,
+          { ...this.inspectedPoint, break_before: true },
+        ].sort((a, b) => a.time - b.time || (a.id ?? 0) - (b.id ?? 0));
+        const next = plotted.findIndex(samePoint) + 1;
+        if (next < plotted.length)
+          plotted[next] = { ...plotted[next], break_before: true };
+      } else {
+        this.inspectedPoint = undefined;
+        this.inspectedTime = undefined;
+        this.inspectionExpired = true;
+      }
+    }
     const g = plotGeometry(
-      points,
+      plotted,
       plotWidth,
       plotHeight,
       interval ? interval * 3000 : Infinity,
+      this.data.span,
     );
     if (!g) {
-      this.innerHTML = `<div class="empty"><h3>${t("chart.empty")}</h3><p>${t("chart.choose_period")}</p></div>`;
+      const invalid = points.some((p) => p.status === "error");
+      const skipped =
+        points.length && points.every((p) => p.status === "skipped");
+      this.innerHTML = points.length
+        ? `<div class="empty"><h3>${t(invalid ? "history.sensor_error" : skipped ? "history.skipped" : "history.no_valid")}</h3><p>${t("history.check_table")}</p></div>`
+        : `<div class="empty"><h3>${t("chart.empty")}</h3><p>${t("chart.choose_period")}</p></div>`;
       return;
     }
     const gap = interval ? interval * 3000 : Infinity;
@@ -263,7 +312,14 @@ class Chart extends Component {
       cursor = this.querySelector(".cursor"),
       marker = this.querySelector(".selected-point"),
       selection = this.querySelector(".chart-selection");
-    const saved = g.points.findIndex((p) => p.time === this.inspectedTime);
+    const saved = g.points.findIndex(samePoint);
+    if (this.inspectionExpired) {
+      const notice = document.createElement("p");
+      notice.className = "small muted";
+      notice.setAttribute("role", "status");
+      notice.textContent = t("history.selection_expired");
+      this.prepend(notice);
+    }
     if (saved >= 0) slider.value = saved;
     const inspect = () => {
       const p = g.points[Number(slider.value)];
@@ -280,7 +336,9 @@ class Chart extends Component {
       cursor.setAttribute("x2", g.x(p.time));
     };
     slider.addEventListener("input", () => {
-      this.inspectedTime = g.points[Number(slider.value)].time;
+      this.inspectedPoint = g.points[Number(slider.value)];
+      this.inspectedTime = this.inspectedPoint.time;
+      this.inspectionExpired = false;
       inspect();
     });
     if (sliderFocused) slider.focus({ preventScroll: true });
@@ -305,14 +363,17 @@ class Chart extends Component {
           nearest = i;
       });
       slider.value = nearest;
-      if (event.type === "pointerdown" || event.buttons)
-        this.inspectedTime = g.points[nearest].time;
+      if (event.type === "pointerdown" || event.buttons) {
+        this.inspectedPoint = g.points[nearest];
+        this.inspectedTime = this.inspectedPoint.time;
+        this.inspectionExpired = false;
+      }
       inspect();
     };
     svg.addEventListener("pointerdown", selectPoint);
     svg.addEventListener("pointermove", selectPoint);
     svg.addEventListener("pointerleave", () => {
-      const pinned = g.points.findIndex((p) => p.time === this.inspectedTime);
+      const pinned = g.points.findIndex(samePoint);
       slider.value = pinned >= 0 ? pinned : g.points.length - 1;
       inspect();
     });

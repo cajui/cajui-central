@@ -2259,12 +2259,17 @@ test("history dialogs isolate sensor and device diagnostics and restore focus", 
   await slider.focus();
   await page.keyboard.press("Home");
   const cursor = page.locator("#history .cursor");
-  await expect(cursor).toHaveAttribute("x1", "0");
+  await expect(slider).toHaveValue("0");
+  const firstPosition = Number(await cursor.getAttribute("x1"));
+  expect(firstPosition).toBeGreaterThan(0);
   await page.keyboard.press("End");
-  await expect(cursor).not.toHaveAttribute("x1", "0");
+  expect(Number(await cursor.getAttribute("x1"))).toBeGreaterThan(
+    firstPosition,
+  );
   const plot = page.locator("#history svg");
   await plot.click({ position: { x: 64, y: 40 } });
-  await expect(cursor).toHaveAttribute("x1", "0");
+  await expect(slider).toHaveValue("0");
+  expect(Number(await cursor.getAttribute("x1"))).toBe(firstPosition);
   await expect(page.locator("#history .selected-point")).toBeVisible();
   const violations = await new AxeBuilder({ page }).analyze();
   expect(violations.violations).toEqual([]);
@@ -2700,10 +2705,7 @@ test("persistent history queries periods, pages original readings and keeps an o
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBeTruthy();
-  await page.screenshot({
-    path: "/tmp/cajui-history-mobile.png",
-    fullPage: true,
-  });
+
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
 
@@ -2820,4 +2822,154 @@ test("HTTP history loads persisted records beyond the overview's 100 readings", 
     "0.0",
   );
   await expect(page.locator("#history-older")).toBeDisabled();
+});
+
+test("history works without signal composition and translates network failures", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    AbortSignal.any = undefined;
+    AbortSignal.timeout = undefined;
+  });
+  await liveWorkspace(page, "pt-BR");
+  await page.locator(".reading-button").first().click();
+  await expect(page.locator("#history input[type=range]")).toBeVisible();
+  await page.route("**/ui-api/history?*", (route) => route.abort());
+  await page.locator("#period").selectOption("168");
+  await expect(page.locator("#history-message")).toContainText(
+    "Não foi possível",
+  );
+  await expect(page.locator("#history-message")).not.toContainText("fetch");
+  await expect(page.locator("#history")).not.toContainText("Nenhuma leitura");
+});
+
+test("history cancellation clears loading and closed custom periods do not poll", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await liveWorkspace(page);
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/ui-api/history?*", async (route) => {
+    await gate;
+    await route.abort().catch(() => {});
+  });
+  await page.locator(".reading-button").first().click();
+  await expect(page.locator("#history")).toHaveAttribute("aria-busy", "true");
+  await expect(page.locator("#history")).not.toContainText("No readings");
+  await expect(page.locator("#history-message")).toHaveText("Loading history…");
+  await page.locator("#period").selectOption("custom");
+  release();
+  await expect(page.locator("#history")).not.toHaveAttribute(
+    "aria-busy",
+    "true",
+  );
+  await expect(page.locator("#history")).toContainText("Choose the dates");
+  let requests = 0;
+  await page.route("**/ui-api/history?*", (route) => {
+    requests++;
+    return route.fulfill({
+      json: {
+        points: [],
+        rows: [],
+        count: 0,
+        sampled: false,
+        anchor: 1,
+        next: "",
+      },
+    });
+  });
+  await page.locator('#history-range [name="from"]').fill("2025-01-01T00:00");
+  await page.locator('#history-range [name="to"]').fill("2025-01-02T00:00");
+  await page.locator('#history-range [type="submit"]').click();
+  await expect(page.locator("#plot-count")).toHaveText("0 observations");
+  const before = requests;
+  await page.clock.runFor(65000);
+  expect(requests).toBe(before);
+  await page.locator('#history-range [type="submit"]').click();
+  await expect.poll(() => requests).toBe(before + 1);
+});
+
+test("history timeouts are localized and retryable", async ({ page }) => {
+  await page.clock.install();
+  await liveWorkspace(page);
+  let release;
+  const gate = new Promise((r) => (release = r));
+  await page.route("**/ui-api/history?*", async (route) => {
+    await gate;
+    await route.abort().catch(() => {});
+  });
+  await page.locator(".reading-button").first().click();
+  await expect(page.locator("#history")).toHaveAttribute("aria-busy", "true");
+  await page.clock.runFor(10001);
+  await expect(page.locator("#history-message")).toHaveText(
+    "Could not load history. Retry or choose a shorter period.",
+  );
+  await expect(page.locator("#history-retry")).toBeVisible();
+  await expect(page.locator("#history")).not.toHaveAttribute(
+    "aria-busy",
+    "true",
+  );
+  release();
+});
+
+for (const status of ["error", "skipped"]) {
+  test(`history distinguishes ${status} readings from an empty period`, async ({
+    page,
+  }) => {
+    await liveWorkspace(page);
+    await page.route("**/ui-api/history?*", (route) =>
+      route.fulfill({
+        json: {
+          points: [{ id: 1, time: Date.now() - 1000, value: null, status }],
+          rows: [],
+          count: 288,
+          sampled: false,
+          anchor: 1,
+          next: "",
+        },
+      }),
+    );
+    await page.locator(".reading-button").first().click();
+    await expect(page.locator("#plot-count")).toHaveText("288 observations");
+    await expect(page.locator("#history")).toContainText(
+      status === "error" ? "Sensor failed" : "Measurements were not taken",
+    );
+    await expect(page.locator("#history")).not.toContainText(
+      "No readings in this period",
+    );
+  });
+}
+
+test("history keeps requested bounds and an inspected point omitted by simplification", async ({
+  page,
+}) => {
+  const { snapshot } = await liveWorkspace(page);
+  await page.locator(".reading-button").first().click();
+  const chart = page.locator("#history"),
+    slider = chart.locator("input[type=range]");
+  await expect(slider).toBeVisible();
+  expect(await chart.evaluate((el) => el.data.span)).toEqual([
+    Date.parse(snapshot.generated_at) - 86400000,
+    Date.parse(snapshot.generated_at),
+  ]);
+  await slider.focus();
+  await page.keyboard.press("Home");
+  const pinned = await chart.locator(".chart-selection").textContent();
+  await chart.evaluate((el) => {
+    el.data = { ...el.data, points: el.data.points.slice(1) };
+  });
+  await expect(slider).toBeFocused();
+  await expect(chart.locator(".chart-selection")).toHaveText(pinned);
+  await chart.evaluate((el) => {
+    el.data = {
+      ...el.data,
+      span: [el.inspectedPoint.time + 1, el.data.span[1]],
+    };
+  });
+  await expect(chart.getByRole("status").first()).toContainText(
+    "outside the selected period",
+  );
 });
