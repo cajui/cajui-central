@@ -47,7 +47,7 @@ func (s *Store) migrate() error {
 	if err = tx.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return err
 	}
-	if version > 7 {
+	if version > 8 {
 		return fmt.Errorf("unsupported schema version %d", version)
 	}
 	if version == 0 {
@@ -106,6 +106,14 @@ PRAGMA user_version=7;`); err != nil {
 			return err
 		}
 	}
+	if version < 8 {
+		if _, err = tx.Exec(historySchema); err != nil {
+			return err
+		}
+		if err = backfillHistory(tx); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 func (s *Store) Close() error                   { return s.db.Close() }
@@ -138,6 +146,9 @@ func (s *Store) Insert(ctx context.Context, r telemetry.Reading, receivedAt time
 	}
 	if count == 1 {
 		if err = observeReading(ctx, tx, r); err != nil {
+			return false, err
+		}
+		if err = recordHistory(ctx, tx, "http", "HTTP", r.NodeID, []telemetry.Measurement{{SensorID: r.SensorID, Metric: r.Metric, Unit: r.Unit, Value: &r.Value, Status: "ok"}}, receivedAt, 0); err != nil {
 			return false, err
 		}
 		return true, tx.Commit()
