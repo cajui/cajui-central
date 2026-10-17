@@ -345,6 +345,55 @@ test("measurement identity survives failures and unknown metric names stay neutr
   expect(await page.evaluate(() => window.pwned)).toBeUndefined();
 });
 
+async function mockHistory(page, state) {
+  await page.route("**/ui-api/history?*", (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    const sensor = state.workspace.sensors.find(
+      (s) => String(s.id) === query.get("sensor"),
+    );
+    const device = state.workspace.devices.find(
+      (d) => d.id === sensor?.device_id,
+    );
+    const points = (state.samples ?? [])
+      .filter(
+        (s) => s.source_id === device?.source && s.device_id === device?.device,
+      )
+      .flatMap((s, index) =>
+        s.readings
+          .filter(
+            (r) =>
+              r.sensor_id === sensor?.sensor &&
+              r.metric === query.get("metric") &&
+              r.unit === query.get("unit"),
+          )
+          .map((r) => ({
+            id: index + 1,
+            time: Date.parse(s.received_at),
+            received_at: s.received_at,
+            value: r.status === "ok" ? r.value : null,
+            status: r.status,
+            interval: s.expected_interval_seconds,
+          })),
+      )
+      .filter(
+        (p) =>
+          p.time >= Date.parse(query.get("from")) &&
+          p.time < Date.parse(query.get("to")),
+      )
+      .sort((a, b) => a.time - b.time);
+    return route.fulfill({
+      json: {
+        points,
+        rows: [...points].reverse(),
+        count: points.length,
+        anchor: 100,
+        sampled: false,
+        next: "",
+      },
+    });
+  });
+}
+
 async function liveWorkspace(page, language = "en-US") {
   const now = Date.now();
   const snapshot = {
@@ -434,7 +483,8 @@ async function liveWorkspace(page, language = "en-US") {
   };
   const response = await page.request.get(`/?lang=${language}`);
   const html = await response.text();
-  const serve = (state) => {
+  const serve = async (state) => {
+    await mockHistory(page, state);
     const json = JSON.stringify(state).replaceAll("<", "\\u003c");
     return page.route("**/", (route) =>
       route.fulfill({
@@ -459,8 +509,8 @@ test("live data keeps refreshing while a chart or dialog is open", async ({
   const reading = page.locator(".reading-button").nth(1);
   await reading.click();
   await expect(page.locator("#history-heading")).toBeFocused();
-  await page.locator("#history summary").click();
-  await expect(page.locator("#history details")).toHaveAttribute("open", "");
+  await page.locator("#history-table summary").click();
+  await expect(page.locator("#history-table")).toHaveAttribute("open", "");
   const next = structuredClone(snapshot);
   const humidity = (state, value) => {
     state.samples[0].readings[1].value = value;
@@ -471,14 +521,11 @@ test("live data keeps refreshing while a chart or dialog is open", async ({
   await page.clock.fastForward(31000);
   await expect(reading).toHaveAccessibleName(/Inspect Humidity: 71/);
   await expect(page.locator("#history-panel")).toBeVisible();
-  await expect(page.locator("#history details")).toHaveAttribute("open", "");
-  await expect(page.locator("#history summary")).toBeFocused();
-  await page.locator("#history summary").click();
+  await expect(page.locator("#history-table")).toHaveAttribute("open", "");
+  await expect(page.locator("#history-table summary")).toBeFocused();
+  await page.locator("#history-table summary").click();
   await page.clock.fastForward(31000);
-  await expect(page.locator("#history details")).not.toHaveAttribute(
-    "open",
-    "",
-  );
+  await expect(page.locator("#history-table")).not.toHaveAttribute("open", "");
   await page.keyboard.press("Escape");
   await expect(reading).toBeFocused();
   await page
@@ -637,8 +684,10 @@ test("known measurements keep their decimals on every screen", async ({
   await expect(page.locator("#history .chart-selection")).toHaveText(
     /· 24\.0 °C$/,
   );
-  await page.locator("#history summary").click();
-  await expect(page.locator("#history tbody td").nth(1)).toHaveText("24.0");
+  await page.locator("#history-table summary").click();
+  await expect(page.locator("#history-table tbody td").nth(1)).toHaveText(
+    "24.0",
+  );
   await page.keyboard.press("Escape");
   await page
     .getByRole("button", { name: "Details for Device 1", exact: true })
@@ -1073,8 +1122,8 @@ for (const language of ["pt-BR", "en-US"]) {
       "aria-label",
       pt ? /4 observações/ : /4 observations/,
     );
-    await page.locator("#history summary").click();
-    await expect(page.locator("#history table th").first()).toHaveText(
+    await page.locator("#history-table summary").click();
+    await expect(page.locator("#history-table table th").first()).toHaveText(
       pt ? "Recebido no Central" : "Received at Central",
     );
     await page
@@ -2195,7 +2244,7 @@ test("history dialogs isolate sensor and device diagnostics and restore focus", 
   await expect(page.locator("#history-heading")).toContainText("Sensor 1");
   await page.locator("#metric-select").selectOption({ label: "Humidity · %" });
   await expect(page.locator("#history-heading")).toHaveText("Sensor 1");
-  await page.locator("#period").selectOption("0");
+  await page.locator("#period").selectOption("168");
   await expect(page.locator("#history-value")).not.toHaveText("");
   const controls = await page
     .locator(".history-controls select")
@@ -2274,11 +2323,11 @@ test("history receipt times use the browser zone independently of UI language", 
       await serve(next);
       await page.reload();
       await page.locator(".reading-button").first().click();
-      await page.locator("#history summary").click();
-      await expect(page.locator("#history tbody tr").first()).toContainText(
-        time,
-      );
-      await expect(page.locator("#history th").first()).toHaveText(
+      await page.locator("#history-table summary").click();
+      await expect(
+        page.locator("#history-table tbody tr").first(),
+      ).toContainText(time);
+      await expect(page.locator("#history-table th").first()).toHaveText(
         "Recebido no Central",
       );
     } finally {
@@ -2311,16 +2360,16 @@ test("chart refresh follows latest until explicit inspection and preserves slide
   await append();
   await expect(slider).toBeFocused();
   await expect(chart.locator(".chart-selection")).toHaveText(pinned);
-  await chart.locator("summary").click();
+  await page.locator("#history-table summary").click();
   await page.keyboard.press("Escape");
   await page.locator(".reading-button").first().click();
-  await expect(chart.locator("details")).not.toHaveAttribute("open", "");
+  await expect(page.locator("#history-table")).not.toHaveAttribute("open", "");
   expect(await slider.inputValue()).toBe(await slider.getAttribute("max"));
   await slider.focus();
   await page.keyboard.press("Home");
-  await chart.locator("summary").click();
+  await page.locator("#history-table summary").click();
   await page.locator("#metric-select").selectOption({ label: "Humidity · %" });
-  await expect(chart.locator("details")).not.toHaveAttribute("open", "");
+  await expect(page.locator("#history-table")).not.toHaveAttribute("open", "");
   expect(await slider.inputValue()).toBe(await slider.getAttribute("max"));
 });
 
@@ -2550,4 +2599,225 @@ test("page polling pauses while cached and resumes only once on restoration", as
   );
   await page.clock.runFor(1000);
   expect(await page.evaluate(() => window.pollCount)).toBe(3);
+});
+
+test("persistent history queries periods, pages original readings and keeps an open table stable", async ({
+  page,
+}) => {
+  const { snapshot, serve } = await liveWorkspace(page);
+  const now = Date.parse(snapshot.generated_at);
+  const rows = Array.from({ length: 230 }, (_, i) => ({
+    id: 230 - i,
+    time: now - (i + 1) * 3600000,
+    received_at: new Date(now - (i + 1) * 3600000).toISOString(),
+    value: i,
+    status: "ok",
+    interval: 3600,
+  }));
+  let queries = [],
+    fail = false;
+  const routeHistory = () =>
+    page.route("**/ui-api/history?*", (route) => {
+      const q = new URL(route.request().url()).searchParams;
+      queries.push(Object.fromEntries(q));
+      if (fail) return route.fulfill({ status: 503, body: "unavailable" });
+      let filtered = rows.filter(
+        (p) =>
+          p.time >= Date.parse(q.get("from")) &&
+          p.time < Date.parse(q.get("to")),
+      );
+      if (q.has("before"))
+        filtered = filtered.filter(
+          (p) => p.id < Number(q.get("before").split(":")[1]),
+        );
+      const pageRows = filtered.slice(0, 100),
+        last = pageRows.at(-1);
+      return route.fulfill({
+        json: {
+          points: [...filtered].reverse(),
+          rows: pageRows,
+          count: filtered.length,
+          anchor: 230,
+          sampled: false,
+          next: filtered.length > 100 ? `${last.time}:${last.id}` : "",
+        },
+      });
+    });
+  await routeHistory();
+  await page.locator(".reading-button").first().click();
+  await expect(page.locator("#plot-count")).toHaveText("24 observations");
+  await page.locator("#period").selectOption("720");
+  await expect(page.locator("#plot-count")).toHaveText("230 observations");
+  await page.locator("#history-table summary").click();
+  await expect(page.locator("#history-table tbody tr")).toHaveCount(100);
+  await page.locator("#history-older").click();
+  await expect(page.locator("#history-page")).toHaveText("Page 2");
+  await expect(page.locator("#history-table tbody tr").first()).toContainText(
+    "100.0",
+  );
+  const next = structuredClone(snapshot);
+  next.generated_at = new Date(now + 60000).toISOString();
+  next.samples[0].received_at = next.generated_at;
+  await serve(next);
+  await routeHistory();
+  await page.locator("#refresh").evaluate((el) => el.click());
+  await expect(page.locator("#history-table")).toHaveAttribute("open", "");
+  await expect(page.locator("#history-page")).toHaveText("Page 2");
+  await expect(page.locator("#history-table tbody tr").first()).toContainText(
+    "100.0",
+  );
+  await page.locator("#history-newer").click();
+  await expect(page.locator("#history-page")).toHaveText("Page 1");
+  expect(
+    queries.some((q) => q.view === "rows" && q.anchor === "230" && q.before),
+  ).toBeTruthy();
+  await page.locator("#period").selectOption("custom");
+  await page.locator('#history-range [name="from"]').fill("2025-01-01T00:00");
+  await page.locator('#history-range [name="to"]').fill("2025-02-01T00:00");
+  await page.locator('#history-range [type="submit"]').click();
+  await expect(page.locator("#plot-count")).toHaveText("0 observations");
+  await expect(page.locator("#history .empty")).toBeVisible();
+  expect(queries.at(-1).from).toContain("2025-01-01");
+  await page.locator('#history-range [name="to"]').fill("2024-01-01T00:00");
+  const before = queries.length;
+  await page.locator('#history-range [type="submit"]').click();
+  await expect(page.locator("#history-message")).toContainText(
+    "end after the start",
+  );
+  expect(queries.length).toBe(before);
+  fail = true;
+  await page.locator("#period").selectOption("168");
+  await expect(page.locator("#history-message")).toContainText(
+    "Could not load history",
+  );
+  await expect(page.locator("#history-retry")).toBeVisible();
+  fail = false;
+  await page.locator("#history-retry").click();
+  await expect(page.locator("#plot-count")).toHaveText("167 observations");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({
+    path: "/tmp/cajui-history-mobile.png",
+    fullPage: true,
+  });
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
+
+test("history ignores a slow result after changing measurement", async ({
+  page,
+}) => {
+  const { snapshot } = await liveWorkspace(page);
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/ui-api/history?*", async (route) => {
+    const metric = new URL(route.request().url()).searchParams.get("metric");
+    if (metric === "temperature") await gate;
+    const p = {
+      id: 1,
+      time: Date.parse(snapshot.generated_at) - 1000,
+      received_at: snapshot.generated_at,
+      value: metric === "temperature" ? 999 : 55,
+      status: "ok",
+      interval: 300,
+    };
+    await route.fulfill({
+      json: {
+        points: [p],
+        rows: [p],
+        count: 1,
+        anchor: 1,
+        sampled: false,
+        next: "",
+      },
+    });
+  });
+  await page.locator(".reading-button").first().click();
+  await page.locator("#metric-select").selectOption({ label: "Humidity · %" });
+  await expect(page.locator("#history .chart-selection")).toContainText(
+    "55.0 %",
+  );
+  release();
+  await expect(page.locator("#history .chart-selection")).toContainText(
+    "55.0 %",
+  );
+  await page.locator("#history-table summary").click();
+  await expect(page.locator("#history-table tbody")).not.toContainText("999");
+});
+
+test("HTTP history loads persisted records beyond the overview's 100 readings", async ({
+  page,
+}) => {
+  const { readFile } = await import("node:fs/promises");
+  const token = (
+    await readFile(
+      process.env.CAJUI_UI_API_TOKEN_FILE ?? "/tmp/cajui-ui-token",
+      "utf8",
+    )
+  ).trim();
+  for (let i = 0; i < 115; i++) {
+    const response = await page.request.post("/api/v1/readings", {
+      headers: { Authorization: `Bearer ${token}` },
+      data: {
+        node_id: "history-integration",
+        sensor_id: "probe",
+        session_id: "boot",
+        sequence: i,
+        metric: "temperature",
+        value: i,
+        unit: "degC",
+      },
+    });
+    expect(response.status()).toBe(201);
+  }
+  const response = await page.request.get("/?lang=en-US");
+  const html = await response.text();
+  const state = JSON.parse(
+    html.match(
+      /<script type="application\/json" id="initial-state">([\s\S]*?)<\/script>/,
+    )[1],
+  );
+  expect(state.readings.length).toBe(100);
+  const device = state.workspace.devices.find(
+    (d) => d.device === "history-integration",
+  );
+  const saved = await page.request.put(`/ui-api/devices/${device.id}`, {
+    headers: {
+      Origin: new URL(response.url()).origin,
+      "X-Cajui-Workspace": state.ui_token,
+    },
+    data: {
+      revision: device.revision,
+      name: "History integration",
+      location: "",
+    },
+  });
+  expect(saved.ok()).toBeTruthy();
+  const layout = await page.request.put("/ui-api/dashboard/layout", {
+    headers: {
+      Origin: new URL(response.url()).origin,
+      "X-Cajui-Workspace": state.ui_token,
+    },
+    data: { revision: state.workspace.layout.revision, sections: null },
+  });
+  expect(layout.ok()).toBeTruthy();
+  await page.goto("/?lang=en-US");
+  const place = page
+    .locator(".place")
+    .filter({ hasText: "History integration" });
+  await place.locator(".reading-button").first().click();
+  await expect(page.locator("#plot-count")).toHaveText("115 observations");
+  await page.locator("#history-table summary").click();
+  await expect(page.locator("#history-table tbody tr")).toHaveCount(100);
+  await page.locator("#history-older").click();
+  await expect(page.locator("#history-table tbody tr")).toHaveCount(15);
+  await expect(page.locator("#history-table tbody tr").last()).toContainText(
+    "0.0",
+  );
+  await expect(page.locator("#history-older")).toBeDisabled();
 });

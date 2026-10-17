@@ -949,3 +949,14 @@ test("attention says which measurement, since when and why", async () => {
     [`silent/${placeKey(before)}`],
   );
 });
+
+test("compressed history preserves explicit breaks without inventing regular sampling gaps", () => {
+  const g = plotGeometry([
+    { time: 0, value: 1 },
+    { time: 10000, value: 2 },
+    { time: 11000, value: 3, break_before: true },
+    { time: 20000, value: 4 },
+  ]);
+  assert.equal(g.path.split("M").length - 1, 2);
+  assert.equal(g.path.split("L").length - 1, 2);
+});

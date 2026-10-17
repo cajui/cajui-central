@@ -69,7 +69,6 @@ pt-BR:
     history_accessible: 'Histórico de %{measurement} · Transmissor %{device} · Origem %{source}'
     received_time: Recebido no Central
     latest_reading: Leitura mais recente
-    history_limit: Apenas leituras recentes carregadas; o período selecionado pode estar incompleto.
     organize: Organizar visão geral
     export: Exportar leituras
     summary: Resumo da área de trabalho
@@ -83,8 +82,7 @@ pt-BR:
     hours24: Últimas 24 horas
     hours6: Últimas 6 horas
     hour: Última hora
-    all_data: Todos os dados carregados
-    retention: 'Histórico: últimas 100 amostras + 100 leituras HTTP · últimos valores conhecidos preservados'
+    retention: 'Visão geral: leituras recentes · abra uma medição para consultar o histórico completo'
     details: Detalhes do transmissor
     close_details: Fechar detalhes
     close_history: Fechar histórico
@@ -536,3 +534,23 @@ pt-BR:
     "copy_field": "Copiar %{field}"
     "secret_hidden": "Senha oculta"
     "searching": "Procurando receptor…"
+
+  history:
+    valid: Válida
+    days7: "Últimos 7 dias"
+    days30: "Últimos 30 dias"
+    custom: "Período personalizado"
+    from: "De"
+    to: "Até"
+    apply: "Ver histórico"
+    loading: "Carregando histórico…"
+    invalid_range: "Escolha um fim posterior ao início, com até 366 dias de diferença."
+    load_error: "Não foi possível carregar o histórico. Tente novamente ou escolha um período menor."
+    raw: "Leituras individuais, mais recentes primeiro"
+    status: "Estado"
+    pages: "Páginas do histórico"
+    newer: "Mais recentes"
+    older: "Mais antigas"
+    page: "Página %{page}"
+    sampled: "Gráfico resumido, preservando extremos. Lacunas e erros interrompem a linha. A tabela contém as leituras individuais."
+    complete: "Todas as leituras do período selecionado. A tabela mostra as mais recentes primeiro."

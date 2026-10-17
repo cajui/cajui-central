@@ -1,3 +1,8 @@
+import {
+  createHistoryView,
+  historyControls,
+  historyTable,
+} from "./history-view.mjs";
 import { pollWhileVisible } from "./page-polling.mjs";
 import { watchDeviceStates } from "./state-events.mjs";
 import { t, locale } from "./i18n.mjs";
@@ -50,7 +55,6 @@ export function mountDashboard(root, { state = {}, notify }) {
     filter = "all",
     query = "",
     selected = "",
-    hours = 24,
     pending = false,
     dialogOpener = null,
     attention = [],
@@ -62,9 +66,11 @@ export function mountDashboard(root, { state = {}, notify }) {
     <section id="attention" class="panel attention-panel" aria-labelledby="attention-heading" hidden><div class="attention-head"><h2 id="attention-heading">${t("overview.attention_heading")}</h2><span>${t("overview.attention_order")}</span></div><ul class="attention-list"></ul></section>
     <div class="toolbar" id="toolbar"><div class="segmented" aria-label="${t("dashboard.filter")}"><button data-filter="all" aria-pressed="true">${t("dashboard.all")}</button><button data-filter="attention" aria-pressed="false">${t("dashboard.attention")}</button></div><label class="search">${icon("search")}<span class="sr-only">${t("dashboard.search_label")}</span><input id="search" type="search" placeholder="${t("dashboard.search")}" autocomplete="off"></label></div>
     <section id="devices" class="device-groups" aria-label="${t("dashboard.items")}"></section>
-    <dialog class="history-dialog" id="history-panel" aria-labelledby="history-heading history-accessible" aria-describedby="history-context"><div class="dialog-head"><div><h2 id="history-heading" tabindex="-1">${t("common.history")}</h2><p id="history-context"></p><span class="sr-only" id="history-accessible"></span></div><button class="icon-button" id="close-history" aria-label="${t("dashboard.close_history")}">${icon("close")}</button></div><div class="history-summary"><div><span class="small muted">${t("dashboard.latest_reading")}</span><p class="measurement" id="history-value"></p><cj-badge id="history-state"></cj-badge></div><p class="small muted" id="history-time"></p></div><div class="history-controls"><label for="metric-select">${t("common.measurement")}<select id="metric-select" class="input"></select></label><label for="period">${t("dashboard.period")}<select id="period" class="input"><option value="24">${t("dashboard.hours24")}</option><option value="6">${t("dashboard.hours6")}</option><option value="1">${t("dashboard.hour")}</option><option value="0">${t("dashboard.all_data")}</option></select></label></div><cj-chart id="history"></cj-chart><div class="plot-footer"><div><span id="history-limit"></span></div><span id="plot-count"></span></div></dialog>
+    <dialog class="history-dialog" id="history-panel" aria-labelledby="history-heading history-accessible" aria-describedby="history-context"><div class="dialog-head"><div><h2 id="history-heading" tabindex="-1">${t("common.history")}</h2><p id="history-context"></p><span class="sr-only" id="history-accessible"></span></div><button class="icon-button" id="close-history" aria-label="${t("dashboard.close_history")}">${icon("close")}</button></div><div class="history-summary"><div><span class="small muted">${t("dashboard.latest_reading")}</span><p class="measurement" id="history-value"></p><cj-badge id="history-state"></cj-badge></div><p class="small muted" id="history-time"></p></div><div class="history-controls"><label for="metric-select">${t("common.measurement")}<select id="metric-select" class="input"></select></label><label for="period">${t("dashboard.period")}<select id="period" class="input"><option value="24">${t("dashboard.hours24")}</option><option value="6">${t("dashboard.hours6")}</option><option value="1">${t("dashboard.hour")}</option><option value="168">${t("history.days7")}</option><option value="720">${t("history.days30")}</option><option value="custom">${t("history.custom")}</option></select></label></div>${historyControls()}<cj-chart id="history"></cj-chart><div class="plot-footer"><div><span id="history-limit"></span></div><span id="plot-count"></span></div>${historyTable()}</dialog>
     <footer class="footer"><span>${t("dashboard.retention")}</span></footer>
     <dialog id="device-dialog" aria-labelledby="device-dialog-title"><div class="dialog-head"><h2 id="device-dialog-title">${t("dashboard.details")}</h2><button class="icon-button" id="close-dialog" aria-label="${t("dashboard.close_details")}">${icon("close")}</button></div><div id="device-detail"></div></dialog>`;
+
+  const history = createHistoryView(root);
 
   function rebuild() {
     const now = Date.parse(snapshot.generated_at);
@@ -348,17 +354,7 @@ export function mountDashboard(root, { state = {}, notify }) {
       select.dataset.options = options;
     }
     select.value = selected;
-    const points = c.points.filter(
-      (p) =>
-        !hours || p.time >= Date.parse(snapshot.generated_at) - hours * 3600000,
-    );
-    root.querySelector("#history").data = {
-      ...c,
-      label: c.title,
-      points,
-      plotHeight: 240,
-      timeLabel: t("dashboard.received_time"),
-    };
+    history.show(c, snapshot);
     root.querySelector("#history-panel").dataset.kind = metricIcon(c.metric);
     root.querySelector("#history-heading").textContent = isLinkDiagnostic(c)
       ? t("dashboard.device_diagnostics")
@@ -380,12 +376,6 @@ export function mountDashboard(root, { state = {}, notify }) {
     root.querySelector("#history-time").textContent = latest
       ? new Date(latest.time).toLocaleString(locale())
       : t("common.waiting");
-    root.querySelector("#history-limit").textContent = t(
-      "dashboard.history_limit",
-    );
-    root.querySelector("#plot-count").textContent = t("counts.observations", {
-      count: points.length,
-    });
   }
   function showDevice(g, opener) {
     const values = [
@@ -493,6 +483,7 @@ export function mountDashboard(root, { state = {}, notify }) {
       // Re-rendering replaces the card buttons; keep keyboard focus on the same one.
       const spot = focusSpot(document.activeElement);
       render();
+      history.refresh();
       restoreFocus(spot, { preventScroll: true });
     } catch {
       root.querySelector("#fetch-error").textContent = t(
@@ -527,10 +518,6 @@ export function mountDashboard(root, { state = {}, notify }) {
     query = event.target.value;
     renderGroups();
   });
-  root.querySelector("#period").addEventListener("change", (event) => {
-    hours = Number(event.target.value);
-    renderChart();
-  });
   root
     .querySelector("#metric-select")
     .addEventListener("change", (event) => selectHistory(event.target.value));
@@ -556,6 +543,7 @@ export function mountDashboard(root, { state = {}, notify }) {
   root.querySelector("#history-panel").addEventListener("close", () => {
     if (root.querySelector("#history-panel").open) return;
     selected = "";
+    history.close();
     for (const button of root.querySelectorAll(".reading-button"))
       button.setAttribute("aria-pressed", "false");
     restoreFocus(historyOpener, { preventScroll: true });

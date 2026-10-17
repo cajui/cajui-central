@@ -405,8 +405,8 @@ remain separate from the historical selection. Pointer, touch and keyboard inspe
 a visible point marker. The marker follows new readings until a click, touch or keyboard
 action pins an observation; hovering only previews it. Reopening the dialog or changing
 measurements starts a fresh inspection. The latest reading includes its channel state.
-Gaps remain disconnected, and the dialog identifies the history
-as recent loaded readings rather than a complete period. History uses Central receipt
+Gaps remain disconnected, and the dialog identifies simplified charts explicitly.
+History uses Central receipt
 timestamps, converted to the browser time zone, with newest readings first; it does
 not infer acquisition times for queued samples. Table expansion and slider or summary focus survive
 live refreshes. In an organized dashboard, search matches devices and
@@ -431,12 +431,41 @@ distinct. Zero remains a valid number. HTTP readings have no declared reporting
 interval, so their status is **Recorded**, without a freshness guarantee. A device
 reporting successfully does not mean its measurements are within a healthy range.
 
-History uses **arrival timestamps** from the latest loaded records (up to 100 MQTT
-samples and 100 HTTP readings, plus each known channel’s last observation), with one
-measurement/unit per chart. Period selection
-filters that snapshot, not a full historical query. Missing observations and gaps
-beyond three expected intervals break the line. Pointer and keyboard inspection and
-a data table expose the same values. Unknown diagnostics are never replaced by zero.
+History queries stored measurements independently of the overview snapshot. Choose
+1 hour, 6 hours, 24 hours, 7 days, 30 days, or a custom interval of up to 366 days.
+Custom dates use the browser's time zone; timestamps represent **arrival at Central**,
+not acquisition at the device. There is no automatic age-based deletion: older data
+remains available through custom intervals while the database volume is preserved.
+
+The chart returns all observations up to 600. Larger series are reduced into 120
+time buckets, retaining actual first, last, minimum, maximum and an invalid reading
+per bucket (at most 600 points). Values are never averaged or interpolated. Buckets
+containing errors or gaps beyond three expected intervals are drawn conservatively
+as disconnected points, so compression cannot hide an outage with a continuous line.
+The interface explicitly labels simplified charts. The table always contains original
+readings, including errors and skipped measurements, newest first in pages of 100.
+An open table keeps its snapshot and position during live chart updates; reopen the
+history or reapply the period to start a new table snapshot. The overview CSV export
+continues to export recent loaded readings only.
+
+`GET /ui-api/history` requires the local page capability in `X-Cajui-Workspace` and
+a loopback host, just like the other private UI endpoints. Parameters are `sensor`
+(the workspace sensor ID), `metric`, `unit`, and RFC3339 `from`/`to` boundaries
+(inclusive/exclusive, millisecond resolution). Sources and transports have distinct
+sensor IDs. The response contains `points`, `rows`, the original `count`, `sampled`,
+an `anchor` and a `next` cursor. For table pages, repeat the same channel and dates
+with `view=rows`, `anchor`, and optionally `before=next`. Ordering uses receipt time
+and a unique row ID, and the anchor excludes later inserts, including late arrivals.
+Unknown channels return an empty series. At most two history requests run concurrently;
+each has a five-second database deadline. A timeout asks the user to narrow the period
+rather than silently returning an incomplete chart.
+
+Schema version 8 adds an indexed measurement history projection. Migration backfills
+existing HTTP and MQTT data transactionally; future projection inserts share the
+original ingestion transaction, including deduplication. Original payloads and
+inventory remain intact. The projection consumes additional disk space; back up the
+database before upgrading, and restore that backup if rolling back to a binary that
+only supports schema 7. Large histories may make the first startup take longer.
 
 The dashboard refreshes every 30 seconds while visible and not being interacted
 with. Inventory pages have an explicit Refresh button. A failed dashboard refresh

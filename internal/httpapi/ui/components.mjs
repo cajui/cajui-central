@@ -210,9 +210,13 @@ class Chart extends Component {
         return (
           numeric(p.value) !== null &&
           (!before ||
+            p.break_before ||
             numeric(before.value) === null ||
             p.time - before.time > gap) &&
-          (!after || numeric(after.value) === null || after.time - p.time > gap)
+          (!after ||
+            after.break_before ||
+            numeric(after.value) === null ||
+            after.time - p.time > gap)
         );
       })
       .map(
@@ -227,12 +231,22 @@ class Chart extends Component {
       )
       .join("");
     const time = (t) =>
-      new Date(t).toLocaleTimeString(locale(), {
+      new Date(t).toLocaleString(locale(), {
+        ...(g.end - g.start >= 86400000
+          ? { month: "short", day: "numeric" }
+          : {}),
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
       });
-    this.innerHTML = `<svg class="plot" viewBox="0 0 ${width} ${plotHeight + 52}" role="img" aria-label="${e(t("chart.description", { label, unit: formatUnit(unit), observations: t("counts.observations", { count: g.points.length }) }))}">${ticks}<g transform="translate(64 18)"><path class="series" d="${g.path}"/>${isolated}<circle class="selected-point" r="5"/><line class="gridline cursor" x1="0" x2="0" y1="0" y2="${plotHeight}"/></g><text x="64" y="${plotHeight + 44}">${time(g.start)}</text><text x="${width / 2}" y="${plotHeight + 44}" text-anchor="middle">${time((g.start + g.end) / 2)}</text><text x="${width - 20}" y="${plotHeight + 44}" text-anchor="end">${time(g.end)}</text></svg><p class="chart-selection" aria-hidden="true"></p><label class="plot-inspect"><span>${t("chart.inspect")}</span><input type="range" min="0" max="${g.points.length - 1}" value="${g.points.length - 1}" aria-label="${e(t("chart.observations", { label }))}"><output class="sr-only"></output></label>${g.path.split("M").length > 2 ? `<p class="small muted chart-gaps">${t("chart.gaps")}</p>` : ""}<details class="small muted" ${this.tableOpen ? "open" : ""}><summary>${t("chart.table")}</summary><div class="table-wrap"><table><caption class="sr-only">${e(t("chart.data", { label }))}</caption><thead><tr><th>${e(timeLabel)}</th><th>${e(t("chart.value", { unit: formatUnit(unit) }))}</th></tr></thead><tbody>${[
+    const axisTime = (value) =>
+      g.end - g.start >= 86400000
+        ? new Date(value).toLocaleDateString(locale(), {
+            month: "short",
+            day: "numeric",
+          })
+        : time(value);
+    this.innerHTML = `<svg class="plot" viewBox="0 0 ${width} ${plotHeight + 52}" role="img" aria-label="${e(t("chart.description", { label, unit: formatUnit(unit), observations: t("counts.observations", { count: g.points.length }) }))}">${ticks}<g transform="translate(64 18)"><path class="series" d="${g.path}"/>${isolated}<circle class="selected-point" r="5"/><line class="gridline cursor" x1="0" x2="0" y1="0" y2="${plotHeight}"/></g><text x="64" y="${plotHeight + 44}">${axisTime(g.start)}</text><text x="${width / 2}" y="${plotHeight + 44}" text-anchor="middle">${width >= 560 ? axisTime((g.start + g.end) / 2) : ""}</text><text x="${width - 20}" y="${plotHeight + 44}" text-anchor="end">${axisTime(g.end)}</text></svg><p class="chart-selection" aria-hidden="true"></p><label class="plot-inspect"><span>${t("chart.inspect")}</span><input type="range" min="0" max="${g.points.length - 1}" value="${g.points.length - 1}" aria-label="${e(t("chart.observations", { label }))}"><output class="sr-only"></output></label>${g.path.split("M").length > 2 ? `<p class="small muted chart-gaps">${t("chart.gaps")}</p>` : ""}<details class="small muted" ${this.tableOpen ? "open" : ""}><summary>${t("chart.table")}</summary><div class="table-wrap"><table><caption class="sr-only">${e(t("chart.data", { label }))}</caption><thead><tr><th>${e(timeLabel)}</th><th>${e(t("chart.value", { unit: formatUnit(unit) }))}</th></tr></thead><tbody>${[
       ...g.points,
     ]
       .reverse()
@@ -241,6 +255,7 @@ class Chart extends Component {
           `<tr><td>${e(new Date(p.time).toLocaleString(locale()))}</td><td>${numeric(p.value) === null ? t("chart.no_reading") : formatMeasurement(p.value, metric, unit)}</td></tr>`,
       )
       .join("")}</tbody></table></div></details>`;
+    if (this.data.showTable === false) this.querySelector("details")?.remove();
     if (tableFocused)
       this.querySelector("summary").focus({ preventScroll: true });
     const slider = this.querySelector("input"),
