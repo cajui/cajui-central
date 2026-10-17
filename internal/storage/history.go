@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/cajui/cajui-central/internal/history"
@@ -29,7 +28,7 @@ const historySchema = `CREATE TABLE measurement_history (
 type historyOrigin struct{ ReadingID, SampleID int64 }
 
 func (s *Store) openHistory(path string) error {
-	if path == ":memory:" || strings.Contains(path, "mode=memory") || strings.HasPrefix(path, "file::memory:") {
+	if path == ":memory:" {
 		s.historyDB = s.db
 		return nil
 	}
@@ -38,6 +37,10 @@ func (s *Store) openHistory(path string) error {
 		return err
 	}
 	q := u.Query()
+	if q.Get("mode") == "memory" || u.Opaque == ":memory:" || u.Path == ":memory:" {
+		s.historyDB = s.db
+		return nil
+	}
 	q.Set("mode", "ro")
 	q.Del("_pragma")
 	q.Add("_pragma", "query_only(1)")

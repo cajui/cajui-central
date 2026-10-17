@@ -227,7 +227,7 @@ func TestHistoryLargeSeriesKeepsSensorFailuresAndExtremes(t *testing.T) {
 }
 
 func TestHistoryReadersDoNotBlockIngestionOrHealth(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "history ? &.db"))
+	s, err := Open(filepath.Join(t.TempDir(), "history ? & mode=memory.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
