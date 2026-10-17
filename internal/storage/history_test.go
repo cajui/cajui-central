@@ -312,6 +312,7 @@ func TestHistorySchemaEightUpgradeAndConstraints(t *testing.T) {
 	}
 	for _, query := range []string{
 		`UPDATE measurement_history SET status='invented'`,
+		`UPDATE measurement_history SET value='not-a-number' WHERE status='ok'`,
 		`UPDATE measurement_history SET value=NULL WHERE status='ok'`,
 		`UPDATE measurement_history SET status='error' WHERE value IS NOT NULL`,
 		`UPDATE measurement_history SET reading_id=NULL,sample_id=NULL`,

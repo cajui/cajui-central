@@ -20,7 +20,7 @@ const historySchema = `CREATE TABLE measurement_history (
  received_at TEXT NOT NULL, value REAL, status TEXT NOT NULL, interval INTEGER NOT NULL CHECK(interval>=0),
  CHECK((reading_id IS NULL) != (sample_id IS NULL)),
  CHECK(status IN ('ok','error','skipped')),
- CHECK((status='ok' AND value IS NOT NULL AND abs(value)<=1.7976931348623157e308) OR (status!='ok' AND value IS NULL)),
+ CHECK((status='ok' AND value IS NOT NULL AND typeof(value) IN ('integer','real') AND abs(value)<=1.7976931348623157e308) OR (status!='ok' AND value IS NULL)),
  UNIQUE(reading_id), UNIQUE(sample_id,sensor_id,metric));
  CREATE INDEX history_channel_time ON measurement_history(sensor_id,metric,unit,received_ms,id);
  PRAGMA user_version=9;`
