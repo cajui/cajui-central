@@ -32,7 +32,7 @@ attention, what, where and since when.
    each with its reason and the time it began. With nothing to report, it says so.
 2. **Colour only for the abnormal.** Normal states are neutral. Status uses one fixed
    vocabulary, always with a shape and text and never colour alone:
-   - attention: an amber warning outline, or a clock for delayed readings;
+   - attention: an amber warning outline, or a clock for delayed or unsampled readings;
    - network: an amber disconnected signal, for a receiver or broker without a connection;
    - critical: a red outlined octagon, reserved for values outside critical ranges.
 3. **The value and the data are separate questions.** A value is normal, attention or
