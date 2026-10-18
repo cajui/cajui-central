@@ -313,15 +313,20 @@ test("measurement identity survives failures and unknown metric names stay neutr
   const statusIcon = card.locator('.badge[data-state="error"] svg');
   await expect(statusIcon).toBeVisible();
   await expect(statusIcon).toHaveAttribute("aria-hidden", "true");
+  // Forced colours must keep the shape drawn, in the system text colour.
   await page.emulateMedia({ forcedColors: "active" });
-  const [stroke, canvas] = await statusIcon.evaluate((el) => {
+  await expect(statusIcon).toBeVisible();
+  const [stroke, text, canvas] = await statusIcon.evaluate((el) => {
     const probe = document.createElement("div");
+    probe.style.color = "CanvasText";
     probe.style.background = "Canvas";
     document.body.append(probe);
-    const ground = getComputedStyle(probe).backgroundColor;
+    const style = getComputedStyle(probe);
+    const colours = [style.color, style.backgroundColor];
     probe.remove();
-    return [getComputedStyle(el).stroke, ground];
+    return [getComputedStyle(el).stroke, ...colours];
   });
+  expect(stroke).toBe(text);
   expect(stroke).not.toBe(canvas);
   await page.emulateMedia({ forcedColors: "none" });
   for (const metric of [
