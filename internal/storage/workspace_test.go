@@ -271,7 +271,7 @@ func TestWorkspaceMigrationBackfillsAllHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	before := catalog(t, s)
-	if _, err = s.db.Exec(`DROP TABLE workspace_measurements; DROP TABLE workspace_sensors; DROP TABLE workspace_devices; DROP TABLE workspace_layout; DROP TABLE device_states; DROP TABLE device_availability; DROP TABLE device_commands; PRAGMA user_version=2;`); err != nil {
+	if _, err = s.db.Exec(`DROP TABLE measurement_history; DROP TABLE workspace_measurements; DROP TABLE workspace_sensors; DROP TABLE workspace_devices; DROP TABLE workspace_layout; DROP TABLE device_states; DROP TABLE device_availability; DROP TABLE device_commands; PRAGMA user_version=2;`); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()
@@ -290,7 +290,7 @@ func TestWorkspaceMigrationFailureRollsBack(t *testing.T) {
 	if _, err := s.Insert(context.Background(), sample(), time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`DROP TABLE workspace_measurements; DROP TABLE workspace_sensors; DROP TABLE workspace_devices; DROP TABLE workspace_layout; DROP TABLE device_states; DROP TABLE device_availability; DROP TABLE device_commands; UPDATE readings SET payload='broken'; PRAGMA user_version=2;`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE measurement_history; DROP TABLE workspace_measurements; DROP TABLE workspace_sensors; DROP TABLE workspace_devices; DROP TABLE workspace_layout; DROP TABLE device_states; DROP TABLE device_availability; DROP TABLE device_commands; UPDATE readings SET payload='broken'; PRAGMA user_version=2;`); err != nil {
 		t.Fatal(err)
 	}
 	// The failure must come from the backfill itself, after every schema step ran.
@@ -354,14 +354,14 @@ func TestArchiveMigrationKeepsDevices(t *testing.T) {
 	if _, err := s.Insert(ctx, sample(), time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`ALTER TABLE workspace_devices DROP COLUMN archived; ALTER TABLE workspace_sensors DROP COLUMN archived; ALTER TABLE device_states DROP COLUMN archived; PRAGMA user_version=5;`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE measurement_history; ALTER TABLE workspace_devices DROP COLUMN archived; ALTER TABLE workspace_sensors DROP COLUMN archived; ALTER TABLE device_states DROP COLUMN archived; PRAGMA user_version=5;`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.migrate(); err != nil {
 		t.Fatal(err)
 	}
 	var version int
-	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 7 {
+	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 9 {
 		t.Fatal(version, err)
 	}
 	if c := catalog(t, s); len(c.Devices) != 1 {

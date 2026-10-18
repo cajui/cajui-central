@@ -37,6 +37,9 @@ PRAGMA user_version=6;`
 
 // Observation and telemetry share a transaction, so retries cannot refresh inventory.
 func observe(ctx context.Context, tx *sql.Tx, transport, source, device string, readings []telemetry.Measurement, at time.Time, interval int) error {
+	return observeWithHistory(ctx, tx, transport, source, device, readings, at, interval, historyOrigin{})
+}
+func observeWithHistory(ctx context.Context, tx *sql.Tx, transport, source, device string, readings []telemetry.Measurement, at time.Time, interval int, origin historyOrigin) error {
 	stamp := at.UTC().Format(time.RFC3339Nano)
 	var deviceID int64
 	err := tx.QueryRowContext(ctx, `INSERT INTO workspace_devices(transport,source,device,received_at,interval) VALUES(?,?,?,?,?)
@@ -55,63 +58,21 @@ func observe(ctx context.Context, tx *sql.Tx, transport, source, device string, 
 		if err != nil {
 			return err
 		}
+		if origin.ReadingID != 0 || origin.SampleID != 0 {
+			if err = insertHistory(ctx, tx, sensorID, origin, r, at, interval); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
-}
-func observeReading(ctx context.Context, tx *sql.Tx, r telemetry.Reading) error {
-	return observe(ctx, tx, "http", "HTTP", r.NodeID, []telemetry.Measurement{{SensorID: r.SensorID, Metric: r.Metric, Unit: r.Unit, Value: &r.Value, Status: "ok"}}, r.ReceivedAt, 0)
 }
 
 // Backfill scans stored telemetry once, in receipt order and without loading all
 // history into memory. No names are guessed and existing telemetry is untouched.
 func backfillWorkspace(tx *sql.Tx) error {
-	ctx := context.Background()
-	for _, table := range []string{"readings", "samples"} {
-		query := `SELECT payload FROM readings ORDER BY id`
-		if table == "samples" {
-			query = `SELECT payload,received_at FROM samples ORDER BY id`
-		}
-		rows, err := tx.Query(query)
-		if err != nil {
-			return err
-		}
-		for rows.Next() {
-			var payload, stamp string
-			if table == "readings" {
-				err = rows.Scan(&payload)
-				var r telemetry.Reading
-				if err == nil {
-					err = json.Unmarshal([]byte(payload), &r)
-				}
-				if err == nil {
-					err = observeReading(ctx, tx, r)
-				}
-			} else {
-				err = rows.Scan(&payload, &stamp)
-				var s telemetry.Sample
-				var at time.Time
-				if err == nil {
-					err = json.Unmarshal([]byte(payload), &s)
-				}
-				if err == nil {
-					at, err = time.Parse(time.RFC3339Nano, stamp)
-				}
-				if err == nil {
-					err = observe(ctx, tx, "mqtt", s.SourceID, s.DeviceID, s.Readings, at, s.ExpectedIntervalSeconds)
-				}
-			}
-			if err != nil {
-				rows.Close()
-				return err
-			}
-		}
-		err = rows.Err()
-		rows.Close()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return walkTelemetry(tx, func(transport, source, device string, readings []telemetry.Measurement, at time.Time, interval int, _ historyOrigin) error {
+		return observe(context.Background(), tx, transport, source, device, readings, at, interval)
+	})
 }
 func (s *Store) Catalog(ctx context.Context) (workspace.Catalog, error) {
 	c := workspace.Catalog{Devices: []workspace.Device{}, Sensors: []workspace.Sensor{}}

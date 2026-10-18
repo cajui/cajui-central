@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,12 +19,20 @@ import (
 
 type Store struct {
 	db           *sql.DB
+	historyDB    *sql.DB
 	stateMu      sync.Mutex
 	stateChanged chan struct{}
 }
 
 // Open migrates the database transactionally. A single connection serializes writes.
 func Open(path string) (*Store, error) {
+	if path != ":memory:" && !strings.HasPrefix(path, "file:") {
+		absolute, err := filepath.Abs(path)
+		if err != nil {
+			return nil, err
+		}
+		path = (&url.URL{Scheme: "file", Path: absolute}).String()
+	}
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, err
@@ -31,6 +42,10 @@ func Open(path string) (*Store, error) {
 	if err = s.migrate(); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("initialize database: %w", err)
+	}
+	if err = s.openHistory(path); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("open history reader: %w", err)
 	}
 	return s, nil
 }
@@ -47,7 +62,7 @@ func (s *Store) migrate() error {
 	if err = tx.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return err
 	}
-	if version > 7 {
+	if version > 9 {
 		return fmt.Errorf("unsupported schema version %d", version)
 	}
 	if version == 0 {
@@ -106,9 +121,36 @@ PRAGMA user_version=7;`); err != nil {
 			return err
 		}
 	}
+	if version < 9 {
+		var previousMax int64
+		if version == 8 {
+			if err = tx.QueryRow(`SELECT COALESCE(MAX(id),0) FROM measurement_history`).Scan(&previousMax); err != nil {
+				return err
+			}
+			if _, err = tx.Exec(`DROP TABLE measurement_history`); err != nil {
+				return err
+			}
+		}
+		if _, err = tx.Exec(historySchema); err != nil {
+			return err
+		}
+		if previousMax > 0 {
+			if _, err = tx.Exec(`INSERT INTO sqlite_sequence(name,seq) VALUES('measurement_history',?)`, previousMax); err != nil {
+				return err
+			}
+		}
+		if err = backfillHistory(tx); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
-func (s *Store) Close() error                   { return s.db.Close() }
+func (s *Store) Close() error {
+	if s.historyDB != nil && s.historyDB != s.db {
+		return errors.Join(s.historyDB.Close(), s.db.Close())
+	}
+	return s.db.Close()
+}
 func (s *Store) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
 
 // Insert treats exact retries as duplicates, but rejects identity reuse with changed data.
@@ -137,9 +179,14 @@ func (s *Store) Insert(ctx context.Context, r telemetry.Reading, receivedAt time
 		return false, err
 	}
 	if count == 1 {
-		if err = observeReading(ctx, tx, r); err != nil {
+		originID, e := result.LastInsertId()
+		if e != nil {
+			return false, e
+		}
+		if err = observeWithHistory(ctx, tx, "http", "HTTP", r.NodeID, []telemetry.Measurement{{SensorID: r.SensorID, Metric: r.Metric, Unit: r.Unit, Value: &r.Value, Status: "ok"}}, receivedAt, 0, historyOrigin{ReadingID: originID}); err != nil {
 			return false, err
 		}
+
 		return true, tx.Commit()
 	}
 	var existing string

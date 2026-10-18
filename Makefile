@@ -17,7 +17,7 @@ docker-build:
 	docker build -t cajui:local .
 # Same checks as `make check`, inside the Go image; caches live in named volumes.
 docker-check:
-	docker run --rm -v "$(CURDIR)":/src -w /src -v cajui-go-mod:/go/pkg/mod -v cajui-go-build:/root/.cache/go-build golang:1.27 make check
+	docker run --rm -v "$(CURDIR)":/src -w /src -v cajui-go-mod:/go/pkg/mod -v cajui-go-build:/root/.cache/go-build golang:1.27.2 make check
 
 .PHONY: check-fast check-full check-ui check-python test-ui test-compose
 PYTHON ?= python3

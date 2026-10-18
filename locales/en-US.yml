@@ -69,7 +69,6 @@ en-US:
     history_accessible: '%{measurement} history · Device %{device} · Source %{source}'
     received_time: Received at Central
     latest_reading: Latest reading
-    history_limit: Recent loaded readings only; the selected period may be incomplete.
     organize: Organize overview
     export: Export readings
     summary: Workspace summary
@@ -83,8 +82,7 @@ en-US:
     hours24: Last 24 hours
     hours6: Last 6 hours
     hour: Last hour
-    all_data: All loaded data
-    retention: 'History: latest 100 samples + 100 HTTP readings · latest known values retained'
+    retention: 'Overview: recent readings · open a measurement for its full history'
     details: Device details
     close_details: Close details
     close_history: Close history
@@ -534,3 +532,29 @@ en-US:
     "copy_field": "Copy %{field}"
     "secret_hidden": "Password hidden"
     "searching": "Looking for a receiver…"
+
+  history:
+    valid: Valid
+    days7: "Last 7 days"
+    days30: "Last 30 days"
+    custom: "Custom period"
+    from: "From"
+    to: "Until"
+    apply: "Show history"
+    loading: "Loading history…"
+    invalid_range: "Choose an end after the start, up to 366 days apart."
+    load_error: "Could not load history. Retry or choose a shorter period."
+    raw: "Individual readings, newest first"
+    status: "State"
+    pages: "History pages"
+    newer: "Newer"
+    older: "Older"
+    page: "Page %{page}"
+    sampled: "Chart simplified, preserving extremes. Gaps and errors interrupt the line. The table contains individual readings."
+    complete: "All readings in the selected period. The table shows newest first."
+    choose_range: "Choose the dates and show history."
+    sensor_error: "Sensor failed during this period"
+    skipped: "Measurements were not taken during this period"
+    no_valid: "No valid readings in this period"
+    check_table: "Open the data table to inspect the reported states."
+    selection_expired: "The inspected reading is outside the selected period. Showing the latest reading."

@@ -29,9 +29,14 @@ func (s *Store) InsertSample(ctx context.Context, sample telemetry.Sample, at ti
 		return false, err
 	}
 	if n == 1 {
-		if err = observe(ctx, tx, "mqtt", sample.SourceID, sample.DeviceID, sample.Readings, at, sample.ExpectedIntervalSeconds); err != nil {
+		originID, e := result.LastInsertId()
+		if e != nil {
+			return false, e
+		}
+		if err = observeWithHistory(ctx, tx, "mqtt", sample.SourceID, sample.DeviceID, sample.Readings, at, sample.ExpectedIntervalSeconds, historyOrigin{SampleID: originID}); err != nil {
 			return false, err
 		}
+
 		return true, tx.Commit()
 	}
 	var previous string

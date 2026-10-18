@@ -153,6 +153,8 @@ class Device extends Component {
 class Chart extends Component {
   resetInspection() {
     this.inspectedTime = undefined;
+    this.inspectedPoint = undefined;
+    this.inspectionExpired = false;
     this.tableOpen = false;
     const table = this.querySelector("details");
     if (table) table.open = false;
@@ -192,14 +194,61 @@ class Chart extends Component {
       interval = 0,
       timeLabel = t("chart.time"),
     } = this.data;
+    if (this.data.loadState) {
+      this.innerHTML =
+        this.data.loadState === "range"
+          ? `<div class="empty">${t("history.choose_range")}</div>`
+          : `<div class="empty" aria-hidden="true"></div>`;
+      return;
+    }
+    if (
+      this.inspectedPoint &&
+      this.data.span &&
+      (this.inspectedPoint.time < this.data.span[0] ||
+        this.inspectedPoint.time >= this.data.span[1])
+    ) {
+      this.inspectedPoint = undefined;
+      this.inspectedTime = undefined;
+      this.inspectionExpired = true;
+    }
+    let plotted = points;
+    const samePoint = (p) =>
+      this.inspectedPoint?.id != null
+        ? p.id === this.inspectedPoint.id
+        : p.time === this.inspectedTime;
+    if (this.inspectedPoint && !points.some(samePoint)) {
+      const span = this.data.span ?? [points[0]?.time, points.at(-1)?.time];
+      if (
+        this.inspectedPoint.time >= span[0] &&
+        this.inspectedPoint.time < span[1]
+      ) {
+        plotted = [
+          ...points,
+          { ...this.inspectedPoint, break_before: true },
+        ].sort((a, b) => a.time - b.time || (a.id ?? 0) - (b.id ?? 0));
+        const next = plotted.findIndex(samePoint) + 1;
+        if (next < plotted.length)
+          plotted[next] = { ...plotted[next], break_before: true };
+      } else {
+        this.inspectedPoint = undefined;
+        this.inspectedTime = undefined;
+        this.inspectionExpired = true;
+      }
+    }
     const g = plotGeometry(
-      points,
+      plotted,
       plotWidth,
       plotHeight,
       interval ? interval * 3000 : Infinity,
+      this.data.span,
     );
     if (!g) {
-      this.innerHTML = `<div class="empty"><h3>${t("chart.empty")}</h3><p>${t("chart.choose_period")}</p></div>`;
+      const invalid = points.some((p) => p.status === "error");
+      const skipped =
+        points.length && points.every((p) => p.status === "skipped");
+      this.innerHTML = points.length
+        ? `<div class="empty"><h3>${t(invalid ? "history.sensor_error" : skipped ? "history.skipped" : "history.no_valid")}</h3><p>${t("history.check_table")}</p></div>`
+        : `<div class="empty"><h3>${t("chart.empty")}</h3><p>${t("chart.choose_period")}</p></div>`;
       return;
     }
     const gap = interval ? interval * 3000 : Infinity;
@@ -210,9 +259,13 @@ class Chart extends Component {
         return (
           numeric(p.value) !== null &&
           (!before ||
+            p.break_before ||
             numeric(before.value) === null ||
             p.time - before.time > gap) &&
-          (!after || numeric(after.value) === null || after.time - p.time > gap)
+          (!after ||
+            after.break_before ||
+            numeric(after.value) === null ||
+            after.time - p.time > gap)
         );
       })
       .map(
@@ -227,12 +280,22 @@ class Chart extends Component {
       )
       .join("");
     const time = (t) =>
-      new Date(t).toLocaleTimeString(locale(), {
+      new Date(t).toLocaleString(locale(), {
+        ...(g.end - g.start >= 86400000
+          ? { month: "short", day: "numeric" }
+          : {}),
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
       });
-    this.innerHTML = `<svg class="plot" viewBox="0 0 ${width} ${plotHeight + 52}" role="img" aria-label="${e(t("chart.description", { label, unit: formatUnit(unit), observations: t("counts.observations", { count: g.points.length }) }))}">${ticks}<g transform="translate(64 18)"><path class="series" d="${g.path}"/>${isolated}<circle class="selected-point" r="5"/><line class="gridline cursor" x1="0" x2="0" y1="0" y2="${plotHeight}"/></g><text x="64" y="${plotHeight + 44}">${time(g.start)}</text><text x="${width / 2}" y="${plotHeight + 44}" text-anchor="middle">${time((g.start + g.end) / 2)}</text><text x="${width - 20}" y="${plotHeight + 44}" text-anchor="end">${time(g.end)}</text></svg><p class="chart-selection" aria-hidden="true"></p><label class="plot-inspect"><span>${t("chart.inspect")}</span><input type="range" min="0" max="${g.points.length - 1}" value="${g.points.length - 1}" aria-label="${e(t("chart.observations", { label }))}"><output class="sr-only"></output></label>${g.path.split("M").length > 2 ? `<p class="small muted chart-gaps">${t("chart.gaps")}</p>` : ""}<details class="small muted" ${this.tableOpen ? "open" : ""}><summary>${t("chart.table")}</summary><div class="table-wrap"><table><caption class="sr-only">${e(t("chart.data", { label }))}</caption><thead><tr><th>${e(timeLabel)}</th><th>${e(t("chart.value", { unit: formatUnit(unit) }))}</th></tr></thead><tbody>${[
+    const axisTime = (value) =>
+      g.end - g.start >= 86400000
+        ? new Date(value).toLocaleDateString(locale(), {
+            month: "short",
+            day: "numeric",
+          })
+        : time(value);
+    this.innerHTML = `<svg class="plot" viewBox="0 0 ${width} ${plotHeight + 52}" role="img" aria-label="${e(t("chart.description", { label, unit: formatUnit(unit), observations: t("counts.observations", { count: g.points.length }) }))}">${ticks}<g transform="translate(64 18)"><path class="series" d="${g.path}"/>${isolated}<circle class="selected-point" r="5"/><line class="gridline cursor" x1="0" x2="0" y1="0" y2="${plotHeight}"/></g><text x="64" y="${plotHeight + 44}">${axisTime(g.start)}</text><text x="${width / 2}" y="${plotHeight + 44}" text-anchor="middle">${width >= 560 ? axisTime((g.start + g.end) / 2) : ""}</text><text x="${width - 20}" y="${plotHeight + 44}" text-anchor="end">${axisTime(g.end)}</text></svg><p class="chart-selection" aria-hidden="true"></p><label class="plot-inspect"><span>${t("chart.inspect")}</span><input type="range" min="0" max="${g.points.length - 1}" value="${g.points.length - 1}" aria-label="${e(t("chart.observations", { label }))}"><output class="sr-only"></output></label>${g.path.split("M").length > 2 ? `<p class="small muted chart-gaps">${t("chart.gaps")}</p>` : ""}<details class="small muted" ${this.tableOpen ? "open" : ""}><summary>${t("chart.table")}</summary><div class="table-wrap"><table><caption class="sr-only">${e(t("chart.data", { label }))}</caption><thead><tr><th>${e(timeLabel)}</th><th>${e(t("chart.value", { unit: formatUnit(unit) }))}</th></tr></thead><tbody>${[
       ...g.points,
     ]
       .reverse()
@@ -241,6 +304,7 @@ class Chart extends Component {
           `<tr><td>${e(new Date(p.time).toLocaleString(locale()))}</td><td>${numeric(p.value) === null ? t("chart.no_reading") : formatMeasurement(p.value, metric, unit)}</td></tr>`,
       )
       .join("")}</tbody></table></div></details>`;
+    if (this.data.showTable === false) this.querySelector("details")?.remove();
     if (tableFocused)
       this.querySelector("summary").focus({ preventScroll: true });
     const slider = this.querySelector("input"),
@@ -248,7 +312,14 @@ class Chart extends Component {
       cursor = this.querySelector(".cursor"),
       marker = this.querySelector(".selected-point"),
       selection = this.querySelector(".chart-selection");
-    const saved = g.points.findIndex((p) => p.time === this.inspectedTime);
+    const saved = g.points.findIndex(samePoint);
+    if (this.inspectionExpired) {
+      const notice = document.createElement("p");
+      notice.className = "small muted";
+      notice.setAttribute("role", "status");
+      notice.textContent = t("history.selection_expired");
+      this.prepend(notice);
+    }
     if (saved >= 0) slider.value = saved;
     const inspect = () => {
       const p = g.points[Number(slider.value)];
@@ -265,7 +336,9 @@ class Chart extends Component {
       cursor.setAttribute("x2", g.x(p.time));
     };
     slider.addEventListener("input", () => {
-      this.inspectedTime = g.points[Number(slider.value)].time;
+      this.inspectedPoint = g.points[Number(slider.value)];
+      this.inspectedTime = this.inspectedPoint.time;
+      this.inspectionExpired = false;
       inspect();
     });
     if (sliderFocused) slider.focus({ preventScroll: true });
@@ -290,14 +363,17 @@ class Chart extends Component {
           nearest = i;
       });
       slider.value = nearest;
-      if (event.type === "pointerdown" || event.buttons)
-        this.inspectedTime = g.points[nearest].time;
+      if (event.type === "pointerdown" || event.buttons) {
+        this.inspectedPoint = g.points[nearest];
+        this.inspectedTime = this.inspectedPoint.time;
+        this.inspectionExpired = false;
+      }
       inspect();
     };
     svg.addEventListener("pointerdown", selectPoint);
     svg.addEventListener("pointermove", selectPoint);
     svg.addEventListener("pointerleave", () => {
-      const pinned = g.points.findIndex((p) => p.time === this.inspectedTime);
+      const pinned = g.points.findIndex(samePoint);
       slider.value = pinned >= 0 ? pinned : g.points.length - 1;
       inspect();
     });
