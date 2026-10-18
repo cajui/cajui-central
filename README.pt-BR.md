@@ -8,16 +8,12 @@ O Cajuí Central é uma aplicação local de monitoramento. Dê nomes aos dispos
 e sensores, organize um painel e consulte as leituras ao longo do tempo pelo
 navegador. As medições ficam em um banco SQLite no computador que executa o Central.
 
-Ele é a aplicação de monitoramento do [Cajuí](https://github.com/cajui/docs/blob/main/README.pt-BR.md),
-uma rede de sensores open source pensada para transmissores de baixo consumo e
-uma receptora feita com uma única placa LoRa compatível, sem gateway LoRaWAN
-comercial. O projeto busca atender diferentes tipos de sensor e vários sensores
-por transmissor. O firmware de referência atual atende um sensor de clima por
-transmissor; o objetivo de meses entre recargas ainda precisa de validação de autonomia.
-
-O Central recebe medições pelos contratos MQTT e HTTP documentados. Novas
-integrações de sensores precisam seguir esses contratos. Temperatura e umidade
-aparecem na demonstração abaixo como o primeiro exemplo em funcionamento.
+O Central é a aplicação de monitoramento do
+[Cajuí](https://github.com/cajui/docs/blob/main/README.pt-BR.md), uma rede de
+sensores open source por rádio LoRa. Ele recebe as medições por um broker MQTT ou
+pela API HTTP, então qualquer produtor que siga esses contratos pode alimentá-lo.
+A demonstração abaixo usa temperatura e umidade, as medições dos transmissores de
+referência do projeto.
 
 ![Visão geral do Cajuí Central com leituras simuladas de temperatura e umidade](docs/images/overview.pt-BR.png)
 
@@ -28,7 +24,8 @@ aparecem na demonstração abaixo como o primeiro exemplo em funcionamento.
 
 ## O que você pode fazer
 
-- Reunir as medições de vários dispositivos e sensores em um painel.
+- Reunir em um painel as medições de todos os dispositivos e sensores, como
+  temperatura e umidade.
 - Nomear dispositivos e sensores, atribuir locais e escolher quais medições exibir.
 - Abrir gráficos de histórico e consultar leituras originais por data, inclusive
   períodos maiores que 24 horas. Os dados não são apagados automaticamente por idade.
