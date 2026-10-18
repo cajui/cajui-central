@@ -366,7 +366,7 @@ en-US:
       zero: No transmitters
       one: "%{count} transmitter"
       other: "%{count} transmitters"
-    offline_notice: No connection. Check the receiver's power and Wi-Fi.
+    offline_notice: Check the receiver's power and Wi-Fi.
     queue_notice:
       one: "%{count} reading is waiting to be sent to the broker."
       other: "%{count} readings are waiting to be sent to the broker."
