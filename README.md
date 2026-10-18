@@ -8,6 +8,17 @@ Cajuí Central is a local monitoring application. Give devices and sensors usefu
 names, organize a dashboard, and inspect readings over time in your browser.
 Your measurements stay in a SQLite database on the computer running Central.
 
+It is the monitoring application for [Cajuí](https://github.com/cajui/docs), an
+open-source sensor network designed around low-power transmitters and a receiver
+built from a single supported LoRa board, without a commercial LoRaWAN gateway.
+The project aims to support different sensor types and several sensors per
+transmitter. The current reference firmware supports one climate sensor per
+transmitter; its goal of months between charges still needs battery-life validation.
+
+Central receives measurements through documented MQTT and HTTP contracts. New
+sensor integrations must follow those contracts. Temperature and humidity are
+used in the demo below as the first working example.
+
 ![Cajuí Central overview showing simulated temperature and humidity readings](docs/images/overview.en-US.png)
 
 *Actual application with demonstration data. Names and measurements are fictional.*
@@ -17,7 +28,7 @@ Your measurements stay in a SQLite database on the computer running Central.
 
 ## What you can do
 
-- Follow temperature, humidity and other reported measurements on one dashboard.
+- Bring measurements from multiple devices and sensors together on one dashboard.
 - Name devices and sensors, assign locations, and choose which measurements to show.
 - Open history charts and browse original readings by date, including periods longer
   than 24 hours. Data has no automatic age-based deletion.

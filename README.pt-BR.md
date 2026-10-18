@@ -8,6 +8,17 @@ O Cajuí Central é uma aplicação local de monitoramento. Dê nomes aos dispos
 e sensores, organize um painel e consulte as leituras ao longo do tempo pelo
 navegador. As medições ficam em um banco SQLite no computador que executa o Central.
 
+Ele é a aplicação de monitoramento do [Cajuí](https://github.com/cajui/docs/blob/main/README.pt-BR.md),
+uma rede de sensores open source pensada para transmissores de baixo consumo e
+uma receptora feita com uma única placa LoRa compatível, sem gateway LoRaWAN
+comercial. O projeto busca atender diferentes tipos de sensor e vários sensores
+por transmissor. O firmware de referência atual atende um sensor de clima por
+transmissor; o objetivo de meses entre recargas ainda precisa de validação de autonomia.
+
+O Central recebe medições pelos contratos MQTT e HTTP documentados. Novas
+integrações de sensores precisam seguir esses contratos. Temperatura e umidade
+aparecem na demonstração abaixo como o primeiro exemplo em funcionamento.
+
 ![Visão geral do Cajuí Central com leituras simuladas de temperatura e umidade](docs/images/overview.pt-BR.png)
 
 *Aplicação real com dados de demonstração. Nomes e medições são fictícios.*
@@ -17,7 +28,7 @@ navegador. As medições ficam em um banco SQLite no computador que executa o Ce
 
 ## O que você pode fazer
 
-- Acompanhar temperatura, umidade e outras medições recebidas em um painel.
+- Reunir as medições de vários dispositivos e sensores em um painel.
 - Nomear dispositivos e sensores, atribuir locais e escolher quais medições exibir.
 - Abrir gráficos de histórico e consultar leituras originais por data, inclusive
   períodos maiores que 24 horas. Os dados não são apagados automaticamente por idade.
