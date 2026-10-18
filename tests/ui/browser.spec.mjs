@@ -156,7 +156,7 @@ test("brand contrast audit updates with theme and navigation works", async ({
   page,
 }) => {
   await page.goto(referenceURL + "/design/brand");
-  await expect(page.locator("#contrast-audit tr")).toHaveCount(16);
+  await expect(page.locator("#contrast-audit tr")).toHaveCount(14);
   await expect(page.locator("#contrast-audit")).not.toContainText(
     "Below target",
   );
@@ -310,24 +310,24 @@ test("measurement identity survives failures and unknown metric names stay neutr
   ).toBe(before);
   await expect(card.locator(".reading-note")).toHaveText("Value unavailable");
   // An abnormal state carries a shape besides colour and text (ADR 0002).
-  const shape = (state) =>
-    card
-      .locator(`.badge[data-state="${state}"]`)
-      .evaluate((el) => getComputedStyle(el, "::before").content);
-  expect(await shape("error")).not.toBe("none");
-  // Forced colours replace author backgrounds; the shape must still be drawn.
+  const statusIcon = card.locator('.badge[data-state="error"] svg');
+  await expect(statusIcon).toBeVisible();
+  await expect(statusIcon).toHaveAttribute("aria-hidden", "true");
+  // Forced colours must keep the shape drawn, in the system text colour.
   await page.emulateMedia({ forcedColors: "active" });
-  const [fill, canvas] = await card
-    .locator('.badge[data-state="error"]')
-    .evaluate((el) => {
-      const probe = document.createElement("div");
-      probe.style.background = "Canvas";
-      document.body.append(probe);
-      const ground = getComputedStyle(probe).backgroundColor;
-      probe.remove();
-      return [getComputedStyle(el, "::before").backgroundColor, ground];
-    });
-  expect(fill).not.toBe(canvas);
+  await expect(statusIcon).toBeVisible();
+  const [stroke, text, canvas] = await statusIcon.evaluate((el) => {
+    const probe = document.createElement("div");
+    probe.style.color = "CanvasText";
+    probe.style.background = "Canvas";
+    document.body.append(probe);
+    const style = getComputedStyle(probe);
+    const colours = [style.color, style.backgroundColor];
+    probe.remove();
+    return [getComputedStyle(el).stroke, ...colours];
+  });
+  expect(stroke).toBe(text);
+  expect(stroke).not.toBe(canvas);
   await page.emulateMedia({ forcedColors: "none" });
   for (const metric of [
     "custom_metric",

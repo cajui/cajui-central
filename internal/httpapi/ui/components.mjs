@@ -8,7 +8,7 @@ import {
   formatUnit,
   plotGeometry,
 } from "./model.mjs";
-import { icon, metricIcon } from "./icons.mjs";
+import { icon, metricIcon, statusIcon } from "./icons.mjs";
 
 function attributeNumber(element, name) {
   const value = element.getAttribute(name);
@@ -36,8 +36,7 @@ class Badge extends Component {
     const state = Object.hasOwn(states, this.getAttribute("state"))
       ? this.getAttribute("state")
       : "empty";
-    // Normal states are quiet; abnormal ones get their shape from CSS (ADR 0002).
-    this.innerHTML = `<span class="badge" data-state="${state}">${e(this.getAttribute("label") ?? states[state])}</span>`;
+    this.innerHTML = `<span class="badge" data-state="${state}">${statusIcon(state)}${e(this.getAttribute("label") ?? states[state])}</span>`;
   }
 }
 class Sensor extends Component {

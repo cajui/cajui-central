@@ -11,7 +11,7 @@ import {
   uptimeText,
   receiverSummary,
 } from "./model.mjs";
-import { icon } from "./icons.mjs";
+import { icon, statusIcon } from "./icons.mjs";
 import { saveWorkspace } from "./workspace-api.mjs";
 import { fetchSnapshot } from "./snapshot-api.mjs";
 
@@ -90,7 +90,7 @@ export function receiverCard(r, snapshot) {
   const card = document.createElement("article");
   card.className = "panel receiver-card";
   card.dataset.status = summary.status;
-  card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("signal")}</span><div><h2>${e(receiverLabel(r.device_id))}</h2><p class="muted">${e(t("receivers.transmitters", { count: transmitters }))}</p></div><span class="badge" data-state="${badge}">${e(t(`receivers.${summary.status}`))}</span></div>${summary.notices.length ? `<ul class="receiver-notices">${summary.notices.map((n) => `<li data-level="${n.level}">${n.level === "info" ? `<span>${e(n.text)}</span>` : `<span class="badge" data-state="${n.level === "error" ? "network" : "warning"}">${e(n.text)}</span>`}</li>`).join("")}</ul>` : ""}<dl class="detail-list receiver-details">${rows.map(([k, v]) => `<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join("")}</dl>`;
+  card.innerHTML = `<div class="device-identity"><span class="device-symbol">${icon("signal")}</span><div><h2>${e(receiverLabel(r.device_id))}</h2><p class="muted">${e(t("receivers.transmitters", { count: transmitters }))}</p></div><span class="badge" data-state="${badge}">${statusIcon(badge)}${e(t(`receivers.${summary.status}`))}</span></div>${summary.notices.length ? `<ul class="receiver-notices">${summary.notices.map((n) => `<li data-level="${n.level}">${n.level === "info" ? `<span>${e(n.text)}</span>` : `<span class="badge" data-state="${n.level === "error" ? "network" : "warning"}">${statusIcon(n.level === "error" ? "network" : "warning")}${e(n.text)}</span>`}</li>`).join("")}</ul>` : ""}<dl class="detail-list receiver-details">${rows.map(([k, v]) => `<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join("")}</dl>`;
   return card;
 }
 export function mountReceivers(root, { state, notify }) {

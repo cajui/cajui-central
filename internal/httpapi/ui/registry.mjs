@@ -17,7 +17,7 @@ import {
   createDialog,
   localizeValidation,
 } from "./workspace-api.mjs";
-import { icon } from "./icons.mjs";
+import { icon, statusIcon } from "./icons.mjs";
 import { fetchSnapshot } from "./snapshot-api.mjs";
 import {
   BATTERY_CRITICAL_V,
@@ -96,7 +96,7 @@ export function mountRegistry(root, { state, kind, notify }) {
             ? `${text(c)} · ${states.stale}`
             : (states[c.state] ?? c.state);
     const mark = (state, text) =>
-      `<span class="badge" data-state="${state}">${e(text)}</span>`;
+      `<span class="badge" data-state="${state}">${statusIcon(state)}${e(text)}</span>`;
     const battery = channel("voltage");
     // A revoked device no longer reports: its values are history, not problems.
     const volts = judged ? batteryVolts(group) : null;

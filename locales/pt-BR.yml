@@ -368,7 +368,7 @@ pt-BR:
       zero: Nenhum transmissor
       one: "%{count} transmissor"
       other: "%{count} transmissores"
-    offline_notice: Sem conexão. Verifique a energia e o Wi-Fi do receptor.
+    offline_notice: Verifique a alimentação e o Wi-Fi do receptor.
     queue_notice:
       one: "%{count} leitura aguarda envio ao broker."
       other: "%{count} leituras aguardam envio ao broker."

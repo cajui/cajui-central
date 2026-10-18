@@ -666,8 +666,11 @@ pre {
   line-height: 1.5;
   color: var(--muted);
 }
-.badge::before {
-  flex: none;
+.badge .icon {
+  width: 1.15em;
+  height: 1.15em;
+  flex: 0 0 auto;
+  stroke-width: 1.8;
 }
 .badge:is(
   [data-state="stale"],
@@ -677,41 +680,15 @@ pre {
 ) {
   color: var(--warning);
 }
-.badge:is(
-    [data-state="stale"],
-    [data-state="warning"],
-    [data-state="error"],
-    [data-state="skipped"]
-  )::before {
-  content: "";
-  width: 0.8em;
-  height: 0.7em;
-  background: currentColor;
-  clip-path: polygon(50% 0, 100% 100%, 0 100%);
-}
+
 .badge[data-state="network"] {
-  color: var(--info);
+  color: var(--warning);
 }
-.badge[data-state="network"]::before {
-  content: "";
-  box-sizing: border-box;
-  width: 0.72em;
-  height: 0.72em;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-}
+
 .badge[data-state="critical"] {
   color: var(--danger);
 }
-.badge[data-state="critical"]::before {
-  content: "";
-  width: 0.55em;
-  height: 0.55em;
-  margin-inline: 0.1em;
-  background: currentColor;
-  transform: rotate(45deg);
-}
-/* Forced colours replace author backgrounds, which erased the filled shapes. */
+
 /* Without JavaScript there is no bottom bar: a phone shows the server-rendered menu. */
 @media (scripting: none) and (max-width: 1000px) {
   .product-shell .sidebar {
@@ -731,14 +708,8 @@ pre {
     outline: 2px solid CanvasText;
     outline-offset: -2px;
   }
-  .badge:is(
-      [data-state="stale"],
-      [data-state="warning"],
-      [data-state="error"],
-      [data-state="skipped"],
-      [data-state="critical"]
-    )::before {
-    background: CanvasText;
+  .badge .icon {
+    color: CanvasText;
   }
 }
 .main-grid {
@@ -2303,7 +2274,7 @@ cj-reading {
 .receiver-notices li[data-level="error"],
 .device-alert {
   border-color: transparent;
-  background: var(--info-soft);
+  background: var(--warning-soft);
 }
 .receiver-notices li[data-level="warning"] {
   border-color: transparent;
@@ -2992,7 +2963,7 @@ dialog.history-dialog {
 .attention-list li[data-severity="critical"] {
   background: var(--danger-soft);
 }
-.attention-list li[data-severity="warning"] {
+.attention-list li:is([data-severity="warning"], [data-severity="network"]) {
   background: var(--warning-soft);
 }
 .attention-text {
@@ -3052,7 +3023,7 @@ dialog.history-dialog {
   border-color: var(--warning);
 }
 .place[data-severity="network"] {
-  border-color: var(--info);
+  border-color: var(--warning);
 }
 .place-head {
   display: flex;
