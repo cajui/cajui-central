@@ -1,3 +1,4 @@
+import { statusIcon } from "./icons.mjs";
 import { t, locale, errorMessage } from "./i18n.mjs";
 import { escapeHTML as e, receiverLabel } from "./model.mjs";
 import { brokerSnapshot } from "./broker-api.mjs";
@@ -50,7 +51,7 @@ export function mountBroker(root, { state }) {
     if (!snapshot) return;
     const d = snapshot;
     root.querySelector("#broker-summary").innerHTML =
-      `<div class="broker-stats"><article class="panel"><h2>${t("broker.connection")}</h2><p class="badge" data-state="${!d.configured ? "empty" : d.connected ? "ok" : "network"}">${t(!d.configured ? "broker.disabled" : d.connected ? "broker.connected" : "broker.disconnected")}</p>${d.problem ? `<p>${t(problemKeys[d.problem] || "broker.problem_connection")}</p>` : ""}</article><article class="panel"><h2>${t("broker.received")}</h2><strong>${e(d.total ?? 0)}</strong><p>${t("broker.since_start")}</p></article><article class="panel"><h2>${t("broker.rejected")}</h2><strong>${e(d.rejected ?? 0)}</strong><p>${t("broker.rejected_note")}</p></article></div>`;
+      `<div class="broker-stats"><article class="panel"><h2>${t("broker.connection")}</h2><p class="badge" data-state="${!d.configured ? "empty" : d.connected ? "ok" : "network"}">${statusIcon(!d.configured ? "empty" : d.connected ? "ok" : "network")}${t(!d.configured ? "broker.disabled" : d.connected ? "broker.connected" : "broker.disconnected")}</p>${d.problem ? `<p>${t(problemKeys[d.problem] || "broker.problem_connection")}</p>` : ""}</article><article class="panel"><h2>${t("broker.received")}</h2><strong>${e(d.total ?? 0)}</strong><p>${t("broker.since_start")}</p></article><article class="panel"><h2>${t("broker.rejected")}</h2><strong>${e(d.rejected ?? 0)}</strong><p>${t("broker.rejected_note")}</p></article></div>`;
     const settings = [
       [t("broker.address"), d.host || "—"],
       [t("broker.port"), d.port || "—"],
@@ -114,7 +115,7 @@ export function mountBroker(root, { state }) {
         (managed?.role === "receiver" ? receiverLabel(m.device) : m.device) ||
         "—";
       const kindLabel = kindKeys[kind] ? t(kindKeys[kind]) : "—";
-      const badge = `<span class="badge" data-state="${m.status === "accepted" ? "ok" : m.status === "ignored" ? "empty" : "error"}">${e(t(statusKeys[m.status]))}</span>`;
+      const badge = `<span class="badge" data-state="${m.status === "accepted" ? "ok" : m.status === "ignored" ? "empty" : "error"}">${statusIcon(m.status === "accepted" ? "ok" : m.status === "ignored" ? "empty" : "error")}${e(t(statusKeys[m.status]))}</span>`;
       return {
         id,
         html: `<tr class="broker-message"><td><time datetime="${e(m.at)}" title="${valid ? e(timestamp.format(date)) : ""}">${valid ? e(clock.format(date)) : "—"}</time></td><td class="broker-device"><span title="${e(m.device)}">${e(deviceLabel)}</span></td><td class="broker-kind">${e(kindLabel)}</td><td class="broker-result">${badge}</td><td><button class="button broker-expand" data-message="${e(id)}" aria-expanded="${expanded}" aria-controls="broker-detail-${e(id)}" aria-label="${e(t(expanded ? "broker.collapse_message" : "broker.expand_message", { id }))}">${t(expanded ? "broker.collapse" : "broker.expand")}</button></td></tr><tr class="broker-detail" id="broker-detail-${e(id)}" ${expanded ? "" : "hidden"}><td colspan="5"><dl class="detail-list"><div><dt>${t("broker.time")}</dt><dd>${valid ? e(timestamp.format(date)) : "—"}</dd></div><div><dt>${t("broker.device")}</dt><dd>${e(m.device || "—")}</dd></div><div><dt>${t("broker.source")}</dt><dd>${e(m.source || "—")}</dd></div><div><dt>${t("broker.kind")}</dt><dd>${e(kindLabel)}</dd></div><div><dt>${t("common.status")}</dt><dd>${badge}</dd></div><div><dt>${t("broker.topic")}</dt><dd><code>${e(m.topic)}</code></dd></div><div><dt>${t("broker.size")}</dt><dd>${e(m.bytes)} B</dd></div></dl>${m.retained ? `<p>${t("broker.retained")}</p>` : ""}${m.payload !== undefined ? `<pre>${e(JSON.stringify(m.payload, null, 2))}</pre>` : `<p class="muted">${t("broker.payload_omitted")}</p>`}</td></tr>`,
