@@ -560,13 +560,15 @@ export function mountDashboard(root, { state = {}, notify }) {
     .addEventListener("click", () =>
       root.querySelector("#history-panel").close(),
     );
-  root.querySelector("#history-panel").addEventListener("close", () => {
+  root.querySelector("#history-panel").addEventListener("close", (event) => {
     if (root.querySelector("#history-panel").open) return;
     selected = "";
     history.close();
     for (const button of root.querySelectorAll(".reading-button"))
       button.setAttribute("aria-pressed", "false");
-    restoreFocus(historyOpener, { preventScroll: true });
+    const focus = document.activeElement;
+    if (!focus || focus === document.body || event.target.contains(focus))
+      restoreFocus(historyOpener, { preventScroll: true });
   });
   root.querySelector("#export").addEventListener("click", () => {
     const keys = new Set(

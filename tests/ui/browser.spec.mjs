@@ -1290,7 +1290,10 @@ for (const language of ["pt-BR", "en-US"]) {
         await button.focus();
         await page.keyboard.press("Enter");
         await expect(page.locator("#history-panel")).toBeVisible();
+        await expect(page.locator("#history-heading")).toBeFocused();
         await page.keyboard.press("Escape");
+        await expect(page.locator("#history-panel")).not.toBeVisible();
+        await expect(button).toHaveAttribute("aria-pressed", "false");
         await expect(button).toBeFocused();
       }
       expect(await page.locator(".reading-button img").count()).toBe(0);
@@ -1342,6 +1345,57 @@ for (const language of ["pt-BR", "en-US"]) {
         }
       }
     }
+  });
+  test(`closing history preserves a newer focus choice and the duplicated opener after refresh ${language}`, async ({
+    page,
+  }) => {
+    setLocale(language);
+    await page.clock.install();
+    const { snapshot, serve } = await liveWorkspace(page, language);
+    snapshot.workspace.layout.sections = [
+      { title: "First", items: [{ kind: "sensor", sensor_id: 1 }] },
+      { title: "Second", items: [{ kind: "sensor", sensor_id: 1 }] },
+    ];
+    await serve(snapshot);
+    await page.reload();
+    const buttons = page.locator(".reading-button").filter({
+      has: page.getByText(t("metrics.temperature"), { exact: true }),
+    });
+    await expect(buttons).toHaveCount(2);
+    const first = buttons.first();
+    const second = buttons.nth(1);
+    await first.focus();
+    await page.keyboard.press("Enter");
+    const panel = page.locator("#history-panel");
+    await expect(page.locator("#history-heading")).toBeFocused();
+    await second.evaluate(
+      (button) =>
+        new Promise((resolve) => {
+          const dialog = document.querySelector("#history-panel");
+          dialog.addEventListener("close", () => resolve(), { once: true });
+          dialog.close();
+          button.focus();
+        }),
+    );
+    await expect(panel).not.toBeVisible();
+    await expect(second).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#history-heading")).toBeFocused();
+    const previousID = await second.getAttribute("id");
+    snapshot.samples[0].readings[0].value = 25;
+    snapshot.workspace.sensors[0].measurements[0].value = 25;
+    await serve(snapshot);
+    await page.clock.fastForward(31000);
+    await expect(second).not.toHaveAttribute("id", previousID);
+    await expect(page.locator("#history-value")).toContainText(
+      language === "pt-BR" ? "25,0" : "25.0",
+    );
+    await expect(page.locator("#history-heading")).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(panel).not.toBeVisible();
+    await expect(second).toBeFocused();
+    await expect(first).not.toBeFocused();
+    await expect(second).toHaveAttribute("aria-pressed", "false");
   });
   test(`identical readings from different devices have distinct accessible names ${language}`, async ({
     page,
