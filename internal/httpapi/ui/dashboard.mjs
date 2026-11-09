@@ -245,11 +245,19 @@ export function mountDashboard(root, { state = {}, notify }) {
   function placeRow(c, g, sensorName) {
     const button = readingButton(c, g);
     button.classList.add("place-row");
-    button.innerHTML = placeRowHTML(
+    button.querySelector("cj-reading").outerHTML = placeRowHTML(
       c,
       g,
       sensorName,
       Date.parse(snapshot.generated_at),
+    );
+    const labels = [...button.querySelectorAll(".row-label, .row-value")];
+    labels.forEach((label, index) => {
+      label.id = `${button.id}-label-${index}`;
+    });
+    button.setAttribute(
+      "aria-labelledby",
+      [...labels.map((label) => label.id), `${button.id}-context`].join(" "),
     );
     return button;
   }
@@ -272,23 +280,35 @@ export function mountDashboard(root, { state = {}, notify }) {
     const button = document.createElement("button");
     button.className = "reading-button";
     button.dataset.channelKey = c.key;
-    button.setAttribute(
-      "aria-label",
-      t("dashboard.inspect", {
-        measurement: c.title,
-        value: formatMeasurement(
-          ["ok", "recorded", "stale"].includes(c.state) ? c.value : null,
-          c.metric,
-          c.unit,
-        ),
-        unit: formatUnit(c.unit),
-        status: states[c.state],
-        sensor: c.sensorName ?? c.sensor,
-        device: g.name,
-      }),
-    );
+    const description = document.createElement("span");
+    description.id = `reading-description-${crypto.randomUUID()}`;
+    description.hidden = true;
+    description.textContent = t("dashboard.inspect", {
+      measurement: c.title,
+      value: formatMeasurement(
+        ["ok", "recorded", "stale"].includes(c.state) ? c.value : null,
+        c.metric,
+        c.unit,
+      ),
+      unit: formatUnit(c.unit),
+      status: states[c.state],
+      sensor: c.sensorName ?? c.sensor,
+      device: g.name,
+    });
+    button.id = `reading-${crypto.randomUUID()}`;
+    const context = document.createElement("span");
+    context.id = `${button.id}-context`;
+    context.hidden = true;
+    context.textContent = t("registry.sensor_identity", {
+      sensor: c.sensorName ?? c.sensor,
+      device: g.name,
+    });
+    button.setAttribute("aria-describedby", description.id);
+    button.append(description, context);
     button.setAttribute("aria-pressed", String(c.key === selected));
     const reading = document.createElement("cj-reading");
+    reading.id = `${button.id}-content`;
+    button.setAttribute("aria-labelledby", `${reading.id} ${context.id}`);
     reading.data = c;
     button.append(reading);
     button.addEventListener("click", () =>
@@ -540,13 +560,15 @@ export function mountDashboard(root, { state = {}, notify }) {
     .addEventListener("click", () =>
       root.querySelector("#history-panel").close(),
     );
-  root.querySelector("#history-panel").addEventListener("close", () => {
+  root.querySelector("#history-panel").addEventListener("close", (event) => {
     if (root.querySelector("#history-panel").open) return;
     selected = "";
     history.close();
     for (const button of root.querySelectorAll(".reading-button"))
       button.setAttribute("aria-pressed", "false");
-    restoreFocus(historyOpener, { preventScroll: true });
+    const focus = document.activeElement;
+    if (!focus || focus === document.body || event.target.contains(focus))
+      restoreFocus(historyOpener, { preventScroll: true });
   });
   root.querySelector("#export").addEventListener("click", () => {
     const keys = new Set(

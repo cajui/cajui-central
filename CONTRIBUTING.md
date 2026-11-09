@@ -3,7 +3,7 @@
 See [README.md](README.md) to run the project. Use the Go version in go.mod, or
 `make docker-check` to run Go checks in a container.
 
-Install Node.js 22, Python 3.12+, the Go version in go.mod and Docker with Compose.
+Install Node.js 22.12.0 or newer, Python 3.12+, the Go version in go.mod and Docker with Compose.
 Prepare the test dependencies in a Python virtual environment:
 
 ```sh

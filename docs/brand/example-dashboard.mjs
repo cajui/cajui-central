@@ -54,12 +54,16 @@ export function mountDashboard(root, { demo = false, state = {}, notify }) {
     for (const c of filtered()) {
       const button = document.createElement("button");
       button.className = "sensor-link sensor-button";
-      button.setAttribute(
-        "aria-label",
-        `Inspect ${c.title}: ${formatMeasurement(["ok", "stale", "recorded"].includes(c.state) ? c.value : null, c.metric, c.unit)} ${formatUnit(c.unit)}, ${states[c.state]}, from ${c.context}`,
-      );
+      const description = document.createElement("span");
+      description.id = `sensor-description-${crypto.randomUUID()}`;
+      description.hidden = true;
+      description.textContent = `Inspect ${c.title}: ${formatMeasurement(["ok", "stale", "recorded"].includes(c.state) ? c.value : null, c.metric, c.unit)} ${formatUnit(c.unit)}, ${states[c.state]}, from ${c.context}`;
+      button.setAttribute("aria-describedby", description.id);
+      button.append(description);
       button.setAttribute("aria-pressed", String(c.key === selected));
       const card = document.createElement("cj-sensor");
+      card.id = `sensor-content-${crypto.randomUUID()}`;
+      button.setAttribute("aria-labelledby", card.id);
       card.data = c;
       button.append(card);
       button.addEventListener("click", () => {

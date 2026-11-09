@@ -1,10 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect } from "@playwright/test";
+import { t, setLocale } from "../../internal/httpapi/ui/i18n.mjs";
 const referenceURL = "http://127.0.0.1:8092";
 
 // Existing page fixtures own their states; keep the live transport isolated from
 // the disposable server's inventory. Dedicated tests below drive actual SSE frames.
 test.beforeEach(async ({ page }) => {
+  setLocale("en-US");
   await page.route("**/ui-api/device-states/events", (route) => route.abort());
   await page.route("**/ui-api/device-states", async (route) => {
     // A request still in flight when the test navigates has no page left to read the
@@ -194,6 +196,43 @@ for (const path of [
   test(`accessibility audit ${path}`, async ({ page }) => {
     await page.goto(referenceURL + path);
     await page.locator("html.ready").waitFor();
+    await expect(page.locator("a.wordmark")).toHaveAccessibleName(
+      /Cajuí\s*Central/i,
+    );
+    await expect(page.locator("a.wordmark")).toHaveAccessibleDescription(
+      "Cajuí visual identity",
+    );
+    if (path === "/design/dashboard") {
+      for (const button of await page.locator(".sensor-button").all()) {
+        const card = button.locator("cj-sensor");
+        for (const selector of [
+          ".card-title",
+          ".card-context",
+          ".reading-age",
+          ".reading-note",
+          ".sensor-action",
+        ]) {
+          const text = card.locator(selector);
+          if (await text.count())
+            await expect(button).toHaveAccessibleName(
+              new RegExp(
+                (await text.innerText()).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+              ),
+            );
+        }
+        await expect(button).toHaveAccessibleDescription(
+          new RegExp(
+            (await card.locator(".card-context").innerText()).replace(
+              /[.*+?^${}()|[\]\\]/g,
+              "\\$&",
+            ),
+          ),
+        );
+        await expect(card.locator(".sensor-action")).toBeVisible();
+        for (const svg of await card.locator("svg").all())
+          await expect(svg).toHaveAttribute("aria-hidden", "true");
+      }
+    }
     for (const theme of ["light", "dark"]) {
       if (theme === "dark")
         await page
@@ -519,7 +558,21 @@ test("live data keeps refreshing while a chart or dialog is open", async ({
   humidity(next, 71);
   await serve(next);
   await page.clock.fastForward(31000);
-  await expect(reading).toHaveAccessibleName(/Inspect Humidity: 71/);
+  await expect(reading).toHaveAccessibleName(
+    new RegExp(
+      `^${t("metrics.humidity")}\\s*Sensor 1\\s*71\\.0\\s*% ${t("registry.sensor_identity", { device: "Device 1", sensor: "Sensor 1" })}`,
+    ),
+  );
+  await expect(reading).toHaveAccessibleDescription(
+    t("dashboard.inspect", {
+      measurement: t("metrics.humidity"),
+      value: "71.0",
+      unit: "%",
+      status: t("states.ok"),
+      sensor: "Sensor 1",
+      device: "Device 1",
+    }),
+  );
   await expect(page.locator("#history-panel")).toBeVisible();
   await expect(page.locator("#history-table")).toHaveAttribute("open", "");
   await expect(page.locator("#history-table summary")).toBeFocused();
@@ -534,7 +587,21 @@ test("live data keeps refreshing while a chart or dialog is open", async ({
   humidity(next, 72);
   await serve(next);
   await page.clock.fastForward(31000);
-  await expect(reading).toHaveAccessibleName(/Inspect Humidity: 72/);
+  await expect(reading).toHaveAccessibleName(
+    new RegExp(
+      `^${t("metrics.humidity")}\\s*Sensor 1\\s*72\\.0\\s*% ${t("registry.sensor_identity", { device: "Device 1", sensor: "Sensor 1" })}`,
+    ),
+  );
+  await expect(reading).toHaveAccessibleDescription(
+    t("dashboard.inspect", {
+      measurement: t("metrics.humidity"),
+      value: "72.0",
+      unit: "%",
+      status: t("states.ok"),
+      sensor: "Sensor 1",
+      device: "Device 1",
+    }),
+  );
   await expect(
     page.getByRole("button", { name: "Details for Device 1", exact: true }),
   ).toBeFocused();
@@ -543,7 +610,21 @@ test("live data keeps refreshing while a chart or dialog is open", async ({
   humidity(next, 73);
   await serve(next);
   await page.clock.fastForward(31000);
-  await expect(reading).toHaveAccessibleName(/Inspect Humidity: 73/);
+  await expect(reading).toHaveAccessibleName(
+    new RegExp(
+      `^${t("metrics.humidity")}\\s*Sensor 1\\s*73\\.0\\s*% ${t("registry.sensor_identity", { device: "Device 1", sensor: "Sensor 1" })}`,
+    ),
+  );
+  await expect(reading).toHaveAccessibleDescription(
+    t("dashboard.inspect", {
+      measurement: t("metrics.humidity"),
+      value: "73.0",
+      unit: "%",
+      status: t("states.ok"),
+      sensor: "Sensor 1",
+      device: "Device 1",
+    }),
+  );
   await page.keyboard.press("Escape");
   await expect(
     page.getByRole("button", { name: "Details for Device 1", exact: true }),
@@ -573,7 +654,13 @@ for (const width of [390, 820, 1440]) {
     await expect(page.locator('a[href^="/design/"]')).toHaveCount(0);
     await expect(page.locator(".diagnostic-button").first()).not.toBeVisible();
     await expect(page.locator("#history-panel")).not.toBeVisible();
-    await page.getByRole("button", { name: /Inspect Humidity:/ }).click();
+    await page
+      .getByRole("button", {
+        name: new RegExp(
+          `^${t("metrics.humidity")}\\s*Sensor 1\\s*60\\.0\\s*% ${t("registry.sensor_identity", { device: "Device 1", sensor: "Sensor 1" })}`,
+        ),
+      })
+      .click();
     await expect(page.locator("#history-heading")).toBeFocused();
     await expect(page.locator("#metric-select option:checked")).toContainText(
       "Humidity",
@@ -678,7 +765,21 @@ test("known measurements keep their decimals on every screen", async ({
 }) => {
   const { snapshot, serve } = await liveWorkspace(page);
   const button = page.locator(".reading-button").first();
-  await expect(button).toHaveAccessibleName(/Inspect Temperature: 24\.0 °C/);
+  await expect(button).toHaveAccessibleName(
+    new RegExp(
+      `^${t("metrics.temperature")}\\s*Sensor 1\\s*24\\.0\\s*°C ${t("registry.sensor_identity", { device: "Device 1", sensor: "Sensor 1" })}`,
+    ),
+  );
+  await expect(button).toHaveAccessibleDescription(
+    t("dashboard.inspect", {
+      measurement: t("metrics.temperature"),
+      value: "24.0",
+      unit: "°C",
+      status: t("states.ok"),
+      sensor: "Sensor 1",
+      device: "Device 1",
+    }),
+  );
   await button.click();
   await expect(page.locator("#history-value")).toContainText("24.0");
   await expect(page.locator("#history .chart-selection")).toHaveText(
@@ -947,9 +1048,16 @@ test("persistent registration, independent dashboard composition and safe edits"
     .getByRole("button", { name: "Add item", exact: true })
     .last()
     .click();
-  await page
-    .getByRole("button", { name: "Move section 2 up", exact: true })
-    .click();
+  const moveUp = page
+    .getByRole("group", {
+      name: t("layout.section", { number: 2 }),
+      exact: true,
+    })
+    .getByRole("button", { name: t("layout.up"), exact: true });
+  await expect(moveUp).toHaveAccessibleDescription(
+    t("layout.section", { number: 2 }),
+  );
+  await moveUp.click();
   await page
     .getByRole("button", { name: "Save overview", exact: true })
     .click();
@@ -960,7 +1068,25 @@ test("persistent registration, independent dashboard composition and safe edits"
   await expect(page.locator(".sensor-group")).toContainText(renamed);
   await expect(page.locator("cj-reading")).toHaveCount(2);
   await expect(page.locator("#app img")).toHaveCount(0);
-  await page.getByRole("button", { name: /Inspect Humidity:/ }).click();
+  const humidity = page.getByRole("button", {
+    name: new RegExp(
+      `^${t("metrics.humidity")}\\s*52\\.0\\s*%.*${t("common.history")} `,
+    ),
+  });
+  await expect(humidity).toHaveAccessibleName(
+    `${(await humidity.innerText()).replace(/\s+/g, " ").trim()} ${t("registry.sensor_identity", { device: deviceName, sensor: renamed })}`,
+  );
+  await expect(humidity).toHaveAccessibleDescription(
+    t("dashboard.inspect", {
+      measurement: t("metrics.humidity"),
+      value: "52.0",
+      unit: "%",
+      status: t("states.recorded"),
+      sensor: renamed,
+      device: deviceName,
+    }),
+  );
+  await humidity.click();
   await expect(page.locator("#history-heading")).toContainText(renamed);
   await page.reload();
   await expect(page.locator(".dashboard-section > h2")).toHaveText([
@@ -1003,7 +1129,12 @@ test("persistent registration, independent dashboard composition and safe edits"
   const editorAudit = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
-  expect(editorAudit.violations.map((v) => v.id)).toEqual([]);
+  expect(
+    editorAudit.violations.map((v) => ({
+      id: v.id,
+      nodes: v.nodes.map((n) => n.target),
+    })),
+  ).toEqual([]);
   await page
     .getByRole("button", { name: "Save overview", exact: true })
     .click();
@@ -1101,6 +1232,277 @@ test("language selection persists across navigation and server-rendered pages", 
 });
 
 for (const language of ["pt-BR", "en-US"]) {
+  test(`reading names follow visible content and retain context in both layouts ${language}`, async ({
+    page,
+  }) => {
+    setLocale(language);
+    const { snapshot, serve } = await liveWorkspace(page, language);
+    const device = 'Device <one> & "north"';
+    const sensor = 'Sensor <one> & "inside"';
+    snapshot.workspace.devices[0].name = device;
+    snapshot.workspace.sensors[0].name = sensor;
+    const value = language === "pt-BR" ? "24,0" : "24.0";
+    const description = t("dashboard.inspect", {
+      measurement: t("metrics.temperature"),
+      value,
+      unit: "°C",
+      status: t("states.ok"),
+      sensor,
+      device,
+    });
+    for (const sections of [
+      null,
+      [
+        { title: "First", items: [{ kind: "sensor", sensor_id: 1 }] },
+        { title: "Second", items: [{ kind: "sensor", sensor_id: 1 }] },
+      ],
+    ]) {
+      snapshot.workspace.layout.sections = sections;
+      await serve(snapshot);
+      await page.goto("/");
+      await page.locator("html.ready").waitFor();
+      const buttons = page.locator(".reading-button").filter({
+        has: page.getByText(t("metrics.temperature"), { exact: true }),
+      });
+      await expect(buttons).toHaveCount(sections ? 2 : 1);
+      for (const button of await buttons.all()) {
+        await expect(button).toHaveAccessibleDescription(description);
+        const visible = (await button.innerText()).replace(/\s+/g, " ").trim();
+        await expect(button).toHaveAccessibleName(
+          `${visible} ${t("registry.sensor_identity", { device, sensor })}`,
+        );
+        await expect(button).toHaveAccessibleName(
+          new RegExp(value.replace(".", "\\.")),
+        );
+        if (sections) {
+          await expect(button.locator(".reading-history")).toBeVisible();
+          await expect(button).toHaveAccessibleName(
+            new RegExp(t("common.history")),
+          );
+          for (const svg of await button.locator("svg").all())
+            await expect(svg).toHaveAttribute("aria-hidden", "true");
+        }
+        expect(
+          await page
+            .locator(`[id="${await button.getAttribute("aria-describedby")}"]`)
+            .count(),
+        ).toBe(1);
+        await button.focus();
+        await page.keyboard.press("Enter");
+        await expect(page.locator("#history-panel")).toBeVisible();
+        await expect(page.locator("#history-heading")).toBeFocused();
+        await page.keyboard.press("Escape");
+        await expect(page.locator("#history-panel")).not.toBeVisible();
+        await expect(button).toHaveAttribute("aria-pressed", "false");
+        await expect(button).toBeFocused();
+      }
+      expect(await page.locator(".reading-button img").count()).toBe(0);
+      for (const theme of ["light", "dark"]) {
+        await page.evaluate((theme) => {
+          document.documentElement.dataset.theme = theme;
+          window.dispatchEvent(new Event("cajui-theme"));
+        }, theme);
+        const audit = await new AxeBuilder({ page })
+          .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+          .analyze();
+        expect(
+          audit.violations.map((v) => ({
+            id: v.id,
+            nodes: v.nodes.map((n) => n.target),
+          })),
+        ).toEqual([]);
+        if (sections) {
+          await page
+            .getByRole("button", { name: t("dashboard.organize"), exact: true })
+            .click();
+          const editor = page.getByRole("dialog");
+          for (const number of [1, 2]) {
+            const section = editor.getByRole("group", {
+              name: t("layout.section", { number }),
+              exact: true,
+            });
+            for (const key of ["layout.up", "layout.down"]) {
+              const move = section.getByRole("button", {
+                name: t(key),
+                exact: true,
+              });
+              await expect(move).toHaveAccessibleName(t(key));
+              await expect(move).toHaveAccessibleDescription(
+                t("layout.section", { number }),
+              );
+            }
+          }
+          const editorAudit = await new AxeBuilder({ page })
+            .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+            .analyze();
+          expect(
+            editorAudit.violations.map((v) => ({
+              id: v.id,
+              nodes: v.nodes.map((n) => n.target),
+            })),
+          ).toEqual([]);
+          await page.keyboard.press("Escape");
+        }
+      }
+    }
+  });
+  test(`closing history preserves a newer focus choice and the duplicated opener after refresh ${language}`, async ({
+    page,
+  }) => {
+    setLocale(language);
+    await page.clock.install();
+    const { snapshot, serve } = await liveWorkspace(page, language);
+    snapshot.workspace.layout.sections = [
+      { title: "First", items: [{ kind: "sensor", sensor_id: 1 }] },
+      { title: "Second", items: [{ kind: "sensor", sensor_id: 1 }] },
+    ];
+    await serve(snapshot);
+    await page.reload();
+    const buttons = page.locator(".reading-button").filter({
+      has: page.getByText(t("metrics.temperature"), { exact: true }),
+    });
+    await expect(buttons).toHaveCount(2);
+    const first = buttons.first();
+    const second = buttons.nth(1);
+    await first.focus();
+    await page.keyboard.press("Enter");
+    const panel = page.locator("#history-panel");
+    await expect(page.locator("#history-heading")).toBeFocused();
+    await second.evaluate(
+      (button) =>
+        new Promise((resolve) => {
+          const dialog = document.querySelector("#history-panel");
+          dialog.addEventListener("close", () => resolve(), { once: true });
+          dialog.close();
+          button.focus();
+        }),
+    );
+    await expect(panel).not.toBeVisible();
+    await expect(second).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#history-heading")).toBeFocused();
+    const previousID = await second.getAttribute("id");
+    snapshot.samples[0].readings[0].value = 25;
+    snapshot.workspace.sensors[0].measurements[0].value = 25;
+    await serve(snapshot);
+    await page.clock.fastForward(31000);
+    await expect(second).not.toHaveAttribute("id", previousID);
+    await expect(page.locator("#history-value")).toContainText(
+      language === "pt-BR" ? "25,0" : "25.0",
+    );
+    await expect(page.locator("#history-heading")).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(panel).not.toBeVisible();
+    await expect(second).toBeFocused();
+    await expect(first).not.toBeFocused();
+    await expect(second).toHaveAttribute("aria-pressed", "false");
+  });
+  test(`identical readings from different devices have distinct accessible names ${language}`, async ({
+    page,
+  }) => {
+    setLocale(language);
+    const { snapshot, serve } = await liveWorkspace(page, language);
+    const sensor = 'Sensor <same> & "inside"';
+    const devices = ['Device <one> & "north"', 'Device <two> & "south"'];
+    snapshot.workspace.devices[0].name = devices[0];
+    snapshot.workspace.sensors[0].name = sensor;
+    snapshot.devices.push({ ...snapshot.devices[0], device_id: "device-2" });
+    snapshot.samples.push(
+      ...snapshot.samples.map((sample) => ({
+        ...structuredClone(sample),
+        device_id: "device-2",
+      })),
+    );
+    snapshot.workspace.devices.push({
+      ...snapshot.workspace.devices[0],
+      id: 2,
+      device: "device-2",
+      name: devices[1],
+    });
+    snapshot.workspace.sensors.push({
+      ...structuredClone(snapshot.workspace.sensors[0]),
+      id: 3,
+      device_id: 2,
+    });
+    const value = language === "pt-BR" ? "24,0" : "24.0";
+    for (const status of ["ok", "error"]) {
+      for (const sample of snapshot.samples)
+        Object.assign(sample.readings[0], {
+          status,
+          value: status === "ok" ? 24 : null,
+        });
+      for (const registered of snapshot.workspace.sensors.filter(
+        (s) => s.sensor === "sensor-1",
+      ))
+        Object.assign(registered.measurements[0], {
+          status,
+          value: status === "ok" ? 24 : null,
+        });
+      for (const sections of [
+        null,
+        [
+          {
+            title: "Same measurements",
+            items: [
+              { kind: "sensor", sensor_id: 1 },
+              { kind: "sensor", sensor_id: 3 },
+            ],
+          },
+        ],
+      ]) {
+        snapshot.workspace.layout.sections = sections;
+        await serve(snapshot);
+        await page.goto("/");
+        await page.locator("html.ready").waitFor();
+        const buttons = page.locator(".reading-button").filter({
+          has: page.getByText(t("metrics.temperature"), { exact: true }),
+        });
+        await expect(buttons).toHaveCount(2);
+        const visible = (await buttons.first().innerText())
+          .replace(/\s+/g, " ")
+          .trim();
+        expect(
+          (await buttons.nth(1).innerText()).replace(/\s+/g, " ").trim(),
+        ).toBe(visible);
+        const names = devices.map(
+          (device) =>
+            `${visible} ${t("registry.sensor_identity", { device, sensor })}`,
+        );
+        expect(names[0]).not.toBe(names[1]);
+        for (const [index, name] of names.entries()) {
+          await expect(buttons.nth(index)).toHaveAccessibleName(name);
+          await expect(
+            page.getByRole("button", { name, exact: true }),
+          ).toHaveCount(1);
+          await expect(buttons.nth(index)).toHaveAccessibleDescription(
+            t("dashboard.inspect", {
+              measurement: t("metrics.temperature"),
+              value: status === "ok" ? value : "—",
+              unit: "°C",
+              status: t(`states.${status}`),
+              sensor,
+              device: devices[index],
+            }),
+          );
+        }
+        for (const theme of ["light", "dark"]) {
+          await page.evaluate((theme) => {
+            document.documentElement.dataset.theme = theme;
+            window.dispatchEvent(new Event("cajui-theme"));
+          }, theme);
+          const audit = await new AxeBuilder({ page })
+            .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+            .analyze();
+          expect(
+            audit.violations.map((v) => ({
+              id: v.id,
+              nodes: v.nodes.map((n) => n.target),
+            })),
+          ).toEqual([]);
+        }
+      }
+    }
+  });
   test(`localized readings, chart, editor and tablet layout ${language}`, async ({
     page,
   }) => {
