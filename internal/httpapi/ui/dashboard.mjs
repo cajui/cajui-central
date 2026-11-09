@@ -245,7 +245,7 @@ export function mountDashboard(root, { state = {}, notify }) {
   function placeRow(c, g, sensorName) {
     const button = readingButton(c, g);
     button.classList.add("place-row");
-    button.innerHTML = placeRowHTML(
+    button.querySelector("cj-reading").outerHTML = placeRowHTML(
       c,
       g,
       sensorName,
@@ -272,21 +272,23 @@ export function mountDashboard(root, { state = {}, notify }) {
     const button = document.createElement("button");
     button.className = "reading-button";
     button.dataset.channelKey = c.key;
-    button.setAttribute(
-      "aria-label",
-      t("dashboard.inspect", {
-        measurement: c.title,
-        value: formatMeasurement(
-          ["ok", "recorded", "stale"].includes(c.state) ? c.value : null,
-          c.metric,
-          c.unit,
-        ),
-        unit: formatUnit(c.unit),
-        status: states[c.state],
-        sensor: c.sensorName ?? c.sensor,
-        device: g.name,
-      }),
-    );
+    const description = document.createElement("span");
+    description.id = `reading-description-${crypto.randomUUID()}`;
+    description.hidden = true;
+    description.textContent = t("dashboard.inspect", {
+      measurement: c.title,
+      value: formatMeasurement(
+        ["ok", "recorded", "stale"].includes(c.state) ? c.value : null,
+        c.metric,
+        c.unit,
+      ),
+      unit: formatUnit(c.unit),
+      status: states[c.state],
+      sensor: c.sensorName ?? c.sensor,
+      device: g.name,
+    });
+    button.setAttribute("aria-describedby", description.id);
+    button.append(description);
     button.setAttribute("aria-pressed", String(c.key === selected));
     const reading = document.createElement("cj-reading");
     reading.data = c;

@@ -209,7 +209,7 @@ workspace. The application must remain on loopback.
 
 ## Frontend development checks
 
-Development tests use Node 22 and Python 3 for the reference server; neither is a runtime dependency. With an isolated Central
+Development tests use Node 22.12.0 or newer and Python 3 for the reference server; neither is a runtime dependency. With an isolated Central
 instance running on `127.0.0.1:8091` (or `CAJUI_UI_TEST_URL`):
 
 ```sh

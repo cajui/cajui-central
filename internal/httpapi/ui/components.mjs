@@ -65,12 +65,12 @@ class Sensor extends Component {
     );
     const kind = metricIcon(d.metric ?? this.getAttribute("metric"));
     this.innerHTML = `<article class="card sensor-card" data-kind="${kind}" data-state="${e(state)}">
-      <div class="sensor-heading"><span class="metric-icon">${icon(kind)}</span><div><h3 class="card-title">${e(d.title ?? this.getAttribute("label") ?? t("common.measurement"))}</h3><p class="card-context">${e(d.context ?? this.getAttribute("context") ?? t("components.no_sensor"))}</p></div></div>
+      <div class="sensor-heading"><span class="metric-icon">${icon(kind)}</span><div><h3 class="card-title">${e(d.title ?? this.getAttribute("label") ?? t("common.measurement"))}</h3> <p class="card-context">${e(d.context ?? this.getAttribute("context") ?? t("components.no_sensor"))}</p></div></div>
       <p class="measurement">${formatMeasurement(value, d.metric ?? this.getAttribute("metric"), d.unit ?? this.getAttribute("unit"))}<span class="unit">${e(formatUnit(d.unit ?? this.getAttribute("unit")))}</span></p>
       ${spark ? `<svg class="spark" viewBox="0 0 180 32" preserveAspectRatio="none" aria-hidden="true"><path d="${spark.path}" transform="translate(0 2)"/></svg>` : ""}
-      <div class="sensor-status">${quiet(state) ? "" : `<cj-badge state="${e(state)}"></cj-badge>`}<span class="reading-age">${e(d.updated ?? this.getAttribute("updated") ?? t("age.unknown"))}</span></div>
+      <div class="sensor-status">${quiet(state) ? "" : `<cj-badge state="${e(state)}"></cj-badge> `}<span class="reading-age">${e(d.updated ?? this.getAttribute("updated") ?? t("age.unknown"))}</span></div>
       ${state === "ok" ? "" : `<p class="reading-note">${e(iconText(state))}</p>`}
-      <span class="sensor-action" aria-hidden="true">${t("components.view_history")} ${icon("arrow")}</span>
+      <span class="sensor-action">${t("components.view_history")} ${icon("arrow")}</span>
     </article>`;
   }
 }
@@ -104,7 +104,7 @@ class Reading extends Component {
       <p class="measurement">${formatMeasurement(value, d.metric, d.unit)}<span class="unit">${e(formatUnit(d.unit))}</span></p>
       <div class="reading-quality">${quiet(state) ? "" : `<cj-badge state="${state}"></cj-badge>`}<span class="reading-age">${e(d.updated ?? t("age.unknown"))}</span></div>
       ${["ok", "recorded"].includes(state) ? "" : `<p class="reading-note">${e(iconText(state))}</p>`}
-      <span class="reading-history" aria-hidden="true">${t("common.history")} ${icon("arrow")}</span></div>`;
+      <span class="reading-history">${t("common.history")} ${icon("arrow")}</span></div>`;
   }
 }
 class Battery extends Component {
