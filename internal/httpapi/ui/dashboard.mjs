@@ -251,6 +251,14 @@ export function mountDashboard(root, { state = {}, notify }) {
       sensorName,
       Date.parse(snapshot.generated_at),
     );
+    const labels = [...button.querySelectorAll(".row-label, .row-value")];
+    labels.forEach((label, index) => {
+      label.id = `${button.id}-label-${index}`;
+    });
+    button.setAttribute(
+      "aria-labelledby",
+      [...labels.map((label) => label.id), `${button.id}-context`].join(" "),
+    );
     return button;
   }
   function renderAttention() {
@@ -287,10 +295,20 @@ export function mountDashboard(root, { state = {}, notify }) {
       sensor: c.sensorName ?? c.sensor,
       device: g.name,
     });
+    button.id = `reading-${crypto.randomUUID()}`;
+    const context = document.createElement("span");
+    context.id = `${button.id}-context`;
+    context.hidden = true;
+    context.textContent = t("registry.sensor_identity", {
+      sensor: c.sensorName ?? c.sensor,
+      device: g.name,
+    });
     button.setAttribute("aria-describedby", description.id);
-    button.append(description);
+    button.append(description, context);
     button.setAttribute("aria-pressed", String(c.key === selected));
     const reading = document.createElement("cj-reading");
+    reading.id = `${button.id}-content`;
+    button.setAttribute("aria-labelledby", `${reading.id} ${context.id}`);
     reading.data = c;
     button.append(reading);
     button.addEventListener("click", () =>

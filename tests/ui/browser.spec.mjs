@@ -559,7 +559,9 @@ test("live data keeps refreshing while a chart or dialog is open", async ({
   await serve(next);
   await page.clock.fastForward(31000);
   await expect(reading).toHaveAccessibleName(
-    new RegExp(`^${t("metrics.humidity")}\\s*Sensor 1\\s*71\\.0\\s*%$`),
+    new RegExp(
+      `^${t("metrics.humidity")}\\s*Sensor 1\\s*71\\.0\\s*% ${t("registry.sensor_identity", { device: "Device 1", sensor: "Sensor 1" })}`,
+    ),
   );
   await expect(reading).toHaveAccessibleDescription(
     t("dashboard.inspect", {
@@ -586,7 +588,9 @@ test("live data keeps refreshing while a chart or dialog is open", async ({
   await serve(next);
   await page.clock.fastForward(31000);
   await expect(reading).toHaveAccessibleName(
-    new RegExp(`^${t("metrics.humidity")}\\s*Sensor 1\\s*72\\.0\\s*%$`),
+    new RegExp(
+      `^${t("metrics.humidity")}\\s*Sensor 1\\s*72\\.0\\s*% ${t("registry.sensor_identity", { device: "Device 1", sensor: "Sensor 1" })}`,
+    ),
   );
   await expect(reading).toHaveAccessibleDescription(
     t("dashboard.inspect", {
@@ -607,7 +611,9 @@ test("live data keeps refreshing while a chart or dialog is open", async ({
   await serve(next);
   await page.clock.fastForward(31000);
   await expect(reading).toHaveAccessibleName(
-    new RegExp(`^${t("metrics.humidity")}\\s*Sensor 1\\s*73\\.0\\s*%$`),
+    new RegExp(
+      `^${t("metrics.humidity")}\\s*Sensor 1\\s*73\\.0\\s*% ${t("registry.sensor_identity", { device: "Device 1", sensor: "Sensor 1" })}`,
+    ),
   );
   await expect(reading).toHaveAccessibleDescription(
     t("dashboard.inspect", {
@@ -651,7 +657,7 @@ for (const width of [390, 820, 1440]) {
     await page
       .getByRole("button", {
         name: new RegExp(
-          `^${t("metrics.humidity")}\\s*Sensor 1\\s*60\\.0\\s*%$`,
+          `^${t("metrics.humidity")}\\s*Sensor 1\\s*60\\.0\\s*% ${t("registry.sensor_identity", { device: "Device 1", sensor: "Sensor 1" })}`,
         ),
       })
       .click();
@@ -760,7 +766,9 @@ test("known measurements keep their decimals on every screen", async ({
   const { snapshot, serve } = await liveWorkspace(page);
   const button = page.locator(".reading-button").first();
   await expect(button).toHaveAccessibleName(
-    new RegExp(`^${t("metrics.temperature")}\\s*Sensor 1\\s*24\\.0\\s*°C$`),
+    new RegExp(
+      `^${t("metrics.temperature")}\\s*Sensor 1\\s*24\\.0\\s*°C ${t("registry.sensor_identity", { device: "Device 1", sensor: "Sensor 1" })}`,
+    ),
   );
   await expect(button).toHaveAccessibleDescription(
     t("dashboard.inspect", {
@@ -1062,9 +1070,12 @@ test("persistent registration, independent dashboard composition and safe edits"
   await expect(page.locator("#app img")).toHaveCount(0);
   const humidity = page.getByRole("button", {
     name: new RegExp(
-      `^${t("metrics.humidity")}\\s*52\\.0\\s*%.*${t("common.history")}$`,
+      `^${t("metrics.humidity")}\\s*52\\.0\\s*%.*${t("common.history")} `,
     ),
   });
+  await expect(humidity).toHaveAccessibleName(
+    `${(await humidity.innerText()).replace(/\s+/g, " ").trim()} ${t("registry.sensor_identity", { device: deviceName, sensor: renamed })}`,
+  );
   await expect(humidity).toHaveAccessibleDescription(
     t("dashboard.inspect", {
       measurement: t("metrics.humidity"),
@@ -1257,7 +1268,9 @@ for (const language of ["pt-BR", "en-US"]) {
       for (const button of await buttons.all()) {
         await expect(button).toHaveAccessibleDescription(description);
         const visible = (await button.innerText()).replace(/\s+/g, " ").trim();
-        await expect(button).toHaveAccessibleName(visible);
+        await expect(button).toHaveAccessibleName(
+          `${visible} ${t("registry.sensor_identity", { device, sensor })}`,
+        );
         await expect(button).toHaveAccessibleName(
           new RegExp(value.replace(".", "\\.")),
         );
@@ -1326,6 +1339,112 @@ for (const language of ["pt-BR", "en-US"]) {
             })),
           ).toEqual([]);
           await page.keyboard.press("Escape");
+        }
+      }
+    }
+  });
+  test(`identical readings from different devices have distinct accessible names ${language}`, async ({
+    page,
+  }) => {
+    setLocale(language);
+    const { snapshot, serve } = await liveWorkspace(page, language);
+    const sensor = 'Sensor <same> & "inside"';
+    const devices = ['Device <one> & "north"', 'Device <two> & "south"'];
+    snapshot.workspace.devices[0].name = devices[0];
+    snapshot.workspace.sensors[0].name = sensor;
+    snapshot.devices.push({ ...snapshot.devices[0], device_id: "device-2" });
+    snapshot.samples.push(
+      ...snapshot.samples.map((sample) => ({
+        ...structuredClone(sample),
+        device_id: "device-2",
+      })),
+    );
+    snapshot.workspace.devices.push({
+      ...snapshot.workspace.devices[0],
+      id: 2,
+      device: "device-2",
+      name: devices[1],
+    });
+    snapshot.workspace.sensors.push({
+      ...structuredClone(snapshot.workspace.sensors[0]),
+      id: 3,
+      device_id: 2,
+    });
+    const value = language === "pt-BR" ? "24,0" : "24.0";
+    for (const status of ["ok", "error"]) {
+      for (const sample of snapshot.samples)
+        Object.assign(sample.readings[0], {
+          status,
+          value: status === "ok" ? 24 : null,
+        });
+      for (const registered of snapshot.workspace.sensors.filter(
+        (s) => s.sensor === "sensor-1",
+      ))
+        Object.assign(registered.measurements[0], {
+          status,
+          value: status === "ok" ? 24 : null,
+        });
+      for (const sections of [
+        null,
+        [
+          {
+            title: "Same measurements",
+            items: [
+              { kind: "sensor", sensor_id: 1 },
+              { kind: "sensor", sensor_id: 3 },
+            ],
+          },
+        ],
+      ]) {
+        snapshot.workspace.layout.sections = sections;
+        await serve(snapshot);
+        await page.goto("/");
+        await page.locator("html.ready").waitFor();
+        const buttons = page.locator(".reading-button").filter({
+          has: page.getByText(t("metrics.temperature"), { exact: true }),
+        });
+        await expect(buttons).toHaveCount(2);
+        const visible = (await buttons.first().innerText())
+          .replace(/\s+/g, " ")
+          .trim();
+        expect(
+          (await buttons.nth(1).innerText()).replace(/\s+/g, " ").trim(),
+        ).toBe(visible);
+        const names = devices.map(
+          (device) =>
+            `${visible} ${t("registry.sensor_identity", { device, sensor })}`,
+        );
+        expect(names[0]).not.toBe(names[1]);
+        for (const [index, name] of names.entries()) {
+          await expect(buttons.nth(index)).toHaveAccessibleName(name);
+          await expect(
+            page.getByRole("button", { name, exact: true }),
+          ).toHaveCount(1);
+          await expect(buttons.nth(index)).toHaveAccessibleDescription(
+            t("dashboard.inspect", {
+              measurement: t("metrics.temperature"),
+              value: status === "ok" ? value : "—",
+              unit: "°C",
+              status: t(`states.${status}`),
+              sensor,
+              device: devices[index],
+            }),
+          );
+        }
+        for (const theme of ["light", "dark"]) {
+          await page.evaluate((theme) => {
+            document.documentElement.dataset.theme = theme;
+            window.dispatchEvent(new Event("cajui-theme"));
+          }, theme);
+          const audit = await new AxeBuilder({ page })
+            .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+            .analyze();
+          expect(
+            audit.violations.map((v) => ({
+              id: v.id,
+              nodes: v.nodes.map((n) => n.target),
+            })),
+          ).toEqual([]);
         }
       }
     }

@@ -102,7 +102,7 @@ class Reading extends Component {
     this.innerHTML = `<div class="reading-tile" data-kind="${kind}" data-state="${state}">
       <div class="reading-heading"><span class="metric-icon">${icon(kind)}</span><span class="reading-title">${e(d.title ?? t("common.measurement"))}</span></div>
       <p class="measurement">${formatMeasurement(value, d.metric, d.unit)}<span class="unit">${e(formatUnit(d.unit))}</span></p>
-      <div class="reading-quality">${quiet(state) ? "" : `<cj-badge state="${state}"></cj-badge>`}<span class="reading-age">${e(d.updated ?? t("age.unknown"))}</span></div>
+      <div class="reading-quality">${quiet(state) ? "" : `<cj-badge state="${state}"></cj-badge> `}<span class="reading-age">${e(d.updated ?? t("age.unknown"))}</span></div>
       ${["ok", "recorded"].includes(state) ? "" : `<p class="reading-note">${e(iconText(state))}</p>`}
       <span class="reading-history">${t("common.history")} ${icon("arrow")}</span></div>`;
   }
