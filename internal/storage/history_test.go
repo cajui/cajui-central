@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -271,34 +272,134 @@ func TestHistoryReadersDoNotBlockIngestionOrHealth(t *testing.T) {
 	}
 }
 
+func assertSQLiteIntegrity(t *testing.T, db *sql.DB) {
+	t.Helper()
+	var integrity string
+	if err := db.QueryRow(`PRAGMA integrity_check`).Scan(&integrity); err != nil || integrity != "ok" {
+		t.Fatal("database integrity", integrity, err)
+	}
+	rows, err := db.Query(`PRAGMA foreign_key_check`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		t.Fatal("foreign key violation")
+	}
+	if err = rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestHistorySchemaEightUpgradeAndConstraints(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "db")
 	s, e := Open(path)
 	if e != nil {
 		t.Fatal(e)
 	}
+	defer s.Close()
 	sample := sampleFixture(t)
-	at := time.Now()
-	if _, e = s.InsertSample(context.Background(), sample, at); e != nil {
-		t.Fatal(e)
+	at := time.Date(2026, 1, 10, 12, 0, 0, 123456789, time.UTC)
+	for i, status := range []string{"ok", "ok", "error", "skipped"} {
+		sample.SampleID = fmt.Sprint(i)
+		sample.DeviceID = fmt.Sprintf("demo-device-%d", i%2)
+		value := float64(i)
+		sample.Readings[0].Value = &value
+		sample.Readings[0].Status = status
+		if status != "ok" {
+			sample.Readings[0].Value = nil
+		}
+		if _, e = s.InsertSample(context.Background(), sample, at.Add(time.Duration(i)*time.Second)); e != nil {
+			t.Fatal(e)
+		}
 	}
 	if _, e = s.Insert(context.Background(), telemetry.Reading{NodeID: "http", SensorID: "probe", SessionID: "boot", Metric: "temperature", Unit: "degC", Value: 12}, at); e != nil {
 		t.Fatal(e)
 	}
 	var count, maxID int
-	s.db.QueryRow(`SELECT COUNT(*),MAX(id) FROM measurement_history`).Scan(&count, &maxID)
+	if e = s.db.QueryRow(`SELECT COUNT(*),MAX(id) FROM measurement_history`).Scan(&count, &maxID); e != nil {
+		t.Fatal(e)
+	}
 	_, e = s.db.Exec(`UPDATE workspace_devices SET name='Preserved',archived=1;
  CREATE TABLE old_history AS SELECT id,sensor_id,metric,unit,received_ms,received_at,value,status,interval FROM measurement_history;
  DROP TABLE measurement_history; ALTER TABLE old_history RENAME TO measurement_history; PRAGMA user_version=8;`)
 	if e != nil {
 		t.Fatal(e)
 	}
-	s.Close()
-	s, e = Open(path)
+	snapshot := func(db *sql.DB) map[string][][]any {
+		t.Helper()
+		queries := []string{
+			`SELECT * FROM readings ORDER BY id`,
+			`SELECT * FROM samples ORDER BY id`,
+			`SELECT * FROM workspace_devices ORDER BY id`,
+			`SELECT * FROM workspace_sensors ORDER BY id`,
+			`SELECT * FROM workspace_measurements ORDER BY sensor_id,metric`,
+			`SELECT * FROM workspace_layout ORDER BY id`,
+			`SELECT sensor_id,metric,unit,received_ms,received_at,value,status,interval FROM measurement_history ORDER BY sensor_id,metric,received_ms`,
+		}
+		result := make(map[string][][]any)
+		for _, query := range queries {
+			rows, err := db.Query(query)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer rows.Close()
+			columns, err := rows.Columns()
+			if err != nil {
+				t.Fatal(err)
+			}
+			for rows.Next() {
+				values := make([]any, len(columns))
+				dest := make([]any, len(columns))
+				for i := range values {
+					dest[i] = &values[i]
+				}
+				if err = rows.Scan(dest...); err != nil {
+					t.Fatal(err)
+				}
+				result[query] = append(result[query], values)
+			}
+			if err = rows.Err(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return result
+	}
+	before := snapshot(s.db)
+	backupPath := filepath.Join(t.TempDir(), "backup.db")
+	if _, e = s.db.Exec(`VACUUM INTO ?`, backupPath); e != nil {
+		t.Fatal(e)
+	}
+	if e = s.Close(); e != nil {
+		t.Fatal(e)
+	}
+	backup, e := sql.Open("sqlite", backupPath)
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer s.Close()
+	defer backup.Close()
+	for i := 0; i < 2; i++ {
+		s, e = Open(path)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer s.Close()
+		for _, db := range []*sql.DB{s.db, backup} {
+			if after := snapshot(db); !reflect.DeepEqual(before, after) {
+				t.Fatalf("migration, reopen or backup changed persisted data: before=%v after=%v", before, after)
+			}
+			assertSQLiteIntegrity(t, db)
+		}
+		var backupVersion int
+		if e = backup.QueryRow(`PRAGMA user_version`).Scan(&backupVersion); e != nil || backupVersion != 8 {
+			t.Fatal("backup schema changed", backupVersion, e)
+		}
+		if i == 0 {
+			if e = s.Close(); e != nil {
+				t.Fatal(e)
+			}
+		}
+	}
 	var got, minID, version int
 	s.db.QueryRow(`SELECT COUNT(*),MIN(id) FROM measurement_history`).Scan(&got, &minID)
 	s.db.QueryRow(`PRAGMA user_version`).Scan(&version)
@@ -388,6 +489,53 @@ func TestHistorySchemaEightFailurePreservesPreviousProjection(t *testing.T) {
 	if count != before || version != 8 {
 		t.Fatal(count, before, version)
 	}
+}
+
+func TestHistoryReaderReplacementPreservesPragmas(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	at := time.Date(2026, 1, 10, 12, 0, 0, 0, time.UTC)
+	sample := sampleFixture(t)
+	if _, err := s.InsertSample(ctx, sample, at); err != nil {
+		t.Fatal(err)
+	}
+	conn, err := s.historyDB.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	blocked, cancel := context.WithTimeout(ctx, 20*time.Millisecond)
+	defer cancel()
+	var count int64
+	err = conn.QueryRowContext(blocked, `WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<1000000000) SELECT sum(x) FROM n`).Scan(&count)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("query ignored cancellation", err)
+	}
+	if err = conn.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s.historyDB.SetMaxIdleConns(0)
+	s.historyDB.SetMaxIdleConns(2)
+	for i := 0; i < 2; i++ {
+		replacement, err := s.historyDB.Conn(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer replacement.Close()
+		for pragma, want := range map[string]int{"query_only": 1, "busy_timeout": 5000} {
+			var got int
+			if err = replacement.QueryRowContext(ctx, `PRAGMA `+pragma).Scan(&got); err != nil || got != want {
+				t.Fatal(pragma, got, err)
+			}
+		}
+		if _, err = replacement.ExecContext(ctx, `DELETE FROM measurement_history`); err == nil {
+			t.Fatal("replacement reader accepted a write")
+		}
+	}
+	if err = s.db.QueryRow(`SELECT COUNT(*) FROM measurement_history`).Scan(&count); err != nil || count != int64(len(sample.Readings)) {
+		t.Fatal("cancellation changed history", count, err)
+	}
+	assertSQLiteIntegrity(t, s.db)
 }
 
 func TestHistoryDoesNotAcquireWriterConnection(t *testing.T) {
