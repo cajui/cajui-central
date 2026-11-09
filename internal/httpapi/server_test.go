@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/cajui/cajui-central/internal/devicestate"
+	"github.com/cajui/cajui-central/internal/history"
 	"github.com/cajui/cajui-central/internal/storage"
 	"github.com/cajui/cajui-central/internal/telemetry"
 	"github.com/cajui/cajui-central/internal/workspace"
@@ -250,4 +251,8 @@ func TestConnectionsSSRMarksCurrentPage(t *testing.T) {
 			t.Fatal("missing SSR current page", path)
 		}
 	}
+}
+
+func (brokenRepo) History(context.Context, history.Query, bool) (history.Result, error) {
+	return history.Result{}, errors.New("broken history")
 }

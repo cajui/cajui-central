@@ -20,6 +20,10 @@ const paths = {
   soil: '<path d="M3 20h18M12 20V9M12 14C6 14 5 8 5 6c6 0 7 3 7 8Zm0-5c0-5 3-7 7-7 0 4-2 7-7 7Z"/>',
   alert:
     '<path d="m10.3 4-8 14a2 2 0 0 0 1.7 3h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0Z"/><path d="M12 9v5m0 3h.01"/>',
+  offline:
+    '<path d="m3 3 18 18M8.5 8.5A12 12 0 0 1 21 9M3 9a12 12 0 0 1 2.5-1.7M6 12a8 8 0 0 1 2-1.2m4-.8a8 8 0 0 1 6 2M9 15a4 4 0 0 1 5.5-.4M12 19h.01"/>',
+  critical:
+    '<path d="M8 3h8l5 5v8l-5 5H8l-5-5V8Z"/><path d="M12 7v6m0 4h.01"/>',
   check: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
   arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
@@ -58,3 +62,15 @@ const metricIcons = {
 };
 export const metricIcon = (metric) =>
   Object.hasOwn(metricIcons, metric) ? metricIcons[metric] : "device";
+
+const statusIcons = {
+  stale: "clock",
+  warning: "alert",
+  error: "alert",
+  skipped: "clock",
+  network: "offline",
+  critical: "critical",
+};
+export function statusIcon(state) {
+  return Object.hasOwn(statusIcons, state) ? icon(statusIcons[state]) : "";
+}

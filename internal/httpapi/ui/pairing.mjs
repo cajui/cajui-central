@@ -1,5 +1,5 @@
 import { t } from "./i18n.mjs";
-import { icon } from "./icons.mjs";
+import { icon, statusIcon } from "./icons.mjs";
 import {
   escapeHTML as e,
   formatMeasurement,
@@ -125,7 +125,7 @@ export function pairingSection(snapshot, act, progress = new Map()) {
     ];
     section.insertAdjacentHTML(
       "beforeend",
-      `<p class="pairing-via">${e(t("registry.pairing.via", { receiver: receiverLabel(r.device_id) }))}<span class="badge" data-state="${badge}">${e(t(`receivers.${status}`))}</span></p>`,
+      `<p class="pairing-via">${e(t("registry.pairing.via", { receiver: receiverLabel(r.device_id) }))}<span class="badge" data-state="${badge}">${statusIcon(badge)}${e(t(`receivers.${status}`))}</span></p>`,
     );
     const target = { source_id: r.source_id, device_id: r.device_id };
     if (status !== "online") {

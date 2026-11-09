@@ -7,7 +7,7 @@ import {
   plotGeometry,
   states,
 } from "./model.mjs";
-import { icon } from "./icons.mjs";
+import { icon, statusIcon } from "./icons.mjs";
 
 // The markup of the overview, shared by the page and the components reference so the
 // reference shows exactly what the page draws. Events and focus belong to the page.
@@ -29,20 +29,20 @@ export function summaryHTML(items, devices) {
         .filter(count)
         .map(
           (severity) =>
-            `<span class="badge" data-state="${severity}">${e(states[severity])} · ${count(severity)}</span>`,
+            `<span class="badge" data-state="${severity}">${statusIcon(severity)}${e(states[severity])} · ${count(severity)}</span>`,
         )
         .join("")}</span>`
     : `<p class="overview-headline">${devices ? t("overview.all_clear") : t("common.waiting")}</p><span class="muted">${t("counts.devices", { count: devices })}</span>`;
 }
 
 export function attentionItemHTML(item) {
-  return `<li data-severity="${item.severity}"><span class="badge" data-state="${item.severity}">${e(states[item.severity])}</span><div class="attention-text"><strong>${item.href ? `<a href="${e(item.href)}">${e(item.title)}</a>` : e(item.title)}</strong>${item.detail ? `<span>${e(item.detail)}</span>` : ""}</div><span class="attention-since">${e(item.since)}</span></li>`;
+  return `<li data-severity="${item.severity}"><span class="badge" data-state="${item.severity}">${statusIcon(item.severity)}${e(states[item.severity])}</span><div class="attention-text"><strong>${item.href ? `<a href="${e(item.href)}">${e(item.title)}</a>` : e(item.title)}</strong>${item.detail ? `<span>${e(item.detail)}</span>` : ""}</div><span class="attention-since">${e(item.since)}</span></li>`;
 }
 
 // A place's heading and its own problems; the rows go between them. Heading levels
 // follow the page that embeds them.
 export function placeHTML(group, notes, now, level = 3) {
-  return `<header class="place-head"><div><h${level}>${e(group.name)}</h${level}><p class="muted">${group.location ? `${e(group.location)} · ` : ""}${e(t("overview.last_reading", { age: age(group.at, now).toLowerCase() }))}</p></div><button class="text-button" data-details="${e(`${group.source}/${group.device}`)}" aria-label="${e(t("dashboard.details_for", { name: group.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></header><div class="place-rows"></div>${notes.length ? `<ul class="place-notes">${notes.map((item) => `<li><span class="badge" data-state="${item.severity}">${e(item.short)}</span></li>`).join("")}</ul>` : ""}`;
+  return `<header class="place-head"><div><h${level}>${e(group.name)}</h${level}><p class="muted">${group.location ? `${e(group.location)} · ` : ""}${e(t("overview.last_reading", { age: age(group.at, now).toLowerCase() }))}</p></div><button class="text-button" data-details="${e(`${group.source}/${group.device}`)}" aria-label="${e(t("dashboard.details_for", { name: group.name }))}">${t("dashboard.details_short")}${icon("arrow")}</button></header><div class="place-rows"></div>${notes.length ? `<ul class="place-notes">${notes.map((item) => `<li><span class="badge" data-state="${item.severity}">${statusIcon(item.severity)}${e(item.short)}</span></li>`).join("")}</ul>` : ""}`;
 }
 
 export function placesHeadingHTML(level = 2) {
