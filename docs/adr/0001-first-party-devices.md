@@ -6,7 +6,7 @@
 ## Context
 
 Central was built as a hardware-agnostic dashboard: it knows only the identities and
-metrics carried by the [telemetry contract](../../README.md#wire-contract-version-1). As
+metrics carried by the [telemetry contract](../mqtt.md#wire-contract-version-1). As
 a result it asks users for what the devices already know. Sensors are registered by hand,
 units and ranges are generic, a failed reading is reported without a likely cause, and
 setting up a receiver means generating a producer credential with

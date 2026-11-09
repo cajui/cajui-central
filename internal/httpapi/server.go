@@ -18,11 +18,13 @@ import (
 
 	"github.com/cajui/cajui-central/internal/commands"
 	"github.com/cajui/cajui-central/internal/devicestate"
+	"github.com/cajui/cajui-central/internal/history"
 	"github.com/cajui/cajui-central/internal/telemetry"
 	"github.com/cajui/cajui-central/internal/workspace"
 )
 
 type Repository interface {
+	History(context.Context, history.Query, bool) (history.Result, error)
 	Catalog(context.Context) (workspace.Catalog, error)
 	SaveDevice(context.Context, int64, workspace.Settings) error
 	ArchiveDevice(context.Context, int64, int64) error
@@ -49,12 +51,13 @@ type server struct {
 	token   [32]byte
 	logger  *slog.Logger
 	// Nil when MQTT is not configured: commands then answer 503.
-	publisher      commands.Publisher
-	broker         BrokerObserver
-	receiverSetup  ReceiverSetup
-	stateStreams   chan struct{}
-	commandContext context.Context
-	commandTimeout time.Duration
+	publisher       commands.Publisher
+	broker          BrokerObserver
+	receiverSetup   ReceiverSetup
+	stateStreams    chan struct{}
+	historyRequests chan struct{}
+	commandContext  context.Context
+	commandTimeout  time.Duration
 }
 
 func New(repo Repository, token string, logger *slog.Logger, options ...Option) (http.Handler, error) {
@@ -64,7 +67,7 @@ func New(repo Repository, token string, logger *slog.Logger, options ...Option) 
 	if logger == nil {
 		logger = slog.Default()
 	}
-	s := &server{repo: repo, token: sha256.Sum256([]byte(token)), logger: logger, uiToken: rand.Text(), stateStreams: make(chan struct{}, 16), commandContext: context.Background(), commandTimeout: 12 * time.Second}
+	s := &server{repo: repo, token: sha256.Sum256([]byte(token)), logger: logger, uiToken: rand.Text(), stateStreams: make(chan struct{}, 16), historyRequests: make(chan struct{}, 2), commandContext: context.Background(), commandTimeout: 12 * time.Second}
 	for _, option := range options {
 		option(s)
 	}
@@ -76,6 +79,7 @@ func New(repo Repository, token string, logger *slog.Logger, options ...Option) 
 	mux.HandleFunc("GET /receivers", s.localPage(s.index))
 	mux.HandleFunc("GET /broker", s.localPage(s.index))
 	mux.HandleFunc("GET /ui-api/broker", s.brokerStatus)
+	mux.HandleFunc("GET /ui-api/history", s.measurementHistory)
 	mux.HandleFunc("GET /ui-api/receiver-states", s.receiverStates)
 	mux.HandleFunc("GET /ui-api/device-states", s.localDeviceStates)
 	mux.HandleFunc("GET /ui-api/device-states/events", s.deviceStateEvents)

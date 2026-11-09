@@ -209,7 +209,8 @@ export function plotGeometry(
       previous = p.time;
       continue;
     }
-    if (previous !== null && p.time - previous > gap) open = false;
+    if (p.break_before || (previous !== null && p.time - previous > gap))
+      open = false;
     path += `${open ? "L" : "M"}${x(p.time).toFixed(2)},${y(p.value).toFixed(2)} `;
     open = true;
     previous = p.time;
