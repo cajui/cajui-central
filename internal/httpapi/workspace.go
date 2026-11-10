@@ -98,12 +98,15 @@ func (s *server) editWorkspace(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid item", 400)
 			return
 		}
-		var settings workspace.Settings
-		err = decode(&settings)
-		if err == nil {
-			if kind == "devices" {
+		if kind == "devices" {
+			var settings workspace.Settings
+			if err = decode(&settings); err == nil {
 				err = s.repo.SaveDevice(r.Context(), id, settings)
-			} else {
+			}
+		} else {
+			// A sensor's settings are replaced as a whole: an omitted type is generic.
+			var settings workspace.SensorSettings
+			if err = decode(&settings); err == nil {
 				err = s.repo.SaveSensor(r.Context(), id, settings)
 			}
 		}

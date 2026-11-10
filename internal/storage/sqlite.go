@@ -62,7 +62,7 @@ func (s *Store) migrate() error {
 	if err = tx.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return err
 	}
-	if version > 9 {
+	if version > 10 {
 		return fmt.Errorf("unsupported schema version %d", version)
 	}
 	if version == 0 {
@@ -114,8 +114,9 @@ PRAGMA user_version=7;`); err != nil {
 			return err
 		}
 	}
-	// Backfill writes through observe, which uses the newest workspace columns, so it
-	// runs once the whole schema is in place.
+	// Backfill writes through observe, which uses the workspace columns up to schema 7, so
+	// it runs after them. Schema 10's columns have defaults that observe leaves alone; a
+	// column observe writes must be added before this point.
 	if version < 3 {
 		if err = backfillWorkspace(tx); err != nil {
 			return err
@@ -140,6 +141,11 @@ PRAGMA user_version=7;`); err != nil {
 			}
 		}
 		if err = backfillHistory(tx); err != nil {
+			return err
+		}
+	}
+	if version < 10 {
+		if _, err = tx.Exec(sensorTypeSchema); err != nil {
 			return err
 		}
 	}

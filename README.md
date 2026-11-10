@@ -26,6 +26,8 @@ project's reference transmitters.
 - Bring the measurements of every device and sensor, such as temperature and
   humidity, together on one dashboard.
 - Name devices and sensors, assign locations, and choose which measurements to show.
+- Say what is wired to an analog input. A capacitive soil moisture probe is calibrated
+  in two steps from its own readings and shown as a level; its stored voltage is kept.
 - Open history charts and browse original readings by date, including periods longer
   than 24 hours. Data has no automatic age-based deletion.
 - Distinguish a sensor error from a device that stopped reporting. Inspect receiver
@@ -106,7 +108,7 @@ and [Home Assistant integration](docs/mqtt.md#home-assistant-without-central).
 | Organize the dashboard and understand history and status | [Interface guide](docs/interface.md) |
 | Connect MQTT producers or Home Assistant | [MQTT and delivery contracts](docs/mqtt.md) |
 | Send readings over HTTP | [HTTP API](docs/http-api.md) |
-| Understand storage and design decisions | [Architecture decisions](docs/adr/0001-first-party-devices.md) · [History storage](docs/adr/0003-persisted-measurement-history.md) |
+| Understand storage and design decisions | [Architecture decisions](docs/adr/0001-first-party-devices.md) · [History storage](docs/adr/0003-persisted-measurement-history.md) · [Sensor types](docs/adr/0004-sensor-types.md) |
 | Build and test changes | [Development](docs/development.md) · [Browser checks](docs/interface.md#frontend-development-checks) |
 | Work on visual design or translations | [Brand and components](docs/brand/README.md) · [Localization](docs/localization.md) |
 

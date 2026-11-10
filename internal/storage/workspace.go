@@ -35,6 +35,17 @@ const archiveSchema = `
 ALTER TABLE workspace_devices ADD COLUMN archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0,1));
 PRAGMA user_version=6;`
 
+// What is connected to a sensor's input and the two raw readings that calibrate it
+// (ADR 0004). The workspace package validates the type: a CHECK listing the types would
+// need a table rebuild for each one added.
+const sensorTypeSchema = `
+ALTER TABLE workspace_sensors ADD COLUMN type TEXT NOT NULL DEFAULT '';
+ALTER TABLE workspace_sensors ADD COLUMN calibration_zero REAL;
+ALTER TABLE workspace_sensors ADD COLUMN calibration_full REAL CHECK(
+ (type!='' OR (calibration_zero IS NULL AND calibration_full IS NULL)) AND
+ (calibration_zero IS NULL OR calibration_full IS NULL OR calibration_zero!=calibration_full));
+PRAGMA user_version=10;`
+
 // Observation and telemetry share a transaction, so retries cannot refresh inventory.
 func observe(ctx context.Context, tx *sql.Tx, transport, source, device string, readings []telemetry.Measurement, at time.Time, interval int) error {
 	return observeWithHistory(ctx, tx, transport, source, device, readings, at, interval, historyOrigin{})
@@ -98,14 +109,14 @@ func (s *Store) Catalog(ctx context.Context) (workspace.Catalog, error) {
 	if err != nil {
 		return c, err
 	}
-	rows, err = tx.QueryContext(ctx, `SELECT s.id,s.device_id,s.sensor,s.name,s.location,s.revision FROM workspace_sensors s JOIN workspace_devices d ON d.id=s.device_id WHERE d.archived=0 AND s.archived=0 ORDER BY s.id`)
+	rows, err = tx.QueryContext(ctx, `SELECT s.id,s.device_id,s.sensor,s.name,s.location,s.revision,s.type,s.calibration_zero,s.calibration_full FROM workspace_sensors s JOIN workspace_devices d ON d.id=s.device_id WHERE d.archived=0 AND s.archived=0 ORDER BY s.id`)
 	if err != nil {
 		return c, err
 	}
 	indexes := map[int64]int{}
 	for rows.Next() {
 		var item workspace.Sensor
-		if err = rows.Scan(&item.ID, &item.DeviceID, &item.Sensor, &item.Name, &item.Location, &item.Revision); err != nil {
+		if err = rows.Scan(&item.ID, &item.DeviceID, &item.Sensor, &item.Name, &item.Location, &item.Revision, &item.Type, &item.Calibration.Zero, &item.Calibration.Full); err != nil {
 			rows.Close()
 			return c, err
 		}
@@ -148,7 +159,7 @@ func (s *Store) Catalog(ctx context.Context) (workspace.Catalog, error) {
 	return c, tx.Commit()
 }
 func (s *Store) SaveDevice(ctx context.Context, id int64, settings workspace.Settings) error {
-	return s.saveSettings(ctx, "workspace_devices", id, settings)
+	return s.saveSettings(ctx, "workspace_devices", id, settings, nil)
 }
 
 // ArchiveDevice removes a device from the catalog until it reports again. Its readings,
@@ -188,16 +199,18 @@ func (s *Store) archiveItem(ctx context.Context, table string, id, revision int6
 	}
 	return tx.Commit()
 }
-func (s *Store) SaveSensor(ctx context.Context, id int64, settings workspace.Settings) error {
-	return s.saveSettings(ctx, "workspace_sensors", id, settings)
+func (s *Store) SaveSensor(ctx context.Context, id int64, settings workspace.SensorSettings) error {
+	return s.saveSettings(ctx, "workspace_sensors", id, settings.Settings, &settings)
 }
-func (s *Store) saveSettings(ctx context.Context, table string, id int64, settings workspace.Settings) error {
+
+// sensor carries the type and calibration when the item is a sensor; nil for a device.
+func (s *Store) saveSettings(ctx context.Context, table string, id int64, settings workspace.Settings, sensor *workspace.SensorSettings) error {
 	if id <= 0 {
 		return workspace.ErrInvalid
 	}
 	validate := settings.Validate
-	if table == "workspace_sensors" {
-		validate = settings.ValidateSensor
+	if sensor != nil {
+		validate = sensor.Validate
 	}
 	if err := validate(); err != nil {
 		return err
@@ -219,22 +232,41 @@ func (s *Store) saveSettings(ctx context.Context, table string, id int64, settin
 	if revision != settings.Revision {
 		return workspace.ErrConflict
 	}
-	if table == "workspace_sensors" {
-		var name, sensor string
-		if err = tx.QueryRowContext(ctx, `SELECT d.name,s.sensor FROM workspace_sensors s JOIN workspace_devices d ON d.id=s.device_id WHERE s.id=?`, id).Scan(&name, &sensor); err != nil {
+	if sensor != nil {
+		var name, identity string
+		if err = tx.QueryRowContext(ctx, `SELECT d.name,s.sensor FROM workspace_sensors s JOIN workspace_devices d ON d.id=s.device_id WHERE s.id=?`, id).Scan(&name, &identity); err != nil {
 			return err
 		}
 		if name == "" {
 			return workspace.ErrUnregistered
 		}
 		var count int
-		err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM workspace_measurements WHERE sensor_id=? AND NOT (?='radio' AND ((metric='rssi' AND unit='dBm') OR (metric='snr' AND unit='dB')))`, id, sensor).Scan(&count)
+		err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM workspace_measurements WHERE sensor_id=? AND NOT (?='radio' AND ((metric='rssi' AND unit='dBm') OR (metric='snr' AND unit='dB')))`, id, identity).Scan(&count)
 		if err != nil {
 			return err
 		}
 		if count == 0 {
 			return workspace.ErrInvalid
 		}
+		// A type applies only to a sensor that reports the measurement it reads, and
+		// never to a device diagnostic.
+		if metric, unit, typed := workspace.TypeReads(sensor.Type); typed {
+			if workspace.IsDiagnostic(identity, metric, unit) {
+				return workspace.ErrInvalid
+			}
+			err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM workspace_measurements WHERE sensor_id=? AND metric=? AND unit=?`, id, metric, unit).Scan(&count)
+			if err != nil {
+				return err
+			}
+			if count == 0 {
+				return workspace.ErrInvalid
+			}
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE workspace_sensors SET name=?,location=?,type=?,calibration_zero=?,calibration_full=?,revision=revision+1 WHERE id=?`, settings.Name, settings.Location, sensor.Type, sensor.Calibration.Zero, sensor.Calibration.Full, id)
+		if err != nil {
+			return err
+		}
+		return tx.Commit()
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE `+table+` SET name=?,location=?,revision=revision+1 WHERE id=?`, settings.Name, settings.Location, id)
 	if err != nil {

@@ -30,7 +30,7 @@ type Repository interface {
 	ArchiveDevice(context.Context, int64, int64) error
 	ArchiveSensor(context.Context, int64, int64) error
 	ArchiveReceiver(context.Context, string, string, time.Time) error
-	SaveSensor(context.Context, int64, workspace.Settings) error
+	SaveSensor(context.Context, int64, workspace.SensorSettings) error
 	SaveLayout(context.Context, workspace.Layout) error
 	Insert(context.Context, telemetry.Reading, time.Time) (bool, error)
 	Recent(context.Context, int) ([]telemetry.Reading, error)

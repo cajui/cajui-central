@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+// Takes a current database back to before schema 10, for fixtures of older schemas.
+// The CHECK lives on calibration_full, so that column goes first.
+const dropSensorTypes = `ALTER TABLE workspace_sensors DROP COLUMN calibration_full; ALTER TABLE workspace_sensors DROP COLUMN calibration_zero; ALTER TABLE workspace_sensors DROP COLUMN type;`
+
 func sample() telemetry.Reading {
 	return telemetry.Reading{NodeID: "node", SensorID: "sensor", SessionID: "boot", Sequence: 1, Metric: "temperature", Value: 26.7, Unit: "degC"}
 }
@@ -150,7 +154,7 @@ func TestErrorsAndLimits(t *testing.T) {
 }
 func TestRejectNewerSchema(t *testing.T) {
 	s := openTest(t)
-	if _, err := s.db.Exec("PRAGMA user_version=10"); err != nil {
+	if _, err := s.db.Exec("PRAGMA user_version=11"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.migrate(); err == nil {

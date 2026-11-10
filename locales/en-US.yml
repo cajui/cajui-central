@@ -271,6 +271,23 @@ en-US:
     empty: Empty
     full: Full
     binary: Binary sensor
+  sensor_types:
+    label: Type
+    generic: '%{measurement} (generic)'
+    calibration: Calibration
+    calibration_help: Mark each point while the sensor is in that condition. After moving the sensor, wait for a new reading before marking.
+    wake_hint: To skip the wait, press the pairing button (PRG) on the transmitter briefly. It sends a reading right away.
+    current: 'Current reading: %{value} · %{age}'
+    no_reading: No valid reading to mark right now.
+    not_marked: not marked
+    uncalibrated: Not calibrated
+    same_points: The two points need different readings.
+    soil_moisture:
+      name: Soil moisture (capacitive)
+      zero: Dry
+      full: Wet
+      mark_zero: Mark dry
+      mark_full: Mark wet
   chart:
     gaps: Breaks indicate missing readings.
     empty: No readings in this period

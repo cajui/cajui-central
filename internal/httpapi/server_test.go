@@ -229,7 +229,7 @@ func (brokenRepo) SaveDevice(context.Context, int64, workspace.Settings) error {
 func (brokenRepo) ArchiveDevice(context.Context, int64, int64) error {
 	return errors.New("private database failure")
 }
-func (brokenRepo) SaveSensor(context.Context, int64, workspace.Settings) error {
+func (brokenRepo) SaveSensor(context.Context, int64, workspace.SensorSettings) error {
 	return errors.New("private database failure")
 }
 func (brokenRepo) SaveLayout(context.Context, workspace.Layout) error {

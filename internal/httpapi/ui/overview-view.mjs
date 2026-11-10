@@ -4,10 +4,12 @@ import {
   age,
   formatMeasurement,
   formatUnit,
+  numeric,
   plotGeometry,
   states,
 } from "./model.mjs";
 import { icon, statusIcon } from "./icons.mjs";
+import { levelMeterHTML, typeDetail } from "./sensor-types.mjs";
 
 // The markup of the overview, shared by the page and the components reference so the
 // reference shows exactly what the page draws. Events and focus belong to the page.
@@ -49,7 +51,8 @@ export function placesHeadingHTML(level = 2) {
   return `<div class="places-heading"><h${level}>${t("overview.places_heading")}</h${level}><span>${e(t("overview.trend_window", { hours: TREND_HOURS }))}</span></div>`;
 }
 
-// One measurement row: label, value and the trend of the last hours.
+// One measurement row: label, value and the trend of the last hours. A calibrated
+// level (ADR 0004) adds its meter under the row and its raw reading beside the name.
 export function placeRowHTML(channel, group, sensorName, now) {
   const value = ["ok", "recorded", "stale"].includes(channel.state)
     ? channel.value
@@ -66,5 +69,7 @@ export function placeRowHTML(channel, group, sensorName, now) {
     channel.state === "ok" ||
     channel.state === "recorded" ||
     (group.stale && channel.state === "stale");
-  return `<span class="row-label"><span class="row-title">${e(channel.title)}</span> ${sensorName ? `<span class="row-sub">${e(sensorName)}</span> ` : ""}${quiet ? "" : `<cj-badge state="${e(channel.state)}"></cj-badge>`}</span> <span class="row-value" data-state="${e(channel.state)}">${formatMeasurement(value, channel.metric, channel.unit)}<span class="unit">${e(formatUnit(channel.unit))}</span></span><span class="row-trend">${spark ? `<svg class="spark" viewBox="0 0 96 28" preserveAspectRatio="none" aria-hidden="true"><path d="${spark.path}" transform="translate(0 2)"/></svg>` : ""}</span>`;
+  const sub = [sensorName, typeDetail(channel)].filter(Boolean).join(" · ");
+  const level = channel.calibration && numeric(value) !== null;
+  return `<span class="row-label"><span class="row-title">${e(channel.title)}</span> ${sub ? `<span class="row-sub">${e(sub)}</span> ` : ""}${quiet ? "" : `<cj-badge state="${e(channel.state)}"></cj-badge>`}</span> <span class="row-value" data-state="${e(channel.state)}">${formatMeasurement(value, channel.metric, channel.unit)}<span class="unit">${e(formatUnit(channel.unit))}</span></span><span class="row-trend">${spark ? `<svg class="spark" viewBox="0 0 96 28" preserveAspectRatio="none" aria-hidden="true"><path d="${spark.path}" transform="translate(0 2)"/></svg>` : ""}</span>${level ? `<span class="row-level">${levelMeterHTML(value)}</span>` : ""}`;
 }

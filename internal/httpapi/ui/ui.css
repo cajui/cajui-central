@@ -1828,6 +1828,19 @@ cj-reading {
   color: var(--warning);
   font-weight: 700;
 }
+/* A level reading (ADR 0004): its bounded meter and the raw reading as a detail. */
+.reading-tile .level-track {
+  margin: 0 0 8px;
+}
+.reading-tile .level-labels {
+  margin-bottom: 12px;
+}
+.reading-detail {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: var(--text-detail);
+  font-variant-numeric: tabular-nums;
+}
 .diagnostic-readings {
   display: grid;
   gap: 12px;
@@ -2033,6 +2046,39 @@ cj-reading {
 .form-error {
   color: var(--danger);
   margin: 0;
+}
+.calibration {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+.calibration[hidden] {
+  display: none;
+}
+.calibration legend {
+  padding: 0 8px;
+  font-weight: 700;
+}
+.calibration p {
+  margin: 0;
+}
+.calibration-point {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.calibration-label {
+  min-width: 5em;
+  font-weight: 600;
+}
+.calibration-point output {
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
 }
 .form-error:empty {
   display: none;
@@ -3125,6 +3171,23 @@ dialog.history-dialog {
   width: 100%;
   height: 28px;
   margin-top: 0;
+}
+/* The line colour keeps the empty part of the meter visible on a hovered row. */
+.row-level {
+  grid-column: 1 / -1;
+  height: 4px;
+  margin-block: 2px 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.row-level svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.row-level rect {
+  fill: var(--plot);
 }
 .place-notes {
   list-style: none;

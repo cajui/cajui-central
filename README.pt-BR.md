@@ -27,6 +27,9 @@ referência do projeto.
 - Reunir em um painel as medições de todos os dispositivos e sensores, como
   temperatura e umidade.
 - Nomear dispositivos e sensores, atribuir locais e escolher quais medições exibir.
+- Dizer o que está ligado a uma entrada analógica. Uma sonda capacitiva de umidade do
+  solo é calibrada em dois passos, com as próprias leituras, e aparece como nível; a
+  tensão guardada é mantida.
 - Abrir gráficos de histórico e consultar leituras originais por data, inclusive
   períodos maiores que 24 horas. Os dados não são apagados automaticamente por idade.
 - Distinguir uma falha de sensor de um dispositivo que parou de enviar. Consultar
@@ -114,7 +117,7 @@ também está disponível em português.
 | Organizar o painel e entender histórico e estados | [Interface](docs/interface.md) |
 | Conectar produtores MQTT ou Home Assistant | [MQTT e contratos de entrega](docs/mqtt.md) |
 | Enviar leituras por HTTP | [API HTTP](docs/http-api.md) |
-| Entender armazenamento e decisões de projeto | [Decisões de arquitetura](docs/adr/0001-first-party-devices.md) · [Armazenamento do histórico](docs/adr/0003-persisted-measurement-history.md) |
+| Entender armazenamento e decisões de projeto | [Decisões de arquitetura](docs/adr/0001-first-party-devices.md) · [Armazenamento do histórico](docs/adr/0003-persisted-measurement-history.md) · [Tipos de sensor](docs/adr/0004-sensor-types.md) |
 | Compilar e testar alterações | [Desenvolvimento](docs/development.md) · [Testes de navegador](docs/interface.md#frontend-development-checks) |
 | Trabalhar no visual ou nas traduções | [Marca e componentes](docs/brand/README.md) · [Internacionalização](docs/localization.md) |
 

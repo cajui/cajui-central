@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"math"
 	"strings"
 	"testing"
 )
@@ -15,6 +16,43 @@ func TestSettings(t *testing.T) {
 		if s.Validate() == nil {
 			t.Fatalf("invalid settings accepted: %#v", s)
 		}
+	}
+}
+func TestSensorSettings(t *testing.T) {
+	dry, wet, nan, inf := 2.69, 1.04, math.NaN(), math.Inf(1)
+	for _, s := range []SensorSettings{
+		{},
+		{Settings: Settings{Name: "Bed 1"}},
+		{Type: SoilMoisture},
+		{Type: SoilMoisture, Calibration: Calibration{Zero: &dry}},
+		{Type: SoilMoisture, Calibration: Calibration{Full: &wet}},
+		{Type: SoilMoisture, Calibration: Calibration{Zero: &dry, Full: &wet}},
+		// Nothing says which point is the larger reading: a probe may rise when wet.
+		{Type: SoilMoisture, Calibration: Calibration{Zero: &wet, Full: &dry}},
+	} {
+		if err := s.Validate(); err != nil {
+			t.Fatalf("valid settings rejected: %#v", s)
+		}
+	}
+	for _, s := range []SensorSettings{
+		{Calibration: Calibration{Zero: &dry}},
+		{Calibration: Calibration{Full: &wet}},
+		{Type: "tank_level"},
+		{Type: SoilMoisture, Calibration: Calibration{Zero: &dry, Full: &dry}},
+		{Type: SoilMoisture, Calibration: Calibration{Zero: &nan}},
+		{Type: SoilMoisture, Calibration: Calibration{Full: &inf}},
+		{Type: SoilMoisture, Settings: Settings{Name: "a\nb"}},
+		{Type: SoilMoisture, Settings: Settings{Revision: -1}},
+	} {
+		if s.Validate() == nil {
+			t.Fatalf("invalid settings accepted: %#v", s)
+		}
+	}
+	if metric, unit, ok := TypeReads(SoilMoisture); !ok || metric != "voltage" || unit != "V" {
+		t.Fatal(metric, unit, ok)
+	}
+	if _, _, ok := TypeReads(""); ok {
+		t.Fatal("a generic sensor reads no particular measurement")
 	}
 }
 func TestLayout(t *testing.T) {

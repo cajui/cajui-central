@@ -264,3 +264,53 @@ func TestArchiveSensorEndpoint(t *testing.T) {
 		t.Fatal(after.Workspace)
 	}
 }
+
+func TestSensorTypeEditing(t *testing.T) {
+	h := testHandler(t)
+	reading := `{"node_id":"node","sensor_id":"probe","session_id":"boot","sequence":0,"metric":"voltage","value":2.69,"unit":"V"}`
+	if w := request(h, "POST", "/api/v1/readings", reading, "Bearer "+token, "application/json"); w.Code != 201 {
+		t.Fatal(w.Code)
+	}
+	state := workspaceSnapshot(t, h, "/sensors")
+	device := fmt.Sprintf("/ui-api/devices/%d", state.Workspace.Devices[0].ID)
+	sensor := fmt.Sprintf("/ui-api/sensors/%d", state.Workspace.Sensors[0].ID)
+	if w := workspaceEdit(h, device, `{"name":"Garden","location":"","revision":0}`, state.UIToken, nil); w.Code != 204 {
+		t.Fatal(w.Code, w.Body)
+	}
+	for _, body := range []string{
+		`{"name":"","location":"","revision":0,"type":"tank_level"}`,
+		`{"name":"","location":"","revision":0,"type":"soil_moisture","calibration":{"zero":2.69,"full":2.69}}`,
+		`{"name":"","location":"","revision":0,"type":"soil_moisture","calibration":{"zero":"dry"}}`,
+		`{"name":"","location":"","revision":0,"type":"soil_moisture","calibration":{"zero":2.69,"other":1}}`,
+		`{"name":"","location":"","revision":0,"calibration":{"zero":2.69}}`,
+	} {
+		if w := workspaceEdit(h, sensor, body, state.UIToken, nil); w.Code != 400 {
+			t.Fatal(body, w.Code, w.Body)
+		}
+	}
+	// A device has no type.
+	if w := workspaceEdit(h, device, `{"name":"Garden","location":"","revision":1,"type":"soil_moisture"}`, state.UIToken, nil); w.Code != 400 {
+		t.Fatal(w.Code, w.Body)
+	}
+	if w := workspaceEdit(h, sensor, `{"name":"","location":"","revision":0,"type":"soil_moisture","calibration":{"zero":2.69,"full":null}}`, state.UIToken, nil); w.Code != 204 {
+		t.Fatal(w.Code, w.Body)
+	}
+	item := workspaceSnapshot(t, h, "/").Workspace.Sensors[0]
+	if item.Type != "soil_moisture" || item.Calibration.Zero == nil || *item.Calibration.Zero != 2.69 || item.Calibration.Full != nil {
+		t.Fatalf("type not stored: %#v", item)
+	}
+	// The measurement stays raw for every reader of the snapshot and of the API.
+	if m := item.Measurements[0]; m.Metric != "voltage" || m.Unit != "V" || *m.Value != 2.69 {
+		t.Fatalf("raw reading changed: %#v", m)
+	}
+	if w := request(h, "GET", "/api/v1/readings", "", "Bearer "+token, ""); !strings.Contains(w.Body.String(), `"metric":"voltage"`) || strings.Contains(w.Body.String(), "soil_moisture") {
+		t.Fatal("API reading changed", w.Body)
+	}
+	// A save replaces every setting: without a type the sensor is generic again.
+	if w := workspaceEdit(h, sensor, `{"name":"Bed 1","location":"","revision":1}`, state.UIToken, nil); w.Code != 204 {
+		t.Fatal(w.Code, w.Body)
+	}
+	if item = workspaceSnapshot(t, h, "/").Workspace.Sensors[0]; item.Type != "" || item.Calibration.Zero != nil || item.Name != "Bed 1" {
+		t.Fatalf("settings not replaced: %#v", item)
+	}
+}

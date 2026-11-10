@@ -7,6 +7,7 @@ import {
   channelState,
   deviceStateFor,
 } from "./model.mjs";
+import { applyType, shownMeasurement } from "./sensor-types.mjs";
 
 export function workspaceGroups(state, now = Date.parse(state.generated_at)) {
   const channels = buildChannels(state, now);
@@ -92,6 +93,7 @@ export function workspaceGroups(state, now = Date.parse(state.generated_at)) {
         named: Boolean(record?.name),
       });
       for (const c of s.channels) {
+        applyType(record, c);
         c.deviceName = g.name;
         c.sensorName = s.name;
       }
@@ -128,7 +130,8 @@ export function defaultSensorName(sensor) {
       (sensor?.measurements ?? [])
         .filter((m) => !isLinkDiagnostic({ sensor: sensor.sensor, ...m }))
         .sort((a, b) => rank(a.metric) - rank(b.metric))
-        .map((m) => metricLabel(m.metric, label(m.metric))),
+        .map((m) => shownMeasurement(sensor, m).metric)
+        .map((metric) => metricLabel(metric, label(metric))),
     ),
   ];
   if (!names.length) return label(sensor?.sensor ?? "");
@@ -217,7 +220,8 @@ export function itemChoices(catalog) {
       ...s.measurements
         .filter((m) => !isLinkDiagnostic({ sensor: s.sensor, ...m }))
         .map((m) => ({
-          label: `${metricLabel(m.metric, label(m.metric))} (${m.unit}) · ${s.name} · ${devices.get(s.device_id)?.name}`,
+          label: `${choiceLabel(s, m)} · ${s.name} · ${devices.get(s.device_id)?.name}`,
+          // The item names the stored measurement, whatever the sensor's type shows.
           item: {
             kind: "measurement",
             sensor_id: s.id,
@@ -227,6 +231,10 @@ export function itemChoices(catalog) {
         })),
     ]),
   ];
+}
+function choiceLabel(sensor, measurement) {
+  const { metric, unit } = shownMeasurement(sensor, measurement);
+  return `${metricLabel(metric, label(metric))} (${unit})`;
 }
 export function resolveItem(item, groups) {
   if (item.kind === "device") {
@@ -243,7 +251,9 @@ export function resolveItem(item, groups) {
       const channels =
         item.kind === "measurement"
           ? sensor.channels.filter(
-              (c) => c.metric === item.metric && c.unit === item.unit,
+              (c) =>
+                (c.raw ?? c).metric === item.metric &&
+                (c.raw ?? c).unit === item.unit,
             )
           : sensor.channels;
       return channels.length ? { group, sensor, channels } : null;
