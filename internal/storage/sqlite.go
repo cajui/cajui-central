@@ -114,8 +114,9 @@ PRAGMA user_version=7;`); err != nil {
 			return err
 		}
 	}
-	// Backfill writes through observe, which uses the newest workspace columns, so it
-	// runs once the whole schema is in place.
+	// Backfill writes through observe, which uses the workspace columns up to schema 7, so
+	// it runs after them. Schema 10's columns have defaults that observe leaves alone; a
+	// column observe writes must be added before this point.
 	if version < 3 {
 		if err = backfillWorkspace(tx); err != nil {
 			return err
