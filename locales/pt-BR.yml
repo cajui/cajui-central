@@ -272,6 +272,22 @@ pt-BR:
     empty: Vazio
     full: Cheio
     binary: Sensor binário
+  sensor_types:
+    label: Tipo
+    generic: '%{measurement} (genérico)'
+    calibration: Calibração
+    calibration_help: Marque cada ponto com o sensor naquela condição. Depois de mudar o sensor de lugar, espere chegar uma leitura nova antes de marcar.
+    current: 'Leitura atual: %{value} · %{age}'
+    no_reading: Sem leitura válida para marcar agora.
+    not_marked: não marcado
+    uncalibrated: Falta calibrar
+    same_points: Os dois pontos precisam de leituras diferentes.
+    soil_moisture:
+      name: Umidade do solo (capacitivo)
+      zero: Seco
+      full: Molhado
+      mark_zero: Marcar seco
+      mark_full: Marcar molhado
   chart:
     gaps: As interrupções indicam períodos sem leituras.
     empty: Nenhuma leitura neste período

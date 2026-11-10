@@ -144,6 +144,36 @@ only supports an earlier schema. Large histories may make the first startup take
 See [ADR 0003](adr/0003-persisted-measurement-history.md) for the storage, isolation
 and chart decisions.
 
+## Sensor types
+
+A sensor on a generic input reports an electrical value: a capacitive soil moisture
+probe arrives as `voltage` in `V`. **Sensors → Edit** offers a **Type** for a sensor that
+reports such a measurement. The first type is **Soil moisture (capacitive)**; the default
+shows the reading as telemetry describes it. Device diagnostics, such as the battery
+voltage, have no type.
+
+A type is calibrated with two readings taken from the sensor itself. Put the probe in
+dry soil, wait for a new reading and choose **Mark dry**; do the same in wet soil with
+**Mark wet**; then save. The dialog shows the current reading and its age and follows new
+readings while it is open. No number is typed, and the two points must differ. Prefer the
+soil where the probe will stay over air and water, so the scale covers what it will see.
+
+Once both points exist the sensor reads as a level: a percentage, a bounded meter and
+the raw voltage as a detail, on the overview, in organized sections, on the sensors page,
+in history and in the CSV export. Until then it keeps its voltage under the type's name
+with a **Not calibrated** note, which is not a problem and raises no attention. The
+percentage is the position of the reading between the two marked conditions, bounded to
+0–100 %. It is not volumetric water content and is not comparable between soils.
+
+Stored readings stay raw. History is converted when shown, with the current calibration,
+so recalibrating re-reads every period. API responses and MQTT are unchanged, and a
+layout item keeps naming the stored measurement. Returning a sensor to the generic type
+discards its calibration. See [ADR 0004](adr/0004-sensor-types.md).
+
+Schema version 10 adds `type`, `calibration_zero` and `calibration_full` to
+`workspace_sensors`; existing sensors stay generic. Back up before upgrading: an older
+binary refuses the migrated database.
+
 The dashboard refreshes every 30 seconds while visible and not being interacted
 with. Inventory pages have an explicit Refresh button. A failed dashboard refresh
 retains the previous snapshot with a warning. Edits use revision checks: a stale

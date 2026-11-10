@@ -62,6 +62,8 @@ const measurementDecimals = {
   temperature: { degC: 1 },
   humidity: { "%": 1 },
   voltage: { V: 2 },
+  // A typed sensor (ADR 0004): an index once calibrated, its raw volts until then.
+  soil_moisture: { "%": 0, V: 2 },
   rssi: { dBm: 0 },
   snr: { dB: 1 },
 };
@@ -171,6 +173,7 @@ export function plotGeometry(
   height = 170,
   gap = Infinity,
   span = null,
+  bounds = null,
 ) {
   const valid = points
     .filter(
@@ -191,8 +194,9 @@ export function plotGeometry(
     high === low
       ? Math.max(Math.abs(high) * 0.04, 1 / scale)
       : (high - low) * 0.18;
-  const bottom = low - pad,
-    top = high + pad;
+  // A bounded quantity, such as a level from 0 to 100, has no axis beyond its limits.
+  const bottom = Math.max(low - pad, (bounds?.[0] ?? -Infinity) / scale),
+    top = Math.min(high + pad, (bounds?.[1] ?? Infinity) / scale);
   min = Math.max(-Number.MAX_VALUE, bottom * scale);
   max = Math.min(Number.MAX_VALUE, top * scale);
   // A fixed span puts several plots on one time axis; otherwise the readings set it.

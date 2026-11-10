@@ -10,8 +10,16 @@ import {
   isLinkDiagnostic,
   deviceStateFor,
   receiverLabel,
+  numeric,
 } from "./model.mjs";
 import { shownSensors, workspaceGroups } from "./workspace-model.mjs";
+import {
+  genericName,
+  rawMeasurement,
+  shownMeasurement,
+  typeDetail,
+  typesFor,
+} from "./sensor-types.mjs";
 import {
   saveWorkspace,
   createDialog,
@@ -44,6 +52,7 @@ export function mountRegistry(root, { state, kind, notify }) {
     devices = new Map(),
     available = [],
     addDialog = null,
+    typeControls = null,
     pending = false;
   const commands = commandRunner({
     session: () => snapshot,
@@ -200,10 +209,7 @@ export function mountRegistry(root, { state, kind, notify }) {
         const detail = sensors
           ? entry.measurements
               .filter((m) => !isLinkDiagnostic({ sensor: entry.sensor, ...m }))
-              .map(
-                (m) =>
-                  `${measurementLabel(m.metric)}: ${m.status === "ok" ? formatMeasurement(m.value, m.metric, m.unit) + " " + formatUnit(m.unit) : (states[m.status] ?? m.status)}`,
-              )
+              .map((m) => measurementText(entry, m))
               .join(" · ")
           : age(device.received_at, Date.parse(snapshot.generated_at));
         const cells = [
@@ -266,6 +272,90 @@ export function mountRegistry(root, { state, kind, notify }) {
         edit(entries.find((d) => d.id === Number(b.dataset.edit))),
       );
   }
+  // A measurement as the sensors list says it, in the form the sensor's type gives it.
+  function measurementText(entry, measurement) {
+    const m = shownMeasurement(entry, measurement);
+    if (m.status !== "ok")
+      return `${measurementLabel(m.metric)}: ${states[m.status] ?? m.status}`;
+    const detail = typeDetail(m);
+    return `${measurementLabel(m.metric)}: ${formatMeasurement(m.value, m.metric, m.unit)} ${formatUnit(m.unit)}${detail ? ` (${detail})` : ""}`;
+  }
+  // The type of a sensor and its two calibration points (ADR 0004). A point is the
+  // reading at the moment it is marked, so the current reading follows live refreshes.
+  function mountTypeControls(form, entry) {
+    const select = form.elements.type,
+      fieldset = form.querySelector(".calibration"),
+      alert = form.querySelector('[role="alert"]');
+    const points = {
+      zero: entry.calibration?.zero ?? null,
+      full: entry.calibration?.full ?? null,
+    };
+    const text = (m, value) =>
+      `${formatMeasurement(value, m.metric, m.unit)} ${formatUnit(m.unit)}`;
+    // Rewriting an unchanged text would announce it again on every refresh.
+    const set = (selector, value) => {
+      const element = fieldset.querySelector(selector);
+      if (element.textContent !== value) element.textContent = value;
+      return element;
+    };
+    const current = () => {
+      const m = rawMeasurement(
+        snapshot.workspace.sensors.find((s) => s.id === entry.id),
+        select.value,
+      );
+      return m?.status === "ok" && numeric(m.value) !== null ? m : null;
+    };
+    function paint() {
+      const type = select.value;
+      fieldset.hidden = !type;
+      if (!type) return;
+      const m = current();
+      set(
+        ".calibration-current",
+        m
+          ? t("sensor_types.current", {
+              value: text(m, m.value),
+              age: age(
+                m.received_at,
+                Date.parse(snapshot.generated_at),
+              ).toLowerCase(),
+            })
+          : t("sensor_types.no_reading"),
+      );
+      for (const point of ["zero", "full"]) {
+        set(`[data-label="${point}"]`, t(`sensor_types.${type}.${point}`));
+        set(
+          `[data-point="${point}"]`,
+          points[point] === null
+            ? t("sensor_types.not_marked")
+            : text(rawMeasurement(entry, type), points[point]),
+        );
+        set(
+          `[data-mark="${point}"]`,
+          t(`sensor_types.${type}.mark_${point}`),
+        ).disabled = !m;
+      }
+    }
+    select.addEventListener("change", paint);
+    for (const button of fieldset.querySelectorAll("[data-mark]"))
+      button.addEventListener("click", () => {
+        const m = current();
+        if (!m) return;
+        points[button.dataset.mark] = m.value;
+        alert.textContent =
+          points.zero === points.full ? t("sensor_types.same_points") : "";
+        paint();
+      });
+    paint();
+    return {
+      paint,
+      calibrating: () => Boolean(select.value),
+      settings: () => ({
+        type: select.value,
+        calibration: select.value ? points : { zero: null, full: null },
+      }),
+    };
+  }
   function edit(entry, existingDialog) {
     const dialog =
       existingDialog ??
@@ -278,13 +368,31 @@ export function mountRegistry(root, { state, kind, notify }) {
     const body = document.createElement("div");
     body.className = "dialog-body";
     const { device } = dataFor(entry);
-    body.innerHTML = `<p>${sensors ? e(t("registry.sensor_identity", { device: device.name || device.device, sensor: entry.sensor })) : `${e(entry.transport.toUpperCase())} · ${e(entry.source)} · ${e(entry.device)}`}</p><form class="workspace-form"><label>${t("common.name")}${sensors ? ` <span class="muted">${t("common.optional")}</span>` : ""}<input class="input" name="name" ${sensors ? `placeholder="${e(entry.placeholder)}"` : "required"} maxlength="80" value="${e(sensors ? entry.stored : entry.name)}" autocomplete="off"></label><label>${t("common.location")} <span class="muted">${t("common.optional")}</span><input class="input" name="location" maxlength="80" value="${e(entry.location)}" autocomplete="off"></label><p class="muted">${t("registry.identity_note")}</p><p class="form-error" role="alert"></p><button class="button primary" type="submit">${message("save")}</button></form>`;
+    const offered = sensors ? typesFor(entry) : [];
+    body.innerHTML = `<p>${sensors ? e(t("registry.sensor_identity", { device: device.name || device.device, sensor: entry.sensor })) : `${e(entry.transport.toUpperCase())} · ${e(entry.source)} · ${e(entry.device)}`}</p><form class="workspace-form"><label>${t("common.name")}${sensors ? ` <span class="muted">${t("common.optional")}</span>` : ""}<input class="input" name="name" ${sensors ? `placeholder="${e(entry.placeholder)}"` : "required"} maxlength="80" value="${e(sensors ? entry.stored : entry.name)}" autocomplete="off"></label><label>${t("common.location")} <span class="muted">${t("common.optional")}</span><input class="input" name="location" maxlength="80" value="${e(entry.location)}" autocomplete="off"></label>${offered.length ? `<label>${t("sensor_types.label")}<select class="input" name="type"><option value="">${e(genericName(entry))}</option>${offered.map((id) => `<option value="${id}"${entry.type === id ? " selected" : ""}>${e(t(`sensor_types.${id}.name`))}</option>`).join("")}</select></label><fieldset class="calibration" hidden><legend>${t("sensor_types.calibration")}</legend><p class="muted">${t("sensor_types.calibration_help")}</p><p class="calibration-current"></p>${["zero", "full"].map((point) => `<div class="calibration-point"><span class="calibration-label" data-label="${point}"></span><output data-point="${point}"></output><button class="button" type="button" data-mark="${point}"></button></div>`).join("")}</fieldset>` : ""}<p class="muted">${t("registry.identity_note")}</p><p class="form-error" role="alert"></p><button class="button primary" type="submit">${message("save")}</button></form>`;
     dialog.append(body);
     const form = body.querySelector("form");
     localizeValidation(form);
+    const controls = offered.length ? mountTypeControls(form, entry) : null;
+    typeControls = controls;
+    dialog.addEventListener("close", () => {
+      if (typeControls === controls) typeControls = null;
+    });
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const button = form.querySelector("button");
+      // A save replaces every setting of a sensor, so a sensor always sends its type.
+      const typed = controls?.settings() ?? {
+        type: entry.type ?? "",
+        calibration: entry.calibration ?? { zero: null, full: null },
+      };
+      const { zero, full } = typed.calibration;
+      if (zero !== null && zero === full) {
+        form.querySelector('[role="alert"]').textContent = t(
+          "sensor_types.same_points",
+        );
+        return;
+      }
+      const button = form.querySelector('[type="submit"]');
       button.disabled = true;
       const data = new FormData(form);
       try {
@@ -292,6 +400,7 @@ export function mountRegistry(root, { state, kind, notify }) {
           name: data.get("name").trim(),
           location: data.get("location").trim(),
           revision: entry.revision,
+          ...(sensors ? typed : {}),
         });
         location.reload();
       } catch (error) {
@@ -530,6 +639,7 @@ export function mountRegistry(root, { state, kind, notify }) {
       const { edit, repair } = document.activeElement?.dataset ?? {};
       update();
       render();
+      typeControls?.paint();
       const again = edit
         ? `[data-edit="${CSS.escape(edit)}"]`
         : repair
@@ -556,12 +666,18 @@ export function mountRegistry(root, { state, kind, notify }) {
   update();
   render();
   // New devices and pairing requests appear within seconds while the add dialog is
-  // open; the list itself follows the dashboard's 30 s cadence.
+  // open, and so does the reading a calibration point is taken from; the list itself
+  // follows the dashboard's 30 s cadence.
   const idle = () => !document.hidden && !commands.running;
   pollWhileVisible(() => {
     if (idle()) refresh();
   }, 30000);
   pollWhileVisible(() => {
-    if (idle() && addDialog && addDialog.dataset.mode !== "form") refresh();
+    if (
+      idle() &&
+      ((addDialog && addDialog.dataset.mode !== "form") ||
+        typeControls?.calibrating())
+    )
+      refresh();
   }, 3000);
 }

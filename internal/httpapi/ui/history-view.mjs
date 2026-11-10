@@ -5,6 +5,7 @@ import {
   formatUnit,
   states,
 } from "./model.mjs";
+import { levelPercent } from "./sensor-types.mjs";
 
 export function historyControls() {
   return `<form id="history-range" class="history-range" hidden><label>${t("history.from")}<input class="input" name="from" type="datetime-local" required></label><label>${t("history.to")}<input class="input" name="to" type="datetime-local" required></label><button class="button" type="submit">${t("history.apply")}</button></form><p id="history-message" role="status" aria-live="polite"></p><button id="history-retry" class="button" hidden>${t("common.refresh")}</button>`;
@@ -85,7 +86,23 @@ export function createHistoryView(root) {
       (s) => s.device_id === device?.id && s.sensor === channel.sensor,
     )?.id;
   }
+  // History is stored raw; a calibrated sensor's readings are converted as they arrive,
+  // with the calibration of now.
+  function asShown(data, calibration) {
+    if (!calibration) return data;
+    const convert = (p) => ({
+      ...p,
+      value: levelPercent(calibration, p.value),
+    });
+    return {
+      ...data,
+      points: data.points.map(convert),
+      rows: data.rows.map(convert),
+    };
+  }
   async function fetchHistory(query, controller) {
+    // Read now: another measurement may be chosen while the request is in flight.
+    const calibration = channel.calibration;
     const timer = setTimeout(() => {
       controller.timedOut = true;
       controller.abort();
@@ -97,7 +114,7 @@ export function createHistoryView(root) {
         signal: controller.signal,
       });
       if (!response.ok) throw new Error(t("history.load_error"));
-      return await response.json();
+      return asShown(await response.json(), calibration);
     } finally {
       clearTimeout(timer);
     }
@@ -140,10 +157,11 @@ export function createHistoryView(root) {
       const [from, to] = range();
       const id = sensorID();
       if (!id) throw new Error(t("history.load_error"));
+      const stored = channel.raw ?? channel;
       const query = new URLSearchParams({
         sensor: id,
-        metric: channel.metric,
-        unit: channel.unit,
+        metric: stored.metric,
+        unit: stored.unit,
         from,
         to,
       });
@@ -154,6 +172,7 @@ export function createHistoryView(root) {
         label: channel.title,
         points: data.points,
         span: [Date.parse(from), Date.parse(to)],
+        bounds: channel.calibration ? [0, 100] : null,
         interval: 0,
         plotHeight: 240,
         showTable: false,

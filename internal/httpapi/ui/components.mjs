@@ -9,6 +9,7 @@ import {
   plotGeometry,
 } from "./model.mjs";
 import { icon, metricIcon, statusIcon } from "./icons.mjs";
+import { levelMeterHTML, typeDetail } from "./sensor-types.mjs";
 
 function attributeNumber(element, name) {
   const value = element.getAttribute(name);
@@ -99,9 +100,15 @@ class Reading extends Component {
       ? numeric(d.value)
       : null;
     const kind = metricIcon(d.metric);
+    // A calibrated level (ADR 0004). Without a value there is no meter: an unknown
+    // level must not look empty.
+    const level = d.calibration && value !== null;
+    const detail = typeDetail(d);
     this.innerHTML = `<div class="reading-tile" data-kind="${kind}" data-state="${state}">
       <div class="reading-heading"><span class="metric-icon">${icon(kind)}</span><span class="reading-title">${e(d.title ?? t("common.measurement"))}</span></div>
       <p class="measurement">${formatMeasurement(value, d.metric, d.unit)}<span class="unit">${e(formatUnit(d.unit))}</span></p>
+      ${level ? `<div class="level-track">${levelMeterHTML(value)}</div><div class="level-labels"><span>${e(t(`sensor_types.${d.type}.zero`))}</span><span>${e(t(`sensor_types.${d.type}.full`))}</span></div>` : ""}
+      ${detail ? `<p class="reading-detail">${e(detail)}</p>` : ""}
       <div class="reading-quality">${quiet(state) ? "" : `<cj-badge state="${state}"></cj-badge> `}<span class="reading-age">${e(d.updated ?? t("age.unknown"))}</span></div>
       ${["ok", "recorded"].includes(state) ? "" : `<p class="reading-note">${e(iconText(state))}</p>`}
       <span class="reading-history">${t("common.history")} ${icon("arrow")}</span></div>`;
@@ -240,6 +247,7 @@ class Chart extends Component {
       plotHeight,
       interval ? interval * 3000 : Infinity,
       this.data.span,
+      this.data.bounds,
     );
     if (!g) {
       const invalid = points.some((p) => p.status === "error");

@@ -1171,6 +1171,128 @@ test("persistent registration, independent dashboard composition and safe edits"
   expect(errors).toEqual([]);
 });
 
+test("a probe is given a type and calibrated from its live readings", async ({
+  page,
+}) => {
+  const { readFile } = await import("node:fs/promises");
+  const apiToken = (
+    await readFile(
+      process.env.CAJUI_UI_API_TOKEN_FILE ?? "/tmp/cajui-ui-token",
+      "utf8",
+    )
+  ).trim();
+  const suffix = Date.now().toString(36),
+    node = `soil-${suffix}`,
+    deviceName = `Garden ${suffix}`;
+  let sequence = 0;
+  // Simulated probe on an analog input: 3 V in dry soil, 1 V in wet soil.
+  const send = async (value) => {
+    const response = await page.request.post("/api/v1/readings", {
+      headers: { Authorization: `Bearer ${apiToken}` },
+      data: {
+        node_id: node,
+        sensor_id: "sensor-3",
+        session_id: "ui-test",
+        sequence: sequence++,
+        metric: "voltage",
+        value,
+        unit: "V",
+      },
+    });
+    expect(response.status()).toBe(201);
+  };
+  await send(3);
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/devices");
+  await page.getByRole("button", { name: "Add device", exact: true }).click();
+  await page
+    .getByRole("button", { name: `Select ${node}`, exact: true })
+    .click();
+  await page.getByRole("textbox", { name: /^Name/ }).fill(deviceName);
+  await page.getByRole("button", { name: "Save device", exact: true }).click();
+  await page.goto("/sensors");
+  const row = page.getByRole("row").filter({ hasText: deviceName });
+  await expect(row).toContainText("Voltage: 3.00 V");
+  await row.getByRole("button", { name: "Edit Voltage", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  const type = dialog.getByRole("combobox", { name: "Type", exact: true });
+  await expect(type.locator("option")).toHaveText([
+    "Voltage (generic)",
+    "Soil moisture (capacitive)",
+  ]);
+  const calibration = dialog.getByRole("group", {
+    name: "Calibration",
+    exact: true,
+  });
+  await expect(calibration).toBeHidden();
+  await type.selectOption("soil_moisture");
+  await expect(calibration).toContainText("Current reading: 3.00 V");
+  await calibration
+    .getByRole("button", { name: "Mark dry", exact: true })
+    .click();
+  await expect(calibration.locator('[data-point="zero"]')).toHaveText("3.00 V");
+  await expect(calibration.locator('[data-point="full"]')).toHaveText(
+    "not marked",
+  );
+  // One reading cannot be both ends of the scale, and such a pair is not saved.
+  const markWet = calibration.getByRole("button", {
+    name: "Mark wet",
+    exact: true,
+  });
+  await markWet.click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "The two points need different readings.",
+  );
+  await dialog
+    .getByRole("button", { name: "Save sensor", exact: true })
+    .click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "The two points need different readings.",
+  );
+  // The open dialog follows new readings, so the wet point comes from a fresh one.
+  await send(1);
+  await expect(calibration).toContainText("Current reading: 1.00 V", {
+    timeout: 10000,
+  });
+  await markWet.click();
+  await expect(dialog.locator(".form-error")).toHaveText("");
+  await expect(calibration.locator('[data-point="full"]')).toHaveText("1.00 V");
+  // Only the form: outside it, the dialog's removal button has a visible text that its
+  // accessible name does not contain (label-content-name-mismatch), with or without a type.
+  const audit = await new AxeBuilder({ page })
+    .include(".workspace-form")
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(
+    audit.violations.map((v) => ({
+      id: v.id,
+      nodes: v.nodes.map((n) => n.target),
+    })),
+  ).toEqual([]);
+  await dialog
+    .getByRole("button", { name: "Save sensor", exact: true })
+    .click();
+  await expect(row).toContainText("Soil moisture: 100 % (1.00 V)");
+  await send(2);
+  await page.reload();
+  await expect(row).toContainText("Soil moisture: 50 % (2.00 V)");
+  // The type and both points were stored; returning to generic shows volts again.
+  await row
+    .getByRole("button", { name: "Edit Soil moisture", exact: true })
+    .click();
+  await expect(type).toHaveValue("soil_moisture");
+  await expect(calibration.locator('[data-point="zero"]')).toHaveText("3.00 V");
+  await expect(calibration.locator('[data-point="full"]')).toHaveText("1.00 V");
+  await type.selectOption("");
+  await expect(calibration).toBeHidden();
+  await dialog
+    .getByRole("button", { name: "Save sensor", exact: true })
+    .click();
+  await expect(row).toContainText("Voltage: 2.00 V");
+  expect(errors).toEqual([]);
+});
+
 test("language selection persists across navigation and server-rendered pages", async ({
   page,
 }) => {
@@ -2828,6 +2950,110 @@ test("the overview shows names as text and trends of the last hours", async ({
   // The newest of the loaded readings is 16 minutes old: the trend starts near its end.
   const path = await place.locator(".row-trend path").first().getAttribute("d");
   expect(Number(path.match(/^M([\d.]+),/)[1])).toBeGreaterThan(80);
+});
+
+test("a calibrated probe is a level on the overview, in its history and in a tile", async ({
+  page,
+}) => {
+  const { snapshot, serve } = await liveWorkspace(page);
+  // Simulated probe on an analog input: 3 V in dry soil, 1 V in wet soil.
+  snapshot.samples.forEach((sample, i) =>
+    sample.readings.push({
+      sensor_id: "sensor-3",
+      metric: "voltage",
+      unit: "V",
+      value: 2 + i * 0.2,
+      status: "ok",
+    }),
+  );
+  const probe = {
+    id: 3,
+    device_id: 1,
+    sensor: "sensor-3",
+    name: "",
+    location: "",
+    revision: 0,
+    type: "soil_moisture",
+    calibration: { zero: 3, full: 1 },
+    measurements: [
+      {
+        metric: "voltage",
+        unit: "V",
+        value: 2,
+        status: "ok",
+        received_at: snapshot.samples[0].received_at,
+        interval: 300,
+      },
+    ],
+  };
+  snapshot.workspace.sensors.push(probe);
+  await serve(snapshot);
+  const asked = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/ui-api/history"))
+      asked.push(new URL(request.url()).searchParams);
+  });
+  await page.goto("/");
+  const row = page.locator(".place-row").filter({ hasText: "Soil moisture" });
+  await expect(row.locator(".row-value")).toHaveText("50%");
+  await expect(row.locator(".row-sub")).toHaveText("2.00 V");
+  await expect(row.locator(".row-level rect")).toHaveAttribute("width", "50");
+  // History is asked for as it is stored and shown as the level.
+  await row.click();
+  await expect(page.locator("#history-value")).toHaveText("50%");
+  await expect(page.locator("#metric-select option")).toHaveText([
+    "Soil moisture · %",
+  ]);
+  await page.locator("#history-table summary").click();
+  await expect(
+    page.locator("#history-table tbody tr td:nth-child(2)"),
+  ).toHaveText(["50", "40", "30", "20"]);
+  expect(
+    asked.map((query) => [query.get("metric"), query.get("unit")]),
+  ).toEqual([["voltage", "V"]]);
+  await page.locator("#close-history").click();
+  // An organized overview draws the tile's meter between the type's two ends. The
+  // layout item names the stored measurement.
+  snapshot.workspace.layout = {
+    revision: 1,
+    sections: [
+      {
+        title: "Garden",
+        items: [
+          { kind: "measurement", sensor_id: 3, metric: "voltage", unit: "V" },
+        ],
+      },
+    ],
+  };
+  await serve(snapshot);
+  await page.goto("/");
+  const tile = page.locator(".reading-tile");
+  await expect(tile).toHaveAttribute("data-kind", "soil");
+  await expect(tile.locator(".reading-title")).toHaveText("Soil moisture");
+  await expect(tile.locator(".measurement")).toHaveText("50%");
+  await expect(tile.locator(".level-track rect")).toHaveAttribute(
+    "width",
+    "50",
+  );
+  await expect(tile.locator(".level-labels span")).toHaveText(["Dry", "Wet"]);
+  await expect(tile.locator(".reading-detail")).toHaveText("2.00 V");
+  const audit = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(
+    audit.violations.map((v) => ({
+      id: v.id,
+      nodes: v.nodes.map((n) => n.target),
+    })),
+  ).toEqual([]);
+  // Until both points exist the probe keeps its volts and says what is missing.
+  probe.calibration = { zero: 3, full: null };
+  await serve(snapshot);
+  await page.goto("/");
+  await expect(tile.locator(".reading-title")).toHaveText("Soil moisture");
+  await expect(tile.locator(".measurement")).toHaveText("2.00V");
+  await expect(tile.locator(".reading-detail")).toHaveText("Not calibrated");
+  await expect(tile.locator(".level-track")).toHaveCount(0);
 });
 
 test("a saved layout keeps its search and a filter that matches the attention list", async ({
