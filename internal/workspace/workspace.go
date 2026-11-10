@@ -4,6 +4,7 @@ package workspace
 
 import (
 	"errors"
+	"math"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -44,6 +45,58 @@ func (s Settings) Validate() error {
 	return nil
 }
 
+// SoilMoisture is a capacitive probe on an analog input (ADR 0004).
+const SoilMoisture = "soil_moisture"
+
+// TypeReads names the raw measurement a sensor type interprets.
+func TypeReads(sensorType string) (metric, unit string, ok bool) {
+	if sensorType == SoilMoisture {
+		return "voltage", "V", true
+	}
+	return "", "", false
+}
+
+// Calibration holds the raw readings a typed sensor shows as 0 % and as 100 %. Either
+// may be missing while the sensor is being calibrated.
+type Calibration struct {
+	Zero *float64 `json:"zero"`
+	Full *float64 `json:"full"`
+}
+
+// SensorSettings adds what is connected to the sensor's input. An empty type shows the
+// reading as telemetry describes it and has no calibration.
+type SensorSettings struct {
+	Settings
+	Type        string      `json:"type"`
+	Calibration Calibration `json:"calibration"`
+}
+
+func (s SensorSettings) Validate() error {
+	if err := s.ValidateSensor(); err != nil {
+		return err
+	}
+	zero, full := s.Calibration.Zero, s.Calibration.Full
+	if s.Type == "" {
+		if zero != nil || full != nil {
+			return ErrInvalid
+		}
+		return nil
+	}
+	if _, _, ok := TypeReads(s.Type); !ok {
+		return ErrInvalid
+	}
+	for _, point := range []*float64{zero, full} {
+		if point != nil && (math.IsNaN(*point) || math.IsInf(*point, 0)) {
+			return ErrInvalid
+		}
+	}
+	// Equal points would leave no scale between them.
+	if zero != nil && full != nil && *zero == *full {
+		return ErrInvalid
+	}
+	return nil
+}
+
 type Device struct {
 	ID        int64  `json:"id"`
 	Transport string `json:"transport"`
@@ -65,7 +118,7 @@ type Sensor struct {
 	ID       int64  `json:"id"`
 	DeviceID int64  `json:"device_id"`
 	Sensor   string `json:"sensor"`
-	Settings
+	SensorSettings
 	Measurements []Measurement `json:"measurements"`
 }
 type Catalog struct {

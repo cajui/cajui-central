@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cajui/cajui-central/internal/history"
 	"github.com/cajui/cajui-central/internal/telemetry"
 	"github.com/cajui/cajui-central/internal/workspace"
 )
@@ -40,7 +41,7 @@ func TestWorkspaceInventoryNamesAndPersistence(t *testing.T) {
 		t.Fatal(initial)
 	}
 	d, sen := initial.Devices[0], initial.Sensors[0]
-	if err = s.SaveSensor(ctx, sen.ID, workspace.Settings{Name: "Ambient"}); !errors.Is(err, workspace.ErrUnregistered) {
+	if err = s.SaveSensor(ctx, sen.ID, workspace.SensorSettings{Settings: workspace.Settings{Name: "Ambient"}}); !errors.Is(err, workspace.ErrUnregistered) {
 		t.Fatal(err)
 	}
 	if err = s.SaveDevice(ctx, d.ID, workspace.Settings{Name: "North", Location: "Field"}); err != nil {
@@ -49,7 +50,7 @@ func TestWorkspaceInventoryNamesAndPersistence(t *testing.T) {
 	if err = s.SaveDevice(ctx, d.ID, workspace.Settings{Name: "Lost update"}); !errors.Is(err, workspace.ErrConflict) {
 		t.Fatal(err)
 	}
-	if err = s.SaveSensor(ctx, sen.ID, workspace.Settings{Name: "Ambient"}); err != nil {
+	if err = s.SaveSensor(ctx, sen.ID, workspace.SensorSettings{Settings: workspace.Settings{Name: "Ambient"}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = s.Insert(ctx, r, at.Add(time.Hour)); err != nil {
@@ -82,12 +83,12 @@ func TestWorkspaceInventoryNamesAndPersistence(t *testing.T) {
 	if !reflect.DeepEqual(c, catalog(t, s)) {
 		t.Fatal("reopen changed catalog")
 	}
-	if err = s.SaveSensor(ctx, sen.ID, workspace.Settings{Name: "Renamed", Revision: 1}); err != nil {
+	if err = s.SaveSensor(ctx, sen.ID, workspace.SensorSettings{Settings: workspace.Settings{Name: "Renamed", Revision: 1}}); err != nil {
 		t.Fatal(err)
 	}
 	// A sensor's own name is optional: clearing it returns to the name built from its
 	// readings. A device still needs one.
-	if err = s.SaveSensor(ctx, sen.ID, workspace.Settings{Location: "Shelf", Revision: 2}); err != nil {
+	if err = s.SaveSensor(ctx, sen.ID, workspace.SensorSettings{Settings: workspace.Settings{Location: "Shelf", Revision: 2}}); err != nil {
 		t.Fatal(err)
 	}
 	if got := catalog(t, s).Sensors[0]; got.Name != "" || got.Location != "Shelf" {
@@ -186,7 +187,7 @@ func TestWorkspaceLayoutValidationAndConflict(t *testing.T) {
 		t.Fatal(err)
 	}
 	layout.Revision = 1
-	if err := s.SaveSensor(ctx, sen, workspace.Settings{Name: "Sensor"}); err != nil {
+	if err := s.SaveSensor(ctx, sen, workspace.SensorSettings{Settings: workspace.Settings{Name: "Sensor"}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, bad := range []workspace.Item{{Kind: "device", DeviceID: 999}, {Kind: "sensor", SensorID: 999}, {Kind: "measurement", SensorID: sen, Metric: "missing", Unit: "degC"}} {
@@ -236,7 +237,7 @@ func TestWorkspaceDiagnosticsAndFailure(t *testing.T) {
 	if err := s.SaveDevice(ctx, d, workspace.Settings{Name: "D"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SaveSensor(ctx, sen, workspace.Settings{Name: "Radio"}); !errors.Is(err, workspace.ErrInvalid) {
+	if err := s.SaveSensor(ctx, sen, workspace.SensorSettings{Settings: workspace.Settings{Name: "Radio"}}); !errors.Is(err, workspace.ErrInvalid) {
 		t.Fatal(err)
 	}
 	if err := s.SaveLayout(ctx, workspace.Layout{Sections: []workspace.Section{{Title: "X", Items: []workspace.Item{{Kind: "measurement", SensorID: sen, Metric: "rssi", Unit: "dBm"}}}}}); !errors.Is(err, workspace.ErrInvalid) {
@@ -354,14 +355,14 @@ func TestArchiveMigrationKeepsDevices(t *testing.T) {
 	if _, err := s.Insert(ctx, sample(), time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`DROP TABLE measurement_history; ALTER TABLE workspace_devices DROP COLUMN archived; ALTER TABLE workspace_sensors DROP COLUMN archived; ALTER TABLE device_states DROP COLUMN archived; PRAGMA user_version=5;`); err != nil {
+	if _, err := s.db.Exec(dropSensorTypes + `DROP TABLE measurement_history; ALTER TABLE workspace_devices DROP COLUMN archived; ALTER TABLE workspace_sensors DROP COLUMN archived; ALTER TABLE device_states DROP COLUMN archived; PRAGMA user_version=5;`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.migrate(); err != nil {
 		t.Fatal(err)
 	}
 	var version int
-	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 9 {
+	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 10 {
 		t.Fatal(version, err)
 	}
 	if c := catalog(t, s); len(c.Devices) != 1 {
@@ -381,7 +382,7 @@ func TestArchiveSensorKeepsHistoryAndRestoresOnFreshReading(t *testing.T) {
 		t.Fatal(err)
 	}
 	item := catalog(t, s).Sensors[0]
-	if err := s.SaveSensor(ctx, item.ID, workspace.Settings{Name: "Orchard"}); err != nil {
+	if err := s.SaveSensor(ctx, item.ID, workspace.SensorSettings{Settings: workspace.Settings{Name: "Orchard"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.ArchiveSensor(ctx, item.ID, 0); !errors.Is(err, workspace.ErrConflict) {
@@ -408,5 +409,128 @@ func TestArchiveSensorKeepsHistoryAndRestoresOnFreshReading(t *testing.T) {
 	}
 	if c := catalog(t, s); len(c.Sensors) != 1 || c.Sensors[0].Name != "Orchard" {
 		t.Fatal(c)
+	}
+}
+
+func TestSensorTypeKeepsRawReadingsAndCalibration(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	at := time.Now().UTC()
+	probe := telemetry.Reading{NodeID: "node", SensorID: "probe", SessionID: "boot", Sequence: 1, Metric: "voltage", Value: 2.69, Unit: "V"}
+	battery := probe
+	battery.SensorID, battery.Value = "battery", 3.9
+	for _, r := range []telemetry.Reading{probe, battery, sample()} {
+		if _, err = s.Insert(ctx, r, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := catalog(t, s)
+	if err = s.SaveDevice(ctx, c.Devices[0].ID, workspace.Settings{Name: "Garden"}); err != nil {
+		t.Fatal(err)
+	}
+	ids := map[string]int64{}
+	for _, item := range c.Sensors {
+		ids[item.Sensor] = item.ID
+	}
+	dry, wet := 2.69, 1.04
+	soil := func(revision int64, zero, full *float64) workspace.SensorSettings {
+		return workspace.SensorSettings{Settings: workspace.Settings{Revision: revision}, Type: workspace.SoilMoisture, Calibration: workspace.Calibration{Zero: zero, Full: full}}
+	}
+	// A type needs the measurement it reads, and the battery is a device diagnostic.
+	for _, sensor := range []string{"sensor", "battery"} {
+		if err = s.SaveSensor(ctx, ids[sensor], soil(0, nil, nil)); !errors.Is(err, workspace.ErrInvalid) {
+			t.Fatal(sensor, err)
+		}
+	}
+	// Each point is marked on its own, so one may exist before the other.
+	if err = s.SaveSensor(ctx, ids["probe"], soil(0, &dry, nil)); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.SaveSensor(ctx, ids["probe"], soil(1, &dry, &dry)); !errors.Is(err, workspace.ErrInvalid) {
+		t.Fatal(err)
+	}
+	if err = s.SaveSensor(ctx, ids["probe"], soil(1, &dry, &wet)); err != nil {
+		t.Fatal(err)
+	}
+	probe.Sequence, probe.Value = 2, 1.5
+	if _, err = s.Insert(ctx, probe, at.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if s, err = Open(path); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	find := func() workspace.Sensor {
+		t.Helper()
+		for _, item := range catalog(t, s).Sensors {
+			if item.Sensor == "probe" {
+				return item
+			}
+		}
+		t.Fatal("probe not listed")
+		return workspace.Sensor{}
+	}
+	item := find()
+	if item.Type != workspace.SoilMoisture || item.Calibration.Zero == nil || *item.Calibration.Zero != dry || item.Calibration.Full == nil || *item.Calibration.Full != wet || item.Revision != 2 {
+		t.Fatalf("type or calibration lost: %#v", item)
+	}
+	// The stored reading stays what the device sent.
+	if m := item.Measurements; len(m) != 1 || m[0].Metric != "voltage" || m[0].Unit != "V" || *m[0].Value != 1.5 {
+		t.Fatalf("raw reading changed: %#v", m)
+	}
+	if h, e := s.History(ctx, history.Query{SensorID: item.ID, Metric: "voltage", Unit: "V", From: at.Add(-time.Hour), To: at.Add(time.Hour)}, true); e != nil || len(h.Points) != 2 || *h.Points[0].Value != 2.69 {
+		t.Fatal("raw history changed", h, e)
+	}
+	// The database guards the structure even against a write that skips validation.
+	for _, statement := range []string{
+		`UPDATE workspace_sensors SET calibration_full=calibration_zero WHERE id=?`,
+		`UPDATE workspace_sensors SET type='' WHERE id=?`,
+	} {
+		if _, err = s.db.Exec(statement, item.ID); err == nil {
+			t.Fatal("constraint missing for", statement)
+		}
+	}
+	// Returning to generic discards the calibration.
+	if err = s.SaveSensor(ctx, item.ID, workspace.SensorSettings{Settings: workspace.Settings{Name: "Bed 1", Revision: 2}}); err != nil {
+		t.Fatal(err)
+	}
+	if item = find(); item.Type != "" || item.Calibration.Zero != nil || item.Calibration.Full != nil || item.Name != "Bed 1" {
+		t.Fatalf("generic sensor kept a calibration: %#v", item)
+	}
+}
+
+func TestSensorTypeMigrationKeepsSensorsGeneric(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	if _, err := s.Insert(ctx, sample(), time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveDevice(ctx, catalog(t, s).Devices[0].ID, workspace.Settings{Name: "Node"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveSensor(ctx, catalog(t, s).Sensors[0].ID, workspace.SensorSettings{Settings: workspace.Settings{Name: "Orchard"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(dropSensorTypes + `PRAGMA user_version=9;`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	var version int
+	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 10 {
+		t.Fatal(version, err)
+	}
+	item := catalog(t, s).Sensors[0]
+	if item.Name != "Orchard" || item.Revision != 1 || item.Type != "" || item.Calibration.Zero != nil || item.Calibration.Full != nil || len(item.Measurements) != 1 {
+		t.Fatalf("sensor changed in migration: %#v", item)
 	}
 }

@@ -201,7 +201,12 @@ its telemetry stays stored, and its next observation brings it back with its nam
 They require an allowed loopback Host, an exactly matching Origin, a process-scoped
 `X-Cajui-Workspace` capability from the local page, JSON content type and bounded
 payloads. Cross-site fetch metadata is rejected. Names and optional locations are
-limited to 80 characters; edits require the current revision. Browser capabilities
+limited to 80 characters; edits require the current revision. A sensor edit replaces
+every setting of the sensor: besides `name`, `location` and `revision` it takes `type`
+(`""` or `"soil_moisture"`) and `calibration` (`{"zero":n,"full":n}`, the raw readings
+shown as 0 % and 100 %, each a number or `null`). Omitting them makes the sensor generic.
+A type the sensor's measurements cannot feed, equal points or a calibration without a
+type return 400. Browser capabilities
 expire on server restart and are never stored in browser storage. Reload to recover.
 These controls prevent cross-site edits and reject rebinding hosts; they are **not
 user authentication**. Anyone with access to the local service can configure the

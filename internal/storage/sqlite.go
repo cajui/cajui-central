@@ -62,7 +62,7 @@ func (s *Store) migrate() error {
 	if err = tx.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return err
 	}
-	if version > 9 {
+	if version > 10 {
 		return fmt.Errorf("unsupported schema version %d", version)
 	}
 	if version == 0 {
@@ -140,6 +140,11 @@ PRAGMA user_version=7;`); err != nil {
 			}
 		}
 		if err = backfillHistory(tx); err != nil {
+			return err
+		}
+	}
+	if version < 10 {
+		if _, err = tx.Exec(sensorTypeSchema); err != nil {
 			return err
 		}
 	}

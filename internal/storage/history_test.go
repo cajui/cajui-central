@@ -49,7 +49,7 @@ func TestHistoryMigrationPagingIsolationAndPersistence(t *testing.T) {
 	if _, err = s.Insert(ctx, r, at); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.db.Exec(`DROP TABLE measurement_history; PRAGMA user_version=7`); err != nil {
+	if _, err = s.db.Exec(dropSensorTypes + `DROP TABLE measurement_history; PRAGMA user_version=7`); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()
@@ -320,7 +320,7 @@ func TestHistorySchemaEightUpgradeAndConstraints(t *testing.T) {
 	if e = s.db.QueryRow(`SELECT COUNT(*),MAX(id) FROM measurement_history`).Scan(&count, &maxID); e != nil {
 		t.Fatal(e)
 	}
-	_, e = s.db.Exec(`UPDATE workspace_devices SET name='Preserved',archived=1;
+	_, e = s.db.Exec(dropSensorTypes + `UPDATE workspace_devices SET name='Preserved',archived=1;
  CREATE TABLE old_history AS SELECT id,sensor_id,metric,unit,received_ms,received_at,value,status,interval FROM measurement_history;
  DROP TABLE measurement_history; ALTER TABLE old_history RENAME TO measurement_history; PRAGMA user_version=8;`)
 	if e != nil {
@@ -332,7 +332,8 @@ func TestHistorySchemaEightUpgradeAndConstraints(t *testing.T) {
 			`SELECT * FROM readings ORDER BY id`,
 			`SELECT * FROM samples ORDER BY id`,
 			`SELECT * FROM workspace_devices ORDER BY id`,
-			`SELECT * FROM workspace_sensors ORDER BY id`,
+			// Columns named: this table gains the sensor type columns in schema 10.
+			`SELECT id,device_id,sensor,name,location,revision,archived FROM workspace_sensors ORDER BY id`,
 			`SELECT * FROM workspace_measurements ORDER BY sensor_id,metric`,
 			`SELECT * FROM workspace_layout ORDER BY id`,
 			`SELECT sensor_id,metric,unit,received_ms,received_at,value,status,interval FROM measurement_history ORDER BY sensor_id,metric,received_ms`,
@@ -403,7 +404,7 @@ func TestHistorySchemaEightUpgradeAndConstraints(t *testing.T) {
 	var got, minID, version int
 	s.db.QueryRow(`SELECT COUNT(*),MIN(id) FROM measurement_history`).Scan(&got, &minID)
 	s.db.QueryRow(`PRAGMA user_version`).Scan(&version)
-	if count != got || minID <= maxID || version != 9 {
+	if count != got || minID <= maxID || version != 10 {
 		t.Fatal(count, got, minID, maxID, version)
 	}
 	var changed int
