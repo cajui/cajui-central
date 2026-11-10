@@ -89,7 +89,8 @@ test("a level is the position of a reading between its two points", () => {
   assert.equal(levelPercent(soil, 3), 0);
   assert.equal(levelPercent(soil, 1), 100);
   assert.equal(levelPercent(soil, 2), 50);
-  assert.equal(levelPercent(soil, 2.69), 15.5);
+  // Rounded once: 15.5 is 16 here, in the export and on screen.
+  assert.equal(levelPercent(soil, 2.69), 16);
   // Outside the marked range the index stays bounded.
   assert.equal(levelPercent(soil, 3.3), 0);
   assert.equal(levelPercent(soil, 0.2), 100);

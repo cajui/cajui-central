@@ -165,7 +165,8 @@ the raw voltage as a detail, on the overview, in organized sections, on the sens
 in history and in the CSV export. Until then it keeps its voltage under the type's name
 with a **Not calibrated** note, which is not a problem and raises no attention. The
 percentage is the position of the reading between the two marked conditions, bounded to
-0–100 %. It is not volumetric water content and is not comparable between soils.
+0–100 % and rounded to a whole percent. It is not volumetric water content and is not
+comparable between soils.
 
 Stored readings stay raw. History is converted when shown, with the current calibration,
 so recalibrating re-reads every period. API responses and MQTT are unchanged, and a

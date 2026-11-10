@@ -48,8 +48,8 @@ export function genericName(sensor) {
 }
 
 // Where a raw reading sits between the two calibration points, from 0 to 100, or null
-// when the reading or a point is missing. It is an index of that installation, so it
-// keeps one decimal: finer steps would be noise from the input.
+// when the reading or a point is missing. It is rounded once, to the whole percent every
+// page shows, so the export holds the same number as the screen.
 export function levelPercent(calibration, raw) {
   const zero = numeric(calibration?.zero),
     full = numeric(calibration?.full),
@@ -57,7 +57,7 @@ export function levelPercent(calibration, raw) {
   if (zero === null || full === null || value === null || zero === full)
     return null;
   const percent = ((value - zero) / (full - zero)) * 100;
-  return Math.round(Math.min(100, Math.max(0, percent)) * 10) / 10;
+  return Math.round(Math.min(100, Math.max(0, percent)));
 }
 
 // How a sensor's type shows one of its measurements, or null when it has no say. The
