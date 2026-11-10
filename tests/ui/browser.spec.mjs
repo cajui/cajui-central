@@ -1211,6 +1211,10 @@ test("a probe is given a type and calibrated from its live readings", async ({
     .click();
   await page.getByRole("textbox", { name: /^Name/ }).fill(deviceName);
   await page.getByRole("button", { name: "Save device", exact: true }).click();
+  // Saving reloads the page; leaving before that reload ends aborts the navigation.
+  await expect(
+    page.getByRole("button", { name: `Edit ${deviceName}`, exact: true }),
+  ).toBeVisible();
   await page.goto("/sensors");
   const row = page.getByRole("row").filter({ hasText: deviceName });
   await expect(row).toContainText("Voltage: 3.00 V");
