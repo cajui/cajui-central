@@ -295,7 +295,12 @@ export function createHistoryView(root) {
     },
     show(next, state) {
       if (!root.querySelector("#history-panel").open) return;
-      const changed = channel?.key !== next.key;
+      // A new calibration changes every value shown, as a new measurement does: an open
+      // table would otherwise keep numbers from the old one.
+      const changed =
+        channel?.key !== next.key ||
+        JSON.stringify(channel?.calibration ?? null) !==
+          JSON.stringify(next.calibration ?? null);
       channel = next;
       snapshot = state;
       const nextSignature = `${next.key}/${next.at}/${next.state}/${next.value}`;

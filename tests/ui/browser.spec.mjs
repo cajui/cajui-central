@@ -3081,6 +3081,19 @@ test("a calibrated probe is a level on the overview, in its history and in a til
   expect(
     asked.map((query) => [query.get("metric"), query.get("unit")]),
   ).toEqual([["voltage", "V"]]);
+  // Recalibrating while the table is open starts it again with the new points, as
+  // choosing another measurement does, instead of keeping the old numbers.
+  probe.calibration = { zero: 2.5, full: 1.5 };
+  await serve(snapshot);
+  await page.evaluate(() => document.querySelector("#refresh").click());
+  await expect(page.locator("#history-table")).not.toHaveAttribute("open", "");
+  await page.locator("#history-table summary").click();
+  await expect(
+    page.locator("#history-table tbody tr td:nth-child(2)"),
+  ).toHaveText(["50", "30", "10", "0"]);
+  expect(asked).toHaveLength(2);
+  probe.calibration = { zero: 3, full: 1 };
+  await serve(snapshot);
   await page.locator("#close-history").click();
   // An organized overview draws the tile's meter between the type's two ends. The
   // layout item names the stored measurement.
