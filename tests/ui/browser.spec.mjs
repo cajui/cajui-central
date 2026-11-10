@@ -1228,6 +1228,8 @@ test("a probe is given a type and calibrated from its live readings", async ({
   await expect(calibration).toBeHidden();
   await type.selectOption("soil_moisture");
   await expect(calibration).toContainText("Current reading: 3.00 V");
+  // This source reports over HTTP: it has no transmitter button to mention.
+  await expect(calibration).not.toContainText("pairing button");
   await calibration
     .getByRole("button", { name: "Mark dry", exact: true })
     .click();
@@ -1291,6 +1293,74 @@ test("a probe is given a type and calibrated from its live readings", async ({
     .click();
   await expect(row).toContainText("Voltage: 2.00 V");
   expect(errors).toEqual([]);
+});
+
+test("calibrating a transmitter's probe says its button sends a reading now", async ({
+  page,
+}) => {
+  const state = pairingSnapshot();
+  state.device_states.push({
+    source_id: "site",
+    device_id: "0000aa000000b002",
+    role: "transmitter",
+    receiver_id: "0000aa000000a001",
+    binding: "active",
+    received_at: state.generated_at,
+  });
+  state.workspace.devices = [
+    {
+      id: 1,
+      transport: "mqtt",
+      source: "site",
+      device: "0000aa000000b002",
+      name: "Garden",
+      location: "",
+      revision: 1,
+      received_at: state.generated_at,
+      interval: 300,
+    },
+  ];
+  state.workspace.sensors = [
+    {
+      id: 1,
+      device_id: 1,
+      sensor: "sensor-3",
+      name: "",
+      location: "",
+      revision: 0,
+      type: "",
+      calibration: { zero: null, full: null },
+      measurements: [
+        {
+          metric: "voltage",
+          unit: "V",
+          value: 2.5,
+          status: "ok",
+          received_at: state.generated_at,
+          interval: 300,
+        },
+      ],
+    },
+  ];
+  const html = await (await page.request.get("/sensors?lang=en-US")).text();
+  await page.route("**/sensors", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: html.replace(
+        /(<script type="application\/json" id="initial-state">)[\s\S]*?(<\/script>)/,
+        `$1${JSON.stringify(state).replaceAll("<", "\\u003c")}$2`,
+      ),
+    }),
+  );
+  await page.goto("/sensors");
+  await page.getByRole("button", { name: "Edit Voltage", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("combobox", { name: "Type", exact: true })
+    .selectOption("soil_moisture");
+  await expect(
+    dialog.getByRole("group", { name: "Calibration", exact: true }),
+  ).toContainText(t("sensor_types.wake_hint"));
 });
 
 test("language selection persists across navigation and server-rendered pages", async ({

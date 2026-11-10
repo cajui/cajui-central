@@ -155,7 +155,9 @@ voltage, have no type.
 A type is calibrated with two readings taken from the sensor itself. Put the probe in
 dry soil, wait for a new reading and choose **Mark dry**; do the same in wet soil with
 **Mark wet**; then save. The dialog shows the current reading and its age and follows new
-readings while it is open. No number is typed, and the two points must differ. Prefer the
+readings while it is open. A Cajuí transmitter reports at once when its pairing button
+is pressed briefly, and the dialog says so for its sensors, so a point need not wait for
+the next interval. No number is typed, and the two points must differ. Prefer the
 soil where the probe will stay over air and water, so the scale covers what it will see.
 
 Once both points exist the sensor reads as a level: a percentage, a bounded meter and

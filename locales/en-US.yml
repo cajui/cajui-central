@@ -276,6 +276,7 @@ en-US:
     generic: '%{measurement} (generic)'
     calibration: Calibration
     calibration_help: Mark each point while the sensor is in that condition. After moving the sensor, wait for a new reading before marking.
+    wake_hint: To skip the wait, press the pairing button (PRG) on the transmitter briefly. It sends a reading right away.
     current: 'Current reading: %{value} · %{age}'
     no_reading: No valid reading to mark right now.
     not_marked: not marked
