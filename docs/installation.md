@@ -31,9 +31,40 @@ has no login; never publish it on another interface. The broker listens on port 
 every interface so devices on the network can publish; see
 [Producers on the local network](mqtt.md#producers-on-the-local-network).
 
+### Server without a screen
+
+On a computer without a monitor, open the dashboard from another computer through an
+SSH local port forward. It keeps the dashboard on loopback at both ends:
+
+```sh
+ssh -N -L 127.0.0.1:8080:127.0.0.1:8080 user@server.local
+```
+
+Then open http://127.0.0.1:8080 on the computer running `ssh`; stopping `ssh` closes
+the forward. Use another first port if 8080 is busy there; the last one is the
+server's `CAJUI_PORT`. Keep the `127.0.0.1` bind address: without it, ssh may bind the
+forward to every interface according to `GatewayPorts`. While the forward runs, anyone
+or any program on that computer has the same access as a user of the server, including
+dashboard edits and device commands. Never add `-g` or set `GatewayPorts`. See
+[SECURITY.md](../SECURITY.md).
+
+### Broker address for receivers
+
+The receiver setup assistant shows the broker address for receivers when
+`CAJUI_RECEIVER_HOST` is set in `.env`, for example the server's LAN address or a
+name that resolves on the receivers' network:
+
+```sh
+CAJUI_RECEIVER_HOST=192.168.1.20
+```
+
+Central cannot infer it: inside Docker it only sees the container network. Without it,
+the assistant asks to choose the broker from the list on the receiver's setup page and
+offers address entry as an alternative.
+
 ## Go
 
-Requires Go 1.27.3+ and Make. `go test -race` also needs a C toolchain.
+Requires Go 1.27.4+ and Make. `go test -race` also needs a C toolchain.
 
 ```sh
 export CAJUI_API_TOKEN="$(openssl rand -hex 32)"
@@ -54,7 +85,8 @@ Open http://127.0.0.1:8080. The database is created at `data/cajui.db`.
 Compose also reads these optional values from a `.env` file (see `.env.example`):
 `CAJUI_PORT` (dashboard, default 8080, always on `127.0.0.1`), `CAJUI_MQTT_PORT`
 (default 1883), `CAJUI_MQTT_BIND` (default all interfaces; `127.0.0.1` keeps the broker
-local) and `CAJUI_VERSION` (image tag, default `main`).
+local), `CAJUI_RECEIVER_HOST` (broker address shown in the receiver setup assistant, default unset) and
+`CAJUI_VERSION` (image tag, default `main`).
 
 ## Sending a test reading
 

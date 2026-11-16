@@ -146,8 +146,10 @@ printf '%s\n' "$PASSWORD" | docker compose run --rm -T credentials import receiv
 The device connects to this computer's network address on port 1883. `import` keeps an
 existing device password when moving to a new installation.
 
-To let devices find the broker without typing its address, announce it on the local
-network while the stack runs:
+Cajuí receivers whose firmware searches the network find a broker on port 1883 of
+their own subnet without an announcement. Older receivers and other devices find it
+through mDNS, as does any receiver when the broker uses another port or subnet; announce
+it on the local network while the stack runs:
 
 ```sh
 sh scripts/advertise_broker.sh   # dns-sd on macOS, avahi-publish-service on Linux

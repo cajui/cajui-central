@@ -80,7 +80,7 @@ export async function openReceiverSetup(root, state, onDone) {
       if (step === 1) {
         content.innerHTML = `<p class="muted">${t("setup.on_phone")}</p><ol class="receiver-instructions"><li>${t("setup.press")}</li><li>${t("setup.join")}</li><li>${t("setup.open_page")}</li><li>${t("setup.save_wifi")}</li></ol><p class="muted">${t("setup.keep_open")}</p>`;
       } else if (step === 2) {
-        content.innerHTML = `<p>${t("setup.transfer_hint")}</p><dl class="receiver-values" id="receiver-values"></dl><details class="receiver-address" ${host ? "" : "open"}><summary>${t(host ? "setup.change_address" : "setup.missing_address")}</summary><p class="muted">${t("setup.address_help")}</p><form id="receiver-address-form"><label>${t("setup.host")}<input class="input" name="host" value="${e(host)}" required maxlength="253" autocomplete="off"></label><label>${t("broker.port")}<input class="input" name="port" value="${e(port)}" required type="number" min="1" max="65535"></label><button class="button" type="submit">${t("setup.use_address")}</button></form></details><details class="receiver-help"><summary>${t("setup.help")}</summary><p>${t("setup.copy_devices")}</p><p>${t("setup.shared_credential")}</p><p>${t("setup.transport", { mode: broker.tls ? "TLS" : "TCP" })}</p></details>`;
+        content.innerHTML = `<p>${t(host ? "setup.transfer_hint" : "setup.transfer_hint_list")}</p><dl class="receiver-values" id="receiver-values"></dl><details class="receiver-address"><summary>${t(host ? "setup.change_address" : "setup.missing_address")}</summary><p class="muted">${t("setup.address_help")}</p><form id="receiver-address-form"><label>${t("setup.host")}<input class="input" name="host" value="${e(host)}" required maxlength="253" autocomplete="off"></label><label>${t("broker.port")}<input class="input" name="port" value="${e(port)}" required type="number" min="1" max="65535"></label><button class="button" type="submit">${t("setup.use_address")}</button></form></details><details class="receiver-help"><summary>${t("setup.help")}</summary><p>${t("setup.broker_list")}</p><p>${t("setup.copy_devices")}</p><p>${t("setup.shared_credential")}</p><p>${t("setup.transport", { mode: broker.tls ? "TLS" : "TCP" })}</p></details>`;
         values();
         const form = content.querySelector("form");
         localizeValidation(form);
@@ -111,11 +111,6 @@ export async function openReceiverSetup(root, state, onDone) {
         render();
       });
       body.querySelector("#setup-next").addEventListener("click", () => {
-        if (step === 2 && !host) {
-          notice(t("setup.invalid_host"));
-          body.querySelector('[name="host"]').focus();
-          return;
-        }
         step++;
         showPassword = false;
         render();
@@ -133,13 +128,13 @@ export async function openReceiverSetup(root, state, onDone) {
     function values() {
       const dl = body.querySelector("#receiver-values");
       dl.replaceChildren();
-      function row(label, value, copyValue = value) {
+      function row(label, value, copyValue = value, missing = "—") {
         const wrap = document.createElement("div");
         wrap.className = "receiver-value-row";
         const dt = document.createElement("dt");
         dt.textContent = label;
         const dd = document.createElement("dd");
-        dd.textContent = value || "—";
+        dd.textContent = value || missing;
         const actions = document.createElement("div");
         actions.className = "receiver-value-actions";
         if (copyValue) {
@@ -158,7 +153,7 @@ export async function openReceiverSetup(root, state, onDone) {
         dl.append(wrap);
         return { dd, actions };
       }
-      row(t("setup.host"), host);
+      row(t("setup.host"), host, host, t("setup.host_from_list"));
       row(t("broker.port"), String(port));
       row(t("setup.user"), broker.receiver_username || "");
       const secret = row(

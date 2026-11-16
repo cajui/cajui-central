@@ -287,11 +287,14 @@ visible, keeping its original timestamp, availability and retained status.
 connect to the receiver and save Wi-Fi, transfer MQTT connection details, then find
 and confirm the receiver. Known values are selectable text with copy actions; the
 password is retrieved only when Show password is selected. An optional address editor
-changes only the values shown by the assistant, not server configuration. Missing
-addresses require entry before discovery. Back navigation preserves the details and
+changes only the values shown by the assistant, not server configuration. Without a
+configured address, the assistant asks the person to choose the broker from the
+"MQTT broker" list on the receiver's setup page (brokers the receiver found or that are
+announced through mDNS). The address editor stays available for a broker missing from
+the list, and the search step no longer requires an address. Back navigation preserves the details and
 hides the password again. Configure
-Wi-Fi on the receiver first, then enter the broker's LAN address, port and producer
-credentials. The wizard lists receivers that become online after it opens, excluding those already
+Wi-Fi on the receiver first, then choose or enter the broker's LAN address and enter
+the port and producer credentials. The wizard lists receivers that become online after it opens, excluding those already
 online at the start and retained snapshots. Confirm the receiver that appears, or
 choose yours if several connect. No identifier needs to be typed. It does not enroll transmitters or configure
 Wi-Fi remotely. Its two-second search polls `GET /ui-api/receiver-states`, a local
@@ -315,7 +318,7 @@ Optional server settings:
 | --- | --- |
 | `CAJUI_RECEIVER_USERNAME` | Dedicated producer username shown in setup |
 | `CAJUI_RECEIVER_PASSWORD_FILE` | Operator-configured producer password file |
-| `CAJUI_RECEIVER_HOST` | Explicit broker address reachable from receivers; if unset, setup requires manual entry |
+| `CAJUI_RECEIVER_HOST` | Explicit broker address reachable from receivers; if unset, setup points to the receiver's broker list, with manual entry as an alternative |
 | `CAJUI_RECEIVER_PORT` | Externally reachable broker port |
 
 Central does not infer the receiver address from its own broker connection URL:
