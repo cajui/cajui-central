@@ -61,7 +61,7 @@ offers address entry as an alternative.
 
 ## Go
 
-Requires Go 1.27.3+ and Make. `go test -race` also needs a C toolchain.
+Requires Go 1.27.4+ and Make. `go test -race` also needs a C toolchain.
 
 ```sh
 export CAJUI_API_TOKEN="$(openssl rand -hex 32)"
