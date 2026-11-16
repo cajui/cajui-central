@@ -31,6 +31,20 @@ has no login; never publish it on another interface. The broker listens on port 
 every interface so devices on the network can publish; see
 [Producers on the local network](mqtt.md#producers-on-the-local-network).
 
+### Server without a screen
+
+On a computer without a monitor, open the dashboard from another computer through an
+SSH local port forward. It keeps the dashboard on loopback at both ends:
+
+```sh
+ssh -N -L 8080:127.0.0.1:8080 user@server.local
+```
+
+Then open http://127.0.0.1:8080 on the computer running `ssh`; stopping `ssh` closes
+the forward. Use another first port if 8080 is busy there. Anyone who can use that
+computer can open the dashboard while the forward runs, so do not add `-g` or bind the
+forward to another address. See [SECURITY.md](../SECURITY.md).
+
 ### Broker address for receivers
 
 The receiver setup assistant shows the broker address that receivers should use when
