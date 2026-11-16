@@ -37,13 +37,16 @@ On a computer without a monitor, open the dashboard from another computer throug
 SSH local port forward. It keeps the dashboard on loopback at both ends:
 
 ```sh
-ssh -N -L 8080:127.0.0.1:8080 user@server.local
+ssh -N -L 127.0.0.1:8080:127.0.0.1:8080 user@server.local
 ```
 
 Then open http://127.0.0.1:8080 on the computer running `ssh`; stopping `ssh` closes
-the forward. Use another first port if 8080 is busy there. Anyone who can use that
-computer can open the dashboard while the forward runs, so do not add `-g` or bind the
-forward to another address. See [SECURITY.md](../SECURITY.md).
+the forward. Use another first port if 8080 is busy there; the last one is the
+server's `CAJUI_PORT`. Keep the `127.0.0.1` bind address: without it, ssh may bind the
+forward to every interface according to `GatewayPorts`. While the forward runs, anyone
+or any program on that computer has the same access as a user of the server, including
+dashboard edits and device commands. Never add `-g` or set `GatewayPorts`. See
+[SECURITY.md](../SECURITY.md).
 
 ### Broker address for receivers
 

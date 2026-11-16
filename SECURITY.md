@@ -1,12 +1,14 @@
 # Security
 
 Early-stage software for local use. There is no login, TLS, roles or session policy
-yet, so do not expose it through a proxy or tunnel. The web page and `/healthz` are
-open to anyone on the machine; the API requires a Bearer token. The one exception is an
-administrator's SSH local port forward to a server without a screen
-([installation](docs/installation.md#server-without-a-screen)): it stays on loopback at
-both ends and opens the page to whoever can use the administrator's computer, so never
-add `-g`, bind it to another address, or replace it with a public tunnel.
+yet, so do not expose it through a proxy or tunnel. The one exception is an
+administrator's SSH local port forward to a server without a screen, bound to
+`127.0.0.1` at both ends ([installation](docs/installation.md#server-without-a-screen)).
+While it runs, anyone or any program on the administrator's computer has the same access
+as a user of the server, including dashboard edits and device commands. Never add `-g`,
+set `GatewayPorts`, bind it to another address, or replace it with a public tunnel.
+The web page and `/healthz` are open to anyone on the machine; the API requires a
+Bearer token.
 
 The binary binds loopback addresses only. `CAJUI_ALLOW_NON_LOOPBACK=1` lifts that
 restriction for containers, where `compose.yaml` publishes the port on the host's
