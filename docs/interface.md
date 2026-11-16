@@ -288,10 +288,10 @@ connect to the receiver and save Wi-Fi, transfer MQTT connection details, then f
 and confirm the receiver. Known values are selectable text with copy actions; the
 password is retrieved only when Show password is selected. An optional address editor
 changes only the values shown by the assistant, not server configuration. Without a
-configured address, the assistant asks to choose the broker from the list on the
-receiver's setup page, which receiver firmware that searches the network shows; the
-address editor stays available for older firmware or a broker missing from the list,
-and discovery does not wait for it. Back navigation preserves the details and
+configured address, the assistant asks the person to choose the broker from the
+"MQTT broker" list on the receiver's setup page (brokers the receiver found or that are
+announced through mDNS). The address editor stays available for a broker missing from
+the list, and the search step no longer requires an address. Back navigation preserves the details and
 hides the password again. Configure
 Wi-Fi on the receiver first, then choose or enter the broker's LAN address and enter
 the port and producer credentials. The wizard lists receivers that become online after it opens, excluding those already

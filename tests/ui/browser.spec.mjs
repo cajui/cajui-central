@@ -2629,11 +2629,18 @@ test("receiver setup without an address points to the receiver's broker list", a
   );
   await page.locator("#setup-next").click();
   await expect(page.locator("#receiver-step-content > p").first()).toHaveText(
-    /toque em “Use” ao lado do broker encontrado/,
+    /escolha o broker encontrado/,
   );
   await expect(page.locator("#receiver-values")).toContainText(
     "Escolha na lista da página do receptor",
   );
+  await expect(
+    page
+      .locator("#receiver-values .receiver-value-row")
+      .first()
+      .locator("button"),
+  ).toHaveCount(0);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await expect(page.locator(".receiver-address")).not.toHaveAttribute(
     "open",
     "",
@@ -2646,6 +2653,12 @@ test("receiver setup without an address points to the receiver's broker list", a
   await page.locator(".receiver-address summary").click();
   await page.locator('[name="host"]').fill("localhost");
   await page.locator('#receiver-address-form [type="submit"]').click();
+  await expect(page.locator("#setup-error")).toHaveText(
+    "Informe um endereço do broker acessível pelo receptor, sem protocolo de URL nem espaços.",
+  );
+  await expect(page.locator("#receiver-values")).toContainText(
+    "Escolha na lista da página do receptor",
+  );
   await expect(page.locator("#receiver-step-title")).toHaveText(
     "Dados de conexão",
   );
