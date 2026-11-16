@@ -2611,7 +2611,7 @@ test("receiver wizard retrieves secrets explicitly and waits for new connections
   expect(await page.content()).not.toContain("fixture-secret");
 });
 
-test("receiver setup asks for a missing address only in the details step", async ({
+test("receiver setup without an address points to the receiver's broker list", async ({
   page,
 }) => {
   await page.route("**/ui-api/broker", (r) =>
@@ -2628,9 +2628,22 @@ test("receiver setup asks for a missing address only in the details step", async
     "Conectar ao receptor",
   );
   await page.locator("#setup-next").click();
-  await expect(page.locator(".receiver-address")).toHaveAttribute("open", "");
+  await expect(page.locator("#receiver-step-content > p").first()).toHaveText(
+    /toque em “Use” ao lado do broker encontrado/,
+  );
+  await expect(page.locator("#receiver-values")).toContainText(
+    "Escolha na lista da página do receptor",
+  );
+  await expect(page.locator(".receiver-address")).not.toHaveAttribute(
+    "open",
+    "",
+  );
   await page.locator("#setup-next").click();
-  await expect(page.locator("#setup-error")).not.toBeEmpty();
+  await expect(page.locator("#receiver-step-title")).toHaveText(
+    "Encontrar receptor",
+  );
+  await page.locator("#setup-back").click();
+  await page.locator(".receiver-address summary").click();
   await page.locator('[name="host"]').fill("localhost");
   await page.locator('#receiver-address-form [type="submit"]').click();
   await expect(page.locator("#receiver-step-title")).toHaveText(
@@ -2639,6 +2652,9 @@ test("receiver setup asks for a missing address only in the details step", async
   await page.locator('[name="host"]').fill("192.168.1.20");
   await page.locator('#receiver-address-form [type="submit"]').click();
   await expect(page.locator("#receiver-values")).toContainText("192.168.1.20");
+  await expect(page.locator("#receiver-step-content > p").first()).toHaveText(
+    /Se ela listar este endereço/,
+  );
   await expect(page.locator(".receiver-address")).not.toHaveAttribute(
     "open",
     "",
