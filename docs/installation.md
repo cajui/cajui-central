@@ -47,7 +47,7 @@ forward to another address. See [SECURITY.md](../SECURITY.md).
 
 ### Broker address for receivers
 
-The receiver setup assistant shows the broker address that receivers should use when
+The receiver setup assistant shows the broker address for receivers when
 `CAJUI_RECEIVER_HOST` is set in `.env`, for example the server's LAN address or a
 name that resolves on the receivers' network:
 
@@ -82,7 +82,7 @@ Open http://127.0.0.1:8080. The database is created at `data/cajui.db`.
 Compose also reads these optional values from a `.env` file (see `.env.example`):
 `CAJUI_PORT` (dashboard, default 8080, always on `127.0.0.1`), `CAJUI_MQTT_PORT`
 (default 1883), `CAJUI_MQTT_BIND` (default all interfaces; `127.0.0.1` keeps the broker
-local), `CAJUI_RECEIVER_HOST` (broker address shown to receivers, default unset) and
+local), `CAJUI_RECEIVER_HOST` (broker address shown in the receiver setup assistant, default unset) and
 `CAJUI_VERSION` (image tag, default `main`).
 
 ## Sending a test reading
